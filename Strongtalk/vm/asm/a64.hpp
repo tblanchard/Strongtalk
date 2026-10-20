@@ -106,6 +106,8 @@ inline insn sbfm(int d, int n, int immr, int imms) { return 0x93400000 | ((immr 
 inline insn lsl_imm(int d, int n, int s) { return ubfm(d, n, (64 - s) & 63, 63 - s); }
 inline insn lsr_imm(int d, int n, int s) { return ubfm(d, n, s, 63); }
 inline insn asr_imm(int d, int n, int s) { return sbfm(d, n, s, 63); }
+inline insn bfm (int d, int n, int immr, int imms) { return 0xB3400000 | ((immr & 63) << 16) | ((imms & 63) << 10) | (R(n) << 5) | R(d); }
+inline insn bfxil(int d, int n, int lsb, int width) { return bfm(d, n, lsb, lsb + width - 1); }	// d<width-1:0> = n<lsb+width-1:lsb>
 inline insn sxtb(int d, int n)           { return sbfm(d, n, 0, 7); }
 inline insn sxth(int d, int n)           { return sbfm(d, n, 0, 15); }
 inline insn sxtw(int d, int n)           { return sbfm(d, n, 0, 31); }
@@ -204,6 +206,8 @@ inline insn scvtf_d_x(int d, int n)    { return 0x9E620000 | (R(n) << 5) | R(d);
 inline insn scvtf_d_w(int d, int n)    { return 0x1E620000 | (R(n) << 5) | R(d); }	// w -> d
 inline insn fcvtzs_x_d(int d, int n)   { return 0x9E780000 | (R(n) << 5) | R(d); }	// d -> x (truncate)
 inline insn fcvtzs_w_d(int d, int n)   { return 0x1E780000 | (R(n) << 5) | R(d); }	// d -> w (truncate)
+inline insn fcvtns_x_d(int d, int n)   { return 0x9E600000 | (R(n) << 5) | R(d); }	// d -> x (round to nearest even)
+inline insn fcvtns_w_d(int d, int n)   { return 0x1E600000 | (R(n) << 5) | R(d); }	// d -> w (round to nearest even)
 inline insn fcvt_s_d(int d, int n)     { return 0x1E624000 | (R(n) << 5) | R(d); }	// d -> s
 inline insn fcvt_d_s(int d, int n)     { return 0x1E22C000 | (R(n) << 5) | R(d); }	// s -> d
 

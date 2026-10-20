@@ -37,6 +37,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "tag.hpp"
 #include "top.hpp"
 #include "init.hpp"
+#include "assemblerTest_arm64.hpp"
 #include "debug.hpp"
 // Add new initialization/finalization methods to the macro below; your
 // functions must be parameterless and must be named after the .c file
@@ -96,6 +97,9 @@ EXIT_DO(DEFINE_TEMPLATE)
 
 void init_globals() {
   ResourceMark rm;
+#ifdef STRONGTALK_ARM64
+  if (TestArm64Assembler) exit(arm64_assembler_test() ? 0 : 1);
+#endif
   INIT_DO(CALL_TEMPLATE)
 #ifdef DELTA_COMPILER
   COMPILER_INIT_DO(CALL_TEMPLATE)

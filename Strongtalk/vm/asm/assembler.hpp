@@ -120,18 +120,24 @@ class Address: public ValueObj {
   Register		_base;
   Register		_index;
   ScaleFactor		_scale;
-  int			_disp;
+  intptr_t		_disp;		// word sized: an absolute address if there is no base register
   relocInfo::relocType	_rtype;
 
  public:
   Address();
-  Address(int disp, relocInfo::relocType rtype);
+  Address(intptr_t disp, relocInfo::relocType rtype);
   Address(Register base, int disp = 0, relocInfo::relocType rtype = relocInfo::none);
   Address(Register base, Register index, ScaleFactor scale, int disp = 0, relocInfo::relocType rtype = relocInfo::none);
 
   friend class Assembler;
 };
 
+
+#ifdef STRONGTALK_ARM64
+
+#include "assembler_arm64.hpp"
+
+#else // x86
 
 // The assembler for the new backend
 
@@ -470,6 +476,8 @@ class MacroAssembler: public Assembler {
   static void inspector(oop edi, oop esi, oop ebp, oop esp, oop ebx, oop edx, oop ecx, oop eax, char* eip);
   void inspect(char* title = NULL);
 };
+
+#endif // STRONGTALK_ARM64
 
 
 #endif // VM_ASM_ASSEMBLER_HPP_HPP

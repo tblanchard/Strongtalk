@@ -259,17 +259,34 @@ Design decisions:
 - JIT memory: mmap MAP_JIT, pthread_jit_write_protect_np around writes, sys_icache_invalidate after.
 
 Phases:
-- [ ] C1 arm64 assembler (x86-shaped API) + code buffer + JIT memory; encoding tests vs clang/llvm-objdump.
+- [x] C1 arm64 assembler (x86-shaped API) + code buffer + JIT memory; encoding tests vs clang/llvm-objdump.
       - [x] asm/a64.hpp: arm64 encoder (integer, load/store all modes, branches, literals, FP); verified by
             porting/a64test.sh (116 forms, 0 mismatches vs `clang -arch arm64` + otool).
-      - [ ] asm/assembler_arm64.cpp: x86-shaped Assembler/MacroAssembler on a64.hpp. Register map planned:
-            eax=x0 ecx=x1 edx=x2 ebx=x19 esi=x20 edi=x21 esp=x28 (Delta sp) ebp=x29; scratch x16/x17, x9-x15.
-            Calls within Delta code push the return address on the Delta stack (x86 frame layout); patchable
-            sites = ldr x16, literal + br x16 with an 8-byte aligned literal (reloc offset -> literal).
-            Flags: logical ops set flags lazily (tst before jcc); carry conditions depend on the last flag op
-            (add-like: C = carry; sub/cmp: x86 below = arm64 LO).
-      - [ ] JIT memory (MAP_JIT, pthread_jit_write_protect_np, sys_icache_invalidate) + run-time tests that
-            execute generated code (per-op semantics vs expected x86 results).
+      - [x] asm/assembler_arm64.{hpp,cpp}: x86-shaped Assembler/MacroAssembler on a64.hpp, selected by
+            STRONGTALK_ARM64 in assembler.hpp (x86 implementation unchanged, under #else). Address::_disp is
+            word sized. Register map eax=x0 ecx=x1 edx=x2 ebx=x19 esp=x28 ebp=x29 esi=x20 edi=x21; scratch
+            x16/x17 (+x9-x11). All "l" ops 64-bit; unsigned immediates zero-extend (Floats::magic).
+            - Delta calls push the return address on the Delta stack (adr/str); ret pops it. Patchable
+              call(entry) = adr, str, ldr literal, br, 8-byte literal (sizeOfCall = 24, return address = end,
+              reloc -> literal); jmp(entry) = ldr literal, br, literal; oops (non-smi) are literals too.
+            - C calls (call_C*): last Delta frame set, return address stored at esp[-1], args loaded from the
+              Delta stack (esp[0..7] -> x0..x7) or moved from registers, blr; C preserves ebx/esi/edi/esp/ebp.
+            - Flags: logical ops set flags eagerly (ands / tst); carry conditions follow the kind of the last
+              flag op (sub: x86 below = LO; add: carrySet = HS); imul overflow via smulh; adc/sbb convert C.
+              above/belowEqual after add, rcl/shld/shrd and carry after shifts are not supported (fatal).
+            - ic_info = movz xzr / movk xzr (32-bit info: offset << 8 | flags), executable no-ops.
+            - x87 emulated on d8..d15 (static stack depth); fprem via fmod; fnstsw_ax builds C0/C2/C3 from the
+              arm64 fcmp flags; fistp rounds to nearest even.
+            - Labels: unbound uses chained through the instruction offset fields (b, b.cond, adr, ic_info).
+      - [x] JIT memory (MAP_JIT, pthread_jit_write_protect_np, sys_icache_invalidate) in the test harness.
+      - [x] asm/assemblerTest_arm64.cpp (+TestArm64Assembler): executes generated code and compares with x86
+            semantics on 64-bit words: 89088 checks, 0 failures (immediates, arithmetic, shifts, all conditions
+            after cmp/sub/add/test/or/xor, cmov, adc/sbb, imul overflow, idiv, mul, memory operands of all
+            forms, push/pop/pushad, enter/leave, labels, call/ret, call/jmp/jcc to entries, ic_info encoding,
+            C calls with register/stack args, last Delta frame, store check, x87 ops/compares/conversions).
+      - Notes for C2/C3: movl to 32-bit int fields must use 32-bit stores (all movl are 64-bit); call(entry, rtype)
+        is the Delta convention - calls of C functions (primitives, DLLs) must use call_C / call_native; idivl
+        expects edx = sign extension of eax (64-bit cdq); x86_imm32() callers must pass full words.
 - [ ] C2 runtime glue: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
 - [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).

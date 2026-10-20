@@ -165,7 +165,7 @@ Address::Address() {
 }
 
 
-Address::Address(int disp, relocInfo::relocType rtype) {
+Address::Address(intptr_t disp, relocInfo::relocType rtype) {
   _base  = noreg;
   _index = noreg;
   _scale = no_scale;
@@ -192,6 +192,8 @@ Address::Address(Register base, Register index, ScaleFactor scale, int disp, rel
   _rtype = rtype;
 }
 
+
+#ifndef STRONGTALK_ARM64	// arm64: see assembler_arm64.cpp
 
 // Implementation of Assembler
 
@@ -1591,3 +1593,5 @@ void MacroAssembler::inspect(char* title) {
     stdOut->print_cr("cannot call inspector for \"%s\" - no entry point yet", s);
   }
 }
+
+#endif // STRONGTALK_ARM64

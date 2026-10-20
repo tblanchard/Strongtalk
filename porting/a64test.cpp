@@ -49,6 +49,9 @@ int main() {
   T(sxth(0,1), "sxth x0, w1");
   T(sxtw(0,1), "sxtw x0, w1");
   T(uxtb(0,1), "ubfx x0, x1, #0, #8");
+  T(bfxil(0,1,0,8), "bfxil x0, x1, #0, #8");
+  T(bfxil(2,16,0,16), "bfxil x2, x16, #0, #16");
+  T(bfxil(0,16,56,8), "bfxil x0, x16, #56, #8");
   T(mul(0,1,2), "mul x0, x1, x2");
   T(madd(0,1,2,3), "madd x0, x1, x2, x3");
   T(msub(0,1,2,3), "msub x0, x1, x2, x3");
@@ -113,6 +116,8 @@ int main() {
   T(scvtf_d_w(0,1), "scvtf d0, w1");
   T(fcvtzs_x_d(0,1), "fcvtzs x0, d1");
   T(fcvtzs_w_d(0,1), "fcvtzs w0, d1");
+  T(fcvtns_x_d(0,1), "fcvtns x0, d1");
+  T(fcvtns_w_d(0,1), "fcvtns w0, d1");
   T(fcvt_s_d(0,1), "fcvt s0, d1");
   T(fcvt_d_s(0,1), "fcvt d0, s1");
   T(fldst_uimm(LDR,3,0,1,16), "ldr d0, [x1, #16]");
