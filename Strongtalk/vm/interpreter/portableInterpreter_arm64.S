@@ -126,6 +126,7 @@ _compiled_to_interpreted:
         mov     x3, x29                 // fp of the compiled caller
         mov     x4, sp                  // out
         bl      _interpret_from_compiled
+continue_compiled:                      // sp: the CompiledReturn filled in by the interpreter
         ldr     x0, [sp, #0]            // eax := result
         ldr     x28, [sp, #8]           // esp
         ldr     x29, [sp, #16]          // ebp
@@ -134,5 +135,30 @@ _compiled_to_interpreted:
         ldr     x16, [sp, #48]          // continuation
         add     sp, sp, #64
         br      x16
+
+
+
+// ---------------------------------------------------------------------------
+// restart_primitiveValue: redoes the evaluation of a block (jumped to by the zombie block and
+// deoptimize block stubs after patching the closure):
+//
+// eax = block closure, esp: return address of the primitiveValue call, the block's arguments,
+// the closure.
+
+        .equ    METHOD_OR_ENTRY, 15     // blockClosureOopDesc::method_or_entry_byte_offset() (tagged)
+
+        .p2align 2
+        .globl _restart_primitiveValue
+_restart_primitiveValue:
+        ldur    x9, [x0, #METHOD_OR_ENTRY]
+        tst     x9, #1                  // Mem_Tag: methodOop
+        b.ne    1f
+        br      x9                      // compiled block: its jump table entry
+1:      sub     sp, sp, #64             // interpreted block: as compiled_to_interpreted
+        mov     x1, x28                 // sp (the return address is at sp[0])
+        mov     x2, x29                 // fp
+        mov     x3, sp                  // out
+        bl      _interpret_block_from_compiled
+        b       continue_compiled
 
 #endif

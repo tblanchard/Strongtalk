@@ -281,6 +281,23 @@ doubleOop Interpreter::oopify_FloatValue() {
 
 int* Interpreter::_invocation_counter_addr = NULL;
 
+#ifndef STRONGTALK_X86_BACKEND
+// portable interpreter: the limit is a variable (the x86 interpreter patches its method entry code)
+static int portable_invocation_counter_limit = -1;
+
+void Interpreter::set_invocation_counter_limit(int new_limit) {
+  assert(0 <= new_limit && new_limit <= methodOopDesc::_invocation_count_max, "illegal counter limit");
+  portable_invocation_counter_limit = new_limit;
+}
+
+int Interpreter::get_invocation_counter_limit() {
+  if (portable_invocation_counter_limit < 0) {
+    portable_invocation_counter_limit = InvocationCounterLimit < methodOopDesc::_invocation_count_max
+                                      ? InvocationCounterLimit : methodOopDesc::_invocation_count_max;
+  }
+  return portable_invocation_counter_limit;
+}
+#else
 void Interpreter::set_invocation_counter_limit(int new_limit) {
   assert(_invocation_counter_addr != NULL, "invocation counter address unknown");
   assert(0 <= new_limit && new_limit <= methodOopDesc::_invocation_count_max, "illegal counter limit");
@@ -293,6 +310,7 @@ int Interpreter::get_invocation_counter_limit() {
   assert(_invocation_counter_addr != NULL, "invocation counter address unknown");
   return get_unsigned_bitfield(*_invocation_counter_addr, methodOopDesc::_invocation_count_offset, methodOopDesc::_invocation_count_width);
 }
+#endif
 
 
 // Interpreter initialization

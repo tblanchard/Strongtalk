@@ -139,6 +139,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "abort.hpp"
 #include "blockOop.hpp"
 #include "doubleOop.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
 #include <setjmp.h>
 
 // ---------------------------------------------------------------------------
@@ -366,10 +368,11 @@ class PortableInterpreter {
   // compiled code
   bool call_compiled(char* entry, oop recv, ReturnPoint rp);	// false if returning to C
   void activate_from_compiled(methodOop m, oop recv, oop temp0);
+  void count_invocation(methodOop m);
 
   friend oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is_block);
-  friend oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args);
-  friend void interpret_from_compiled_activation(methodOop m, oop receiver, oop* sp, intptr_t* fp, CompiledReturn* out);
+  friend oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, bool is_block);
+  friend void interpret_from_compiled_activation(methodOop m, oop receiver, oop temp0, oop* sp, intptr_t* fp, CompiledReturn* out);
 };
 
 // ---------------------------------------------------------------------------
@@ -384,8 +387,7 @@ void PortableInterpreter::activate(methodOop m, oop recv, oop temp0, ReturnPoint
   push((oop) m->codes());
   push(temp0);
   hp = m->codes();
-  int count = m->invocation_count();
-  if (count < methodOopDesc::_invocation_count_max) m->set_invocation_count(count + 1);
+  count_invocation(m);
 }
 
 void PortableInterpreter::activate_from_entry(methodOop m, oop recv, oop temp0) {
@@ -397,8 +399,7 @@ void PortableInterpreter::activate_from_entry(methodOop m, oop recv, oop temp0) 
   push((oop) m->codes());
   push(temp0);
   hp = m->codes();
-  int count = m->invocation_count();
-  if (count < methodOopDesc::_invocation_count_max) m->set_invocation_count(count + 1);
+  count_invocation(m);
 }
 
 // Calls compiled code (eax = recv; the arguments are on the stack, the callee pops them).
@@ -425,8 +426,21 @@ void PortableInterpreter::activate_from_compiled(methodOop m, oop recv, oop temp
   push((oop) m->codes());
   push(temp0);
   hp = m->codes();
-  int count = m->invocation_count();
-  if (count < methodOopDesc::_invocation_count_max) m->set_invocation_count(count + 1);
+  count_invocation(m);
+}
+
+// Counts the invocation of the method of the (complete) current frame; at the limit the
+// recompiler is called (cf. the x86 interpreter's method entry). Execution continues in
+// the interpreter (the x86 interpreter ignores a new nmethod too).
+void PortableInterpreter::count_invocation(methodOop m) {
+  int count = m->invocation_count() + 1;
+  if (count > methodOopDesc::_invocation_count_max) return;
+  m->set_invocation_count(count);
+  if (UseArm64Compiler && UseRecompilation && count >= Interpreter::get_invocation_counter_limit()) {
+    enter_C(hp);
+    Recompilation::methodOop_invocation_counter_overflow(receiver(), m);
+    leave_C();			// hp: the method may have been moved
+  }
 }
 
 // Removes the current frame and nof_args arguments; continues the caller.
@@ -712,9 +726,13 @@ bool PortableInterpreter::call_primitive(bool can_fail) {
 // primitive's arguments (block, arg1 ... argN) as in the x86 interpreter.
 bool PortableInterpreter::primitive_value(int nof_args, bool can_fail) {
   blockClosureOop blk = blockClosureOop(sp[nof_args]);
+  saved_hp() = hp;
+  if (blk->isCompiledBlock()) {
+    // compiled block: eax = the closure; it pops its arguments and the closure
+    return call_compiled(blk->jump_table_entry()->entry_point(), blk, can_fail ? rp_primitive_can_fail : rp_primitive);
+  }
   methodOop m = blk->method();
   contextOop ctx = blk->lexical_scope();
-  saved_hp() = hp;
   activate(m, ctx, ctx, can_fail ? rp_primitive_can_fail : rp_primitive);
   return true;
 }
@@ -1338,7 +1356,12 @@ bool PortableInterpreter::run() {
 // Calls method (or, if is_block, the block method of the closure receiver) with
 // receiver and arguments. Builds an entry frame on the Delta stack (see frame.hpp,
 // frame_next_Delta_fp_offset) and runs the interpreter until the method returns.
+oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, bool is_block);
+
 oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is_block) {
+  if (is_block && blockClosureOop(receiver)->isCompiledBlock()) {
+    return call_compiled_from_C(blockClosureOop(receiver)->jump_table_entry()->entry_point(), receiver, nof_args, args, true);
+  }
   DeltaStack* stack = delta_stack();
   intptr_t* saved_fp = last_Delta_fp;
   oop*      saved_sp = last_Delta_sp;
@@ -1390,7 +1413,7 @@ oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is
 
 // Calls compiled code from C (call_delta with a jump table entry): as call_delta_entry, but
 // the callee is compiled; it returns to return_from_Delta.
-oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args) {
+oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, bool is_block) {
   DeltaStack* stack = delta_stack();
   intptr_t* saved_fp = last_Delta_fp;
   oop*      saved_sp = last_Delta_sp;
@@ -1403,6 +1426,7 @@ oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args) {
   *--sp = (oop) saved_fp;			// fp[-1]: next_Delta_fp
   *--sp = (oop) saved_sp;			// fp[-2]: next_Delta_sp
   last_Delta_fp = NULL;
+  if (is_block) *--sp = receiver;		// blocks pop the closure (the first argument of primitiveValue)
   for (int i = 0; i < nof_args; i++) *--sp = args[i];
 
   CompiledReturn r;
@@ -1424,13 +1448,13 @@ oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args) {
 
 // Runs an interpreted method called from compiled code (see compiled_to_interpreted): sp points
 // to the return address into compiled code, fp is the compiled caller's frame.
-void interpret_from_compiled_activation(methodOop m, oop receiver, oop* sp, intptr_t* fp, CompiledReturn* out) {
+void interpret_from_compiled_activation(methodOop m, oop receiver, oop temp0, oop* sp, intptr_t* fp, CompiledReturn* out) {
   intptr_t* saved_fp = last_Delta_fp;
   oop*      saved_sp = last_Delta_sp;
   last_Delta_fp = NULL;
 
   PortableInterpreter in(fp, sp, delta_stack());
-  in.activate_from_compiled(m, receiver, nilObj);
+  in.activate_from_compiled(m, receiver, temp0);
 
   Activation act;
   act.previous = current_activation;
@@ -1459,14 +1483,21 @@ void interpret_from_compiled_activation(methodOop m, oop receiver, oop* sp, intp
 }
 
 extern "C" void interpret_from_compiled(methodOop m, oop receiver, oop* sp, intptr_t* fp, CompiledReturn* out) {
-  interpret_from_compiled_activation(m, receiver, sp, fp, out);
+  interpret_from_compiled_activation(m, receiver, nilObj, sp, fp, out);
+}
+
+// restart_primitiveValue (portableInterpreter_arm64.S) for an interpreted block: the block
+// method runs with the context as receiver and temp0 (cf. primitive_value)
+extern "C" void interpret_block_from_compiled(blockClosureOop blk, oop* sp, intptr_t* fp, CompiledReturn* out) {
+  contextOop ctx = blk->lexical_scope();
+  interpret_from_compiled_activation(blk->method(), ctx, ctx, sp, fp, out);
 }
 
 extern "C" oop call_delta(void* method, oop receiver, int nofArgs, oop* args) {
   oop m = (oop) method;
   if (m->is_mem() && m->is_method()) return call_delta_entry(methodOop(m), receiver, nofArgs, args, false);
   // a jump table entry (compiled code)
-  return call_compiled_from_C((char*) method, receiver, nofArgs, args);
+  return call_compiled_from_C((char*) method, receiver, nofArgs, args, false);
 }
 
 // The method entry for compiled code (the PIC and megamorphic IC stubs jump to it)
@@ -1552,6 +1583,8 @@ class SelfSendFinder : public ObjectClosure {
 };
 
 static intptr_t test_home_id;
+
+extern "C" void restart_primitiveValue();
 
 bool transitions_arm64_test() {
   ResourceMark rm;
@@ -1669,6 +1702,41 @@ bool transitions_arm64_test() {
       ic->set(send_code, first, second);	// restore the method
       lprintf("  self send method: %s\n", m->selector()->as_string());
     }
+  }
+
+  // compiled blocks: primitiveValue from C (as compiled code calls it) and restart_primitiveValue
+  { char *blk_code, *restarter;
+    { JITWriteScope write_code;
+      { CodeBuffer cb(code + 6144, 1024); MacroAssembler mm(&cb);	// [:x | x + 1000] (compiled)
+        blk_code = mm.pc();
+        mm.enter();
+        mm.movl(eax, Address(ebp, 2 * oopSize));	// the argument
+        mm.addl(eax, (int) (intptr_t) as_smiOop(1000));
+        mm.leave();
+        mm.ret(2 * oopSize);				// the argument and the closure (cf. ReturnNode)
+      }
+      { CodeBuffer cb(code + 7168, 1024); MacroAssembler mm(&cb);	// compiled method: restart its block
+        restarter = mm.pc();
+        mm.enter();
+        mm.pushl(eax);				// the closure (receiver)
+        mm.movl(edx, Address(ebp, 2 * oopSize));
+        mm.pushl(edx);				// the argument
+        mm.call((char*) &restart_primitiveValue, relocInfo::runtime_call_type);
+        mm.movl(ecx, esp);
+        mm.subl(ecx, ebp);			// 0 if the block popped the argument and the closure
+        mm.addl(eax, ecx);
+        mm.leave();
+        mm.ret(1 * oopSize);
+      }
+    }
+    os::flush_icache(code + 6144, 2048);
+    blockClosureOop blk = blockClosureOopDesc::create_clean_block(1, blk_code);
+    T_CHECK(blk->isCompiledBlock(), "compiled clean block");
+    r = primitiveValue1(as_smiOop(5), blk);
+    T_CHECK(r == as_smiOop(1005) && !have_nlr_through_C, "primitiveValue of a compiled block from C");
+    args[0] = as_smiOop(6);
+    r = call_delta(restarter, blk, 1, args);
+    T_CHECK(r == as_smiOop(1006), "restart_primitiveValue of a compiled block, esp balanced");
   }
 
   // nested: C -> compiled -> interpreted -> ... and back, several times (the save areas nest)

@@ -136,6 +136,7 @@ class debugFlags {
   develop(TraceBootstrap                     , false, "Trace the bootstrap readin"                                                  ) \
   develop(PrintJITModeFaults                 , false, "Print the number of code memory mode switches by faults at exit"          ) \
   develop(TestArm64Runtime                   , false, "Run the arm64 runtime tests after initialization and exit"                 ) \
+  develop(UseArm64Compiler                   , false, "Compile on arm64 (interpreter invocation counter overflows trigger recompilation)") \
   develop(TestArm64Assembler                 , false, "Run the arm64 assembler tests at startup and exit"                         ) \
   develop(VerifyFileOut                      , false, "Verify the file out form of all methods when quitting"                      ) \
   develop(TraceMethodPrims                   , false, "Trace method prims"                                                          ) \

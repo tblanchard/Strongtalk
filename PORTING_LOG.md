@@ -370,6 +370,24 @@ Phases:
         a patched inline cache (normal return through the return point slot, and NLR to the interpreted home),
         1000 nested round trips. Not covered yet: compiled blocks (primitiveValue / restart_primitiveValue),
         deoptimization (unpack frames), NLRs that start in the interpreter and pass compiled frames (C2e/C4).
+  - [ ] C2e (part 1 done):
+        - [x] Recompilation trigger: the portable interpreter counts invocations (methods called by sends, from C
+              and from compiled code) and calls Recompilation::methodOop_invocation_counter_overflow at
+              Interpreter::get_invocation_counter_limit() (a variable on arm64; the x86 interpreter patched its
+              entry code), then continues interpreting (as x86). Gated by develop flag UseArm64Compiler (false
+              until the code generator is ported, C3).
+        - [x] NLRs through C into compiled code: call_C with an NLR test point checks have_nlr_through_C after
+              the call (the portable primitiveValue returns from C with it set) and continues the NLR with
+              eax/edi/esi from nlr_result/nlr_home/nlr_home_id (clearing the flag).
+        - [x] Compiled blocks: primitive_value (interpreter) and primitiveValueN/call_delta_entry (C) call the
+              block's jump table entry when the closure is compiled (the block pops its arguments and the
+              closure); restart_primitiveValue (.S, for the zombie/deoptimize block stubs) jumps to compiled
+              blocks or interprets block methods (interpret_block_from_compiled).
+              Tested: primitiveValue1 of a compiled clean block from C; restart_primitiveValue with a compiled
+              block (esp balanced).
+        - [ ] Deoptimization (unpack_unoptimized_frames, deoptimized_return_from_*, redo_bytecode_after_deopt.)
+        - [ ] Interpreted blocks through restart_primitiveValue, interpreter primitive_value with compiled
+              blocks, NLRs starting in the interpreter passing compiled frames: need a running process (C4).
 - [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
 - [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).

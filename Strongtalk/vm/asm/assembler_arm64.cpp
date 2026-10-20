@@ -57,6 +57,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "universe.hpp"
 #include <math.h>
 
+extern "C" bool     have_nlr_through_C;	// abort.cpp
+extern "C" oop      nlr_result;
+extern "C" intptr_t nlr_home;
+extern "C" int      nlr_home_id;
+
 using namespace a64;
 
 // scratch registers of the lowering (never x86 registers)
@@ -1316,6 +1321,22 @@ void MacroAssembler::call_C_sequence(char* entry, int entry_reg, int nof_stack_a
   bind(ret);
   if (nlrTestPoint != NULL) Assembler::ic_info(*nlrTestPoint, 0);
   reset_last_Delta_frame();
+  if (nlrTestPoint != NULL) {
+    // NLRs through C: the portable interpreter returns from C with have_nlr_through_C set
+    // (e.g. a block evaluated by primitiveValue doing an NLR); continue the NLR here with
+    // the NLR registers (eax = result, edi = home, esi = home id)
+    Label no_nlr;
+    load(0, false, S0, Address((intptr_t) &have_nlr_through_C, relocInfo::external_word_type));
+    emit(subs_imm(zr, S0, 0));
+    set_flags(flags_sub);
+    jcc(equal, no_nlr);
+    store(0, zr, Address((intptr_t) &have_nlr_through_C, relocInfo::external_word_type));
+    load(3, false, arm(eax), Address((intptr_t) &nlr_result,  relocInfo::external_word_type));
+    load(3, false, arm(edi), Address((intptr_t) &nlr_home,    relocInfo::external_word_type));
+    load(2, true,  arm(esi), Address((intptr_t) &nlr_home_id, relocInfo::external_word_type));
+    jmp(*nlrTestPoint);
+    bind(no_nlr);
+  }
   set_flags(flags_unknown);
 }
 
