@@ -71,6 +71,10 @@ class StubRoutines: AllStatic {
 
   
   // add tracing routines here
+#ifdef STRONGTALK_ARM64
+  // the DLL call of the arm64 call_DLL stub: converts the arguments and calls f (C convention)
+  static intptr_t call_DLL_arm64(dll_func f, oop* last_argument, intptr_t nof_arguments, intptr_t async);
+#endif
   static void trace_DLL_call_1(dll_func function, oop* last_argument, int nof_arguments);
   static void trace_DLL_call_2(int result);
   static void wrong_DLL_call();

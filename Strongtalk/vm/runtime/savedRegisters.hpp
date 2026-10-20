@@ -36,6 +36,9 @@ class SavedRegisters : AllStatic {
   static oop  fetch(int register_number, intptr_t* frame_pointer);
   static void clear();
   static void save_registers();
+  // for generated code that saves the registers itself (arm64)
+  static oop*       register_address(int register_number);
+  static intptr_t** stored_frame_pointer_address();
 };
 
 

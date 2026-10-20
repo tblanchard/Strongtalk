@@ -202,6 +202,7 @@ static cacheElement secondary[secondary_cache_size];
 
 intptr_t lookupCache::primary_cache_address()	{ return intptr_t(&primary[0]); }
 intptr_t lookupCache::secondary_cache_address()	{ return intptr_t(&secondary[0]); }
+int      lookupCache::cache_element_size()	{ return sizeof(cacheElement); }
 
 void lookupCache::flush() {
   int index;

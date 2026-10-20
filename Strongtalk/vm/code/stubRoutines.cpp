@@ -65,6 +65,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "codeBuffer.hpp"
 #include "assembler.hpp"
 #include "os.hpp"
+#include "oopFactory.hpp"
 #include "dll.hpp"
 #include "stubRoutines.hpp"
 #include "symbolOop.hpp"
@@ -166,6 +167,36 @@ void StubRoutines::wrong_DLL_call() {
 }
 
 
+// Helpers for calling C from stubs
+
+// Calls the C function f; its arguments are the top nof_args words on the stack (x86: the
+// C function reads them from the stack; arm64: they are loaded into argument registers).
+// The result is in eax; eax, ecx and edx are not preserved.
+static void call_C_function(MacroAssembler* masm, char* f, int nof_args) {
+#ifdef STRONGTALK_ARM64
+  masm->call_native(f, nof_args);
+#else
+  masm->call(f, relocInfo::runtime_call_type);
+#endif
+}
+
+// Saves the registers for SavedRegisters::fetch (the last Delta frame must be set).
+static void save_registers(MacroAssembler* masm) {
+#ifdef STRONGTALK_ARM64
+  // stored inline (a C routine cannot see the registers of its caller)
+  Register regs[] = { eax, ecx, edx, ebx, esi, edi };
+  for (int i = 0; i < 6; i++) {
+    masm->movl(Address(asm_word(SavedRegisters::register_address(regs[i].number())), relocInfo::external_word_type), regs[i]);
+  }
+  masm->movl(ebx, Address(asm_word(&last_Delta_fp), relocInfo::external_word_type));
+  masm->movl(Address(asm_word(SavedRegisters::stored_frame_pointer_address()), relocInfo::external_word_type), ebx);
+  masm->movl(ebx, Address(asm_word(SavedRegisters::register_address(ebx.number())), relocInfo::external_word_type));
+#else
+  masm->call((char*)SavedRegisters::save_registers, relocInfo::runtime_call_type);
+#endif
+}
+
+
 // generators
 
 char* StubRoutines::generate_ic_lookup(MacroAssembler* masm, char* lookup_routine_entry) {
@@ -187,7 +218,7 @@ char* StubRoutines::generate_ic_lookup(MacroAssembler* masm, char* lookup_routin
   masm->pushl(eax);				// save receiver
   masm->pushl(ebx);				// pass ic
   masm->pushl(eax);				// pass receiver
-  masm->call(lookup_routine_entry, relocInfo::runtime_call_type);	// eax = lookup_routine(receiver, ic)
+  call_C_function(masm, lookup_routine_entry, 2);	// eax = lookup_routine(receiver, ic)
   masm->movl(ebx, eax);				// ebx = method code
   masm->popl(eax);				// get rid of receiver argument
   masm->popl(eax);				// get rid of ic argument
@@ -230,7 +261,7 @@ char* StubRoutines::generate_zombie_nmethod(MacroAssembler* masm) {
   masm->movl(ebx, Address(esp));		// get return address (= ic address) - don't pop! (needed for correct Delta frame)
   masm->pushl(eax);				// save receiver
   masm->pushl(ebx);				// pass ic
-  masm->call((char*)zombie_nmethod, relocInfo::runtime_call_type);	// eax = zombie_nmethod(return_address)
+  call_C_function(masm, (char*)zombie_nmethod, 1);	// eax = zombie_nmethod(return_address)
   masm->movl(ecx, eax);				// ecx = entry point to redo send
   masm->popl(ebx);				// get rid of ic argument
   masm->popl(eax);				// restore receiver
@@ -325,11 +356,11 @@ char* StubRoutines::generate_zombie_block_nmethod(MacroAssembler* masm) {
 
   masm->set_last_Delta_frame_after_call();
   masm->pushl(self_reg); // pass argument (C calling convention)
-  masm->call((char*)deoptimize_context_and_patch_block, relocInfo::runtime_call_type);
+  call_C_function(masm, (char*)deoptimize_context_and_patch_block, 1);
   masm->movl(ebx, eax);
   masm->popl(self_reg);
   masm->reset_last_Delta_frame();
-  masm->addl(esp, 4);
+  masm->addl(esp, oopSize);			// discard the return address to the zombie nmethod
   masm->jmp((char*)restart_primitiveValue, relocInfo::runtime_call_type);
   return entry_point;
 }
@@ -357,7 +388,11 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   // tos + 4: return address of megamorphic send in compiled code
   // tos + 8: last argument/receiver
   char* entry_point = masm->pc();
+#ifdef STRONGTALK_ARM64
+  masm->emit(a64::mov_reg(19, 17));		// ebx := MIC data (x17 is set by the MIC, see compiledPIC.cpp)
+#else
   masm->popl(ebx);				// get return address (MIC cache)
+#endif
   masm->test(eax, Mem_Tag);			// check if smi
   masm->jcc(Assembler::zero, is_smi);		// if so, get smi class directly
   masm->movl(ecx, Address(eax, memOopDesc::klass_byte_offset()));	// otherwise, load receiver class
@@ -373,7 +408,7 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   // compute hash value
   masm->movl(edi, ecx);
   masm->xorl(edi, edx);
-  masm->andl(edi, (primary_cache_size - 1) << 4);
+  masm->andl(edi, (primary_cache_size - 1) * lookupCache::cache_element_size());	// = hash_value * element size
   // probe cache
   masm->cmpl(ecx, Address(edi, lookupCache::primary_cache_address() + 0*oopSize));
   masm->jcc(Assembler::notEqual, probe_secondary_cache);
@@ -413,7 +448,7 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   // edi: primary cache index
   // tos: return address of megamorphic send in compiled code (ic)
   masm->bind(probe_secondary_cache);		// compute hash value
-  masm->andl(edi, (secondary_cache_size - 1) << 4);
+  masm->andl(edi, (secondary_cache_size - 1) * lookupCache::cache_element_size());
   // probe cache
   masm->cmpl(ecx, Address(edi, lookupCache::secondary_cache_address() + 0*oopSize));
   masm->jcc(Assembler::notEqual, do_lookup);
@@ -435,7 +470,7 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   masm->pushl(eax);				// save receiver
   masm->pushl(edx);				// pass 2nd argument: selector
   masm->pushl(ecx);				// pass 1st argument: receiver klass
-  masm->call((char*)lookupCache::normal_lookup, relocInfo::runtime_call_type);
+  call_C_function(masm, (char*)lookupCache::normal_lookup, 2);
   masm->movl(ecx, eax);				// ecx: method
   masm->popl(ebx);				// pop 1st argument
   masm->popl(ebx);				// pop 2nd argument
@@ -474,7 +509,7 @@ char* StubRoutines::generate_compile_block(MacroAssembler* masm) {
   masm->set_last_Delta_frame_after_call();
   masm->pushl(eax);				// save receiver
   masm->pushl(eax);				// pass receiver
-  masm->call((char*)jumpTable::compile_new_block, relocInfo::runtime_call_type);	// eax = block_closure_compile(receiver)
+  call_C_function(masm, (char*)jumpTable::compile_new_block, 1);	// eax = block_closure_compile(receiver)
   masm->movl(ebx, eax);				// ebx = block code
   masm->popl(eax);				// get rid of receiver argument
   masm->popl(eax);				// restore receiver (don't use argument, might be overwritten)
@@ -520,6 +555,59 @@ char* StubRoutines::generate_continue_NLR(MacroAssembler* masm) {
 }
 #endif // STRONGTALK_ARM64
 
+
+#ifdef STRONGTALK_ARM64
+
+// Calls f with the converted arguments: smis as integers, proxies as their pointers
+// (argument 1 is at the highest address, the last argument at last_argument). The
+// arm64 calling convention is caller cleanup, so unused argument registers are harmless.
+intptr_t StubRoutines::call_DLL_arm64(dll_func f, oop* last_argument, intptr_t nof_arguments, intptr_t async) {
+  const int max_arguments = 16;
+  int n = (int) nof_arguments;
+  if (n > max_arguments) fatal1("DLL call with %d arguments not supported", n);
+  if (TraceDLLCalls) trace_DLL_call_1(f, last_argument, n);
+  intptr_t a[max_arguments] = { 0 };
+  for (int i = 0; i < n; i++) {
+    oop x = last_argument[n - 1 - i];			// argument i+1
+    a[i] = x->is_smi() ? smiOop(x)->value() : (intptr_t) proxyOop(x)->get_pointer();
+  }
+  DeltaProcess* state = NULL;
+  if (async) DLLs::enter_async_call(&state);
+  typedef intptr_t (*fn16)(intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t,
+                           intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t);
+  intptr_t result = ((fn16) f)(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15]);
+  if (async) DLLs::exit_async_call(&state);
+  else       DLLs::exit_sync_call(&state);
+  if (TraceDLLCalls) trace_DLL_call_2((int) result);
+  return result;
+}
+
+
+char* StubRoutines::generate_call_DLL(MacroAssembler* masm, bool async) {
+// The extra frame for DLL calls from compiled code (cf. the x86 version below); the
+// argument conversion and the call are done by call_DLL_arm64.
+//
+// ebx: number of arguments
+// ecx: address of last argument
+// edx: DLL function entry point
+// tos: return address (in compiled code); the caller pops the arguments
+  char* entry_point = masm->pc();
+  masm->set_last_Delta_frame_after_call();
+  // x0 := edx, x1 := ecx, x2 := ebx, x3 := async (through scratch registers: x1, x2 are sources)
+  masm->emit(a64::mov_reg(9, 2));
+  masm->emit(a64::mov_reg(10, 1));
+  masm->emit(a64::mov_reg(11, 19));
+  masm->emit(a64::mov_reg(0, 9));
+  masm->emit(a64::mov_reg(1, 10));
+  masm->emit(a64::mov_reg(2, 11));
+  masm->emit(a64::movz(3, async ? 1 : 0, 0));
+  masm->call_native((char*) &StubRoutines::call_DLL_arm64, 0);	// eax := result
+  masm->reset_last_Delta_frame();
+  masm->ret(0);
+  return entry_point;
+}
+
+#else
 
 char* StubRoutines::generate_call_DLL(MacroAssembler* masm, bool async) {
 // The following routine provides the extra frame for DLL calls.
@@ -641,6 +729,9 @@ char* StubRoutines::generate_call_DLL(MacroAssembler* masm, bool async) {
 }
 
 
+#endif // STRONGTALK_ARM64
+
+
 char* StubRoutines::generate_lookup_DLL(MacroAssembler* masm, bool async) {
 // Lookup routine called from "empty" DLL caches in compiled code only.
 // Calls a lookup & patch routine which updates the DLL cache and then
@@ -654,7 +745,7 @@ char* StubRoutines::generate_lookup_DLL(MacroAssembler* masm, bool async) {
   masm->set_last_Delta_frame_after_call();
   masm->pushl(ebx);				// save registers (edx has no valid value yet)
   masm->pushl(ecx);
-  masm->call((char*)DLLs::lookup_and_patch_CompiledDLL_Cache, relocInfo::runtime_call_type);	// eax := function entry point
+  call_C_function(masm, (char*)DLLs::lookup_and_patch_CompiledDLL_Cache, 0);	// eax := function entry point
   masm->popl(ecx);				// restore registers
   masm->popl(ebx);
   masm->movl(edx, eax);				// setup edx
@@ -673,12 +764,12 @@ char* StubRoutines::generate_recompile_stub(MacroAssembler* masm) {
   char* entry_point = masm->pc();
   //masm->int3();
   masm->set_last_Delta_frame_after_call();
-  masm->call((char*)SavedRegisters::save_registers, relocInfo::runtime_call_type);
+  save_registers(masm);
   masm->movl(ebx, Address(esp));		// get return address (trigger nmethod)
   masm->pushl(eax);				// save receiver
   masm->pushl(ebx);				// pass 2nd argument (pc)
   masm->pushl(eax);				// pass 1st argument (recv)
-  masm->call((char*)Recompilation::nmethod_invocation_counter_overflow, relocInfo::runtime_call_type);	// eax = nmethod_invocation_counter_overflow(receiver, pc)
+  call_C_function(masm, (char*)Recompilation::nmethod_invocation_counter_overflow, 2);	// eax = nmethod_invocation_counter_overflow(receiver, pc)
   masm->movl(ecx, eax);				// save continuation address in ecx
   masm->popl(eax);				// pop 1st argument
   masm->popl(ebx);				// pop 2nd argument
@@ -717,8 +808,8 @@ char* StubRoutines::generate_recompile_stub(MacroAssembler* masm) {
 char* StubRoutines::generate_uncommon_trap(MacroAssembler* masm) {
   char* entry_point = masm->pc();
   masm->set_last_Delta_frame_after_call();
-  masm->call((char*)SavedRegisters::save_registers, relocInfo::runtime_call_type);
-  masm->call((char*)uncommon_trap, relocInfo::runtime_call_type);
+  save_registers(masm);
+  call_C_function(masm, (char*)uncommon_trap, 0);
   masm->reset_last_Delta_frame();
   masm->ret(0);
   return entry_point;
@@ -747,7 +838,7 @@ char* StubRoutines::generate_verify_context_chain(MacroAssembler* masm) {
   char* entry_point = masm->pc();
   masm->set_last_Delta_frame_after_call();
   masm->pushl(self_reg); // pass argument (C calling convention)
-  masm->call((char*)validateContextChain, relocInfo::runtime_call_type);
+  call_C_function(masm, (char*)validateContextChain, 1);
   masm->movl(ebx, eax);
   masm->popl(self_reg);
   masm->reset_last_Delta_frame();
@@ -756,7 +847,7 @@ char* StubRoutines::generate_verify_context_chain(MacroAssembler* masm) {
   masm->ret(0);
 
   masm->bind(deoptimize);
-  masm->addl(esp, 4);
+  masm->addl(esp, oopSize);
   masm->jmp((char*)restart_primitiveValue, relocInfo::runtime_call_type);
   return entry_point;
 }
@@ -804,7 +895,7 @@ char* StubRoutines::generate_deoptimize_block(MacroAssembler* masm) {
   char* entry_point = masm->pc();
   masm->set_last_Delta_frame_after_call();	// nmethod is treated as C routine
   masm->pushl(self_reg);			// pass argument
-  masm->call((char*)deoptimize_block, relocInfo::runtime_call_type);	// eax := deoptimize_block(self_reg)
+  call_C_function(masm, (char*)deoptimize_block, 1);	// eax := deoptimize_block(self_reg)
   masm->popl(ebx);				// get rid of argument
   masm->reset_last_Delta_frame();		// return & restart the primitive (eax must contain the block)
   masm->jmp((char*)restart_primitiveValue, relocInfo::runtime_call_type);
@@ -817,7 +908,7 @@ char* StubRoutines::generate_call_inspector(MacroAssembler* masm) {
   char* entry_point = masm->pc();
   masm->set_last_Delta_frame_after_call();	// just in case somebody wants to look at the stack
   masm->pushad();
-  masm->call((char*)MacroAssembler::inspector, relocInfo::runtime_call_type);
+  call_C_function(masm, (char*)MacroAssembler::inspector, 8);	// (arm64: without eip)
   masm->popad();
   masm->reset_last_Delta_frame();
   masm->ret(0);
@@ -1059,6 +1150,8 @@ void StubRoutines::init() {
 
 #ifdef STRONGTALK_ARM64
 
+static intptr_t dll_test_function(intptr_t a, intptr_t b, intptr_t c) { return a + 2 * b + 3 * c; }
+
 // +TestArm64Runtime: executes stub routines that do not need compiled code.
 bool StubRoutines_arm64_test() {
   ResourceMark rm;
@@ -1101,6 +1194,106 @@ bool StubRoutines_arm64_test() {
   static oop stack[64];
   intptr_t r = ((F) code)(5, &stack[48]);
   if (r != 1005) { failures++; lprintf("  FAILED continue_NLR: got %ld, expected 1005\n", (long) r); }
+
+  typedef intptr_t (*G)(oop* stack);
+  int saved[] = { 19, 20, 21, 28, 29, 30 };
+  // C callable test functions: g(delta_stack) with esp = delta_stack
+#define BEGIN_TEST(m) \
+    m.emit(a64::sub_imm(a64::sp, a64::sp, 64)); \
+    for (int i = 0; i < 6; i++) m.emit(a64::ldst_uimm(a64::STR, 3, saved[i], a64::sp, 8 * i)); \
+    m.emit(a64::mov_reg(28, 0)); m.emit(a64::mov_reg(29, 0));
+#define END_TEST(m) \
+    for (int i = 0; i < 6; i++) m.emit(a64::ldst_uimm(a64::LDR, 3, saved[i], a64::sp, 8 * i)); \
+    m.emit(a64::add_imm(a64::sp, a64::sp, 64)); \
+    m.emit(a64::ret());
+
+  // DLL call from compiled code: arguments 1..3 pushed in order (the last argument is at esp)
+  { char* c = os::allocate_code_memory(4096);
+    { JITWriteScope write_code;
+      CodeBuffer cb(c, 4096);
+      MacroAssembler m(&cb);
+      BEGIN_TEST(m)
+      m.pushl(as_smiOop(10)); m.pushl(as_smiOop(20)); m.pushl(as_smiOop(30));
+      m.movl(ebx, 3);
+      m.movl(ecx, esp);
+      m.movl(edx, asm_word(&dll_test_function));
+      m.call(StubRoutines::call_DLL_entry(false), relocInfo::runtime_call_type);
+      m.addl(esp, 3 * oopSize);
+      m.movl(ecx, esp); m.subl(ecx, ebp); m.addl(eax, ecx);	// + 0 if esp is balanced
+      END_TEST(m)
+    }
+    os::flush_icache(c, 4096);
+    intptr_t r = ((G) c)(&stack[48]);
+    if (r != 10 + 2 * 20 + 3 * 30) { failures++; lprintf("  FAILED call_DLL: got %ld, expected 140\n", (long) r); }
+  }
+
+  // inline register saving (uncommon trap, recompilation)
+  { char* c = os::allocate_code_memory(4096);
+    intptr_t* saved_fp = last_Delta_fp;
+    last_Delta_fp = (intptr_t*) 0x123450;
+    { JITWriteScope write_code;
+      CodeBuffer cb(c, 4096);
+      MacroAssembler m(&cb);
+      BEGIN_TEST(m)
+      Register regs[] = { eax, ecx, edx, ebx, esi, edi };
+      for (int i = 0; i < 6; i++) m.movl(regs[i], (intptr_t) (0x1000 + i) * 4);
+      save_registers(&m);
+      m.movl(eax, ebx);				// ebx must be unchanged
+      END_TEST(m)
+    }
+    os::flush_icache(c, 4096);
+    intptr_t r = ((G) c)(&stack[48]);
+    Register regs[] = { eax, ecx, edx, ebx, esi, edi };
+    for (int i = 0; i < 6; i++) {
+      oop v = SavedRegisters::fetch(regs[i].number(), (intptr_t*) 0x123450);
+      if (v != oop((intptr_t) (0x1000 + i) * 4)) { failures++; lprintf("  FAILED save_registers: %s\n", regs[i].name()); }
+    }
+    if (r != (0x1000 + 3) * 4) { failures++; lprintf("  FAILED save_registers changes ebx\n"); }
+    SavedRegisters::clear();
+    last_Delta_fp = saved_fp;
+  }
+
+  // megamorphic IC: a MIC for (nil printString); the methodOop is passed to method_entry_point
+  { char* c = os::allocate_code_memory(4096);
+    symbolOop sel = oopFactory::new_symbol("printString");
+    klassOop  k   = Universe::nilObj()->klass();
+    LookupResult expected = interpreter_normal_lookup(k, sel);
+    char* saved_entry = method_entry_point;
+    char* mic = c;
+    char* probe = c + 64;
+    { JITWriteScope write_code;
+      a64::insn* p = (a64::insn*) mic;		// MIC layout (compiledPIC.cpp)
+      p[0] = a64::ldr_literal(16, PIC::PIC_stub_offset);
+      p[1] = a64::adr(17, PIC::MIC_selector_offset - 4);
+      p[2] = a64::br(16);
+      p[3] = a64::nop();
+      *(char**) (mic + PIC::PIC_stub_offset) = StubRoutines::megamorphic_ic_entry();
+      *(symbolOop*) (mic + PIC::MIC_selector_offset) = sel;
+      { CodeBuffer cb(probe, 64);		// method entry probe: returns the methodOop
+        MacroAssembler m(&cb);
+        m.movl(eax, ecx);
+        m.ret(0);
+      }
+      CodeBuffer cb(c + 1024, 2048);
+      MacroAssembler m(&cb);
+      BEGIN_TEST(m)
+      m.movl(eax, (intptr_t) Universe::nilObj());	// (no relocation information in this buffer)
+      m.call(mic, relocInfo::runtime_call_type);
+      END_TEST(m)
+    }
+    os::flush_icache(c, 4096);
+    method_entry_point = probe;
+    intptr_t* saved_fp = last_Delta_fp; oop* saved_sp = last_Delta_sp;
+    lookupCache::flush();
+    intptr_t miss = ((G) (c + 1024))(&stack[48]);	// lookup cache miss: normal_lookup is called
+    intptr_t hit  = ((G) (c + 1024))(&stack[48]);	// lookup cache hit
+    last_Delta_fp = saved_fp; last_Delta_sp = saved_sp;
+    method_entry_point = saved_entry;
+    if (!expected.is_method() || miss != (intptr_t) expected.method()) { failures++; lprintf("  FAILED megamorphic IC (cache miss)\n"); }
+    if (!expected.is_method() || hit  != (intptr_t) expected.method()) { failures++; lprintf("  FAILED megamorphic IC (cache hit)\n"); }
+  }
+#undef BEGIN_TEST
+#undef END_TEST
   lprintf("StubRoutines arm64 test: %d failures\n", failures);
   return failures == 0;
 }

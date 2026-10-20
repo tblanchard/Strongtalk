@@ -117,6 +117,13 @@ bool patch_uncommon_call(frame* f) {
   // patch the call site:
   //  from: call _unused_uncommon_trap
   //  to:   call _used_uncommon_trap
+#ifdef STRONGTALK_ARM64
+  NativeCall* call = nativeCall_from_return_address((char*) f->pc());
+  if (call->destination() == (char*)StubRoutines::used_uncommon_trap_entry()) return true;	// executed before
+  assert(call->destination() == (char*)StubRoutines::unused_uncommon_trap_entry(), "Make sure we are patching the right call");
+  call->set_destination((char*)StubRoutines::used_uncommon_trap_entry());
+  return false;
+#endif
 
   // INTEL-SPECIFIC: the call is a rel32 call; its displacement precedes the return address
   char*    next_inst = (char*) f->pc();

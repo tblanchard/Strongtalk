@@ -76,6 +76,21 @@ oop SavedRegisters::fetch(int register_number, intptr_t* frame_pointer) {
 }
 
 
+oop* SavedRegisters::register_address(int register_number) {
+  if (register_number == eax.number()) return &saved_eax;
+  if (register_number == ecx.number()) return &saved_ecx;
+  if (register_number == edx.number()) return &saved_edx;
+  if (register_number == ebx.number()) return &saved_ebx;
+  if (register_number == esi.number()) return &saved_esi;
+  if (register_number == edi.number()) return &saved_edi;
+  fatal("esp and ebp are not saved");
+  return NULL;
+}
+
+intptr_t** SavedRegisters::stored_frame_pointer_address() {
+  return &stored_frame_pointer;
+}
+
 void SavedRegisters::clear() {
   stored_frame_pointer = NULL;
 }

@@ -126,8 +126,8 @@ class Address: public ValueObj {
  public:
   Address();
   Address(intptr_t disp, relocInfo::relocType rtype);
-  Address(Register base, int disp = 0, relocInfo::relocType rtype = relocInfo::none);
-  Address(Register base, Register index, ScaleFactor scale, int disp = 0, relocInfo::relocType rtype = relocInfo::none);
+  Address(Register base, intptr_t disp = 0, relocInfo::relocType rtype = relocInfo::none);
+  Address(Register base, Register index, ScaleFactor scale, intptr_t disp = 0, relocInfo::relocType rtype = relocInfo::none);
 
   friend class Assembler;
 };

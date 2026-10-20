@@ -84,6 +84,7 @@ class lookupCache : AllStatic {
  private:
   static intptr_t primary_cache_address();
   static intptr_t secondary_cache_address();
+  static int      cache_element_size();		// bytes per cache entry (a power of 2; used by the megamorphic IC stub)
 
   static unsigned int hash_value(LookupKey* key);
   static int number_of_primary_hits;

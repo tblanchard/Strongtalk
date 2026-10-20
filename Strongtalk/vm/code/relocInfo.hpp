@@ -177,6 +177,18 @@ class relocIterator : StackObj {
   }
   */
 
+#ifdef STRONGTALK_ARM64
+  // arm64: addr is the literal holding the destination; it ends the call/jump sequence
+  char* call_end() const {
+    assert(type() != relocInfo::oop_type, "must be call");
+    return addr + sizeof(char*);
+  }
+
+  char* callDestination() const {
+    assert(type() != relocInfo::oop_type, "must be call");
+    return *(char**) addr;
+  }
+#else
   char* call_end() const {
     assert(type() != relocInfo::oop_type, "must be call");
     return addr + 4;	// INTEL-SPECIFIC
@@ -186,6 +198,7 @@ class relocIterator : StackObj {
     assert(type() != relocInfo::oop_type, "must be call");
     return addr + sizeof(int32_t) + *(int32_t*)addr;	// INTEL-SPECIFIC: rel32 call displacement
   }
+#endif
 
   // for uncommon traps only: was it ever executed?
   bool wasUncommonTrapExecuted() const;

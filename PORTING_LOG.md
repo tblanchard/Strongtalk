@@ -327,6 +327,27 @@ Phases:
         offsets); +TestArm64Runtime (after the image is loaded): PIC layout, iteration, updates, oops_do, find,
         PIC dispatch executed through the PIC stub (smi/nil/true/false, retargeting), continue_NLR executed
         (reaches the NLR target with the Delta stack balanced).
+  - [x] C2c stub routines reviewed and ported (code/stubRoutines.cpp):
+        - C functions were called with a plain x86 call after pushing their arguments: now call_C_function()
+          (arm64: call_native = arguments from esp[0..n-1] into x0.., blr; x86 unchanged). Used by: IC lookup,
+          zombie, zombie block, megamorphic IC lookup, compile block, DLL lookup, recompile, uncommon trap, context
+          chain check, block deopt, inspector.
+        - SavedRegisters::save_registers read the caller's registers (x86 asm): arm64 stores them inline
+          (save_registers(); SavedRegisters::register_address / stored_frame_pointer_address).
+        - Megamorphic IC: x17 = MIC data (not popped); hash mask (size - 1) * lookupCache::cache_element_size()
+          (32 bytes on 64-bit, was << 4); Address(Register, disp) now takes word displacements (the lookup
+          cache addresses were truncated to int).
+        - DLL calls: arm64 stub calls StubRoutines::call_DLL_arm64 (argument conversion, async protocol, C call);
+          the x86 stdcall frame / argument count check do not apply.
+        - addl(esp, 4) -> oopSize (zombie block, context chain check).
+        - Patching outside the stubs: patch_uncommon_call and relocIterator::callDestination/call_end use the
+          literal; nmethod::makeZombie replaces the first instruction of enter with b <special handler call>.
+        - restart_primitiveValue (jumped to by the block stubs) and method_entry_point are interpreter entries:
+          C2d. Allocation stubs are hlt (unused, as on x86).
+        Tests (+TestArm64Runtime, executed): call_sync_DLL from compiled-style code (smi args, order, balanced
+        esp), inline register saving read back via SavedRegisters::fetch, megamorphic IC for nil printString
+        through lookup-cache miss (C lookup) and hit (hash), plus the PIC/NLR tests. Stubs that need real
+        nmethods/ICs (IC lookup, zombie, compile block, recompile, uncommon trap, deopt) are exercised in C4.
 - [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
 - [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).

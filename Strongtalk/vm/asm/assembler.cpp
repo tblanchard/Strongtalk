@@ -174,7 +174,7 @@ Address::Address(intptr_t disp, relocInfo::relocType rtype) {
 }
 
 
-Address::Address(Register base, int disp, relocInfo::relocType rtype) {
+Address::Address(Register base, intptr_t disp, relocInfo::relocType rtype) {
   _base  = base;
   _index = noreg;
   _scale = no_scale;
@@ -183,7 +183,7 @@ Address::Address(Register base, int disp, relocInfo::relocType rtype) {
 }
 
 
-Address::Address(Register base, Register index, ScaleFactor scale, int disp, relocInfo::relocType rtype) {
+Address::Address(Register base, Register index, ScaleFactor scale, intptr_t disp, relocInfo::relocType rtype) {
   assert((index == noreg) == (scale == Address::no_scale), "inconsistent address");
   _base  = base;
   _index = index;

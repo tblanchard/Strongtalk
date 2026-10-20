@@ -441,6 +441,15 @@ void nmethod::makeZombie(bool clearInlineCaches) {
     call->set_destination(StubRoutines::zombie_block_nmethod_entry());
   }
 
+#ifdef STRONGTALK_ARM64
+  // at verified entry point: overwrite the first instruction of the frame construction
+  // (enter: str ebp, [esp, #-8]!; mov ebp, esp) with a jump to the zombie handler call
+  // (a single instruction: atomic for threads entering the nmethod)
+  { char* p = verifiedEntryPoint();
+    guarantee(*(a64::insn*) p == a64::ldst_pre(a64::STR, 3, 29, 28, -8), "not \"enter\" at verified entry point - check this");
+    native_code_write_insn(p, a64::b((int) (specialHandlerCall() - p)));
+  }
+#else
   // WARNING: INTEL SPECIFIC CODE PROVIDED BY ROBERT
   // at verified entry point: overwrite "push ebp, mov ebp esp" instructions
   // belonging to activation frame construction with jump to zombie handler
@@ -457,6 +466,7 @@ void nmethod::makeZombie(bool clearInlineCaches) {
   p[0] = nop;
   p[1] = jmp;
   p[2] = char(offset);
+#endif
 
   if (TraceZombieCreation) {
     stdOut->print_cr("%s nmethod 0x%x becomes zombie", (is_method() ? "normal" : "block"), this);
