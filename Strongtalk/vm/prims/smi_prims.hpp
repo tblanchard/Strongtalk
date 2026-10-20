@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_SMI_PRIMS_HPP_HPP
+#define VM_PRIMS_SMI_PRIMS_HPP_HPP
 
 
 // Primitives for small integers
@@ -207,3 +209,6 @@ extern "C" oop PRIM_API smiOopPrimitives_remainder(oop receiver, oop argument);
 //              name  = 'double_from_smi' }
 //%
 extern "C" oop PRIM_API double_from_smi(oop receiver);
+
+
+#endif // VM_PRIMS_SMI_PRIMS_HPP_HPP

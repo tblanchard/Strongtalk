@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_DISCLAIMER_HPP_HPP
+#define VM_RUNTIME_DISCLAIMER_HPP_HPP
 
 class Disclaimer: AllStatic {
  private:
@@ -53,6 +55,8 @@ class Disclaimer: AllStatic {
     #endif
   }
 
-  static void print_disclaimer(outputStream* s = std);
+  static void print_disclaimer(outputStream* s = stdOut);
   static void initialize();
 };
+
+#endif // VM_RUNTIME_DISCLAIMER_HPP_HPP

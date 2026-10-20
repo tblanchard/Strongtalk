@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_SCOPE_HPP_HPP
+#define VM_COMPILER_SCOPE_HPP_HPP
 
 
 # ifdef DELTA_COMPILER
@@ -185,7 +187,7 @@ protected:
   void initialize(methodOop method, klassOop methodHolder, InlinedScope* sender, RScope* rs, SendInfo* info);
 
 public:
-  int		scopeID() const 			{ return _scopeID; }
+  smi		scopeID() const 			{ return _scopeID; }
   InlinedScope*	sender() const 				{ return _sender; }
   int		senderBCI() const     			{ return _senderBCI; }
   ScopeInfo	scopeInfo() const			{ return _scopeInfo; }
@@ -359,8 +361,8 @@ class OutlinedScope: public Scope {		// abstract; a scope outside of the current
   bool		expectsContext() const		{ return method()->expectsContext(); }
   
   // debugging
-  void		print_short(char* name);
-  void		print(char* name);
+  void		print_short(const char* name);
+  void		print(const char* name);
 };
 
 OutlinedScope* new_OutlinedScope(nmethod* nm, ScopeDesc* sc);
@@ -406,3 +408,6 @@ class OutlinedBlockScope: public OutlinedScope {
 
 
 # endif
+
+
+#endif // VM_COMPILER_SCOPE_HPP_HPP

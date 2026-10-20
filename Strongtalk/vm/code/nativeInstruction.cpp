@@ -21,10 +21,21 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_nativeInstruction.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "nativeInstruction.hpp"
+#include "ostream.hpp"
 // Implementation of NativeCall
 
 void NativeCall::verify() {
@@ -34,7 +45,7 @@ void NativeCall::verify() {
 
 
 void NativeCall::print() {
-  std->print_cr("0x%x: call 0x%x", instruction_address(), destination());
+  stdOut->print_cr("0x%x: call 0x%x", instruction_address(), destination());
 }
 
 // Implementation of NativeMov
@@ -45,7 +56,7 @@ void NativeMov::verify() {
 
 
 void NativeMov::print() {
-  std->print_cr("0x%x: mov reg, 0x%x", instruction_address(), data());
+  stdOut->print_cr("0x%x: mov reg, 0x%x", instruction_address(), data());
 }
 
 // Implementation of NativeTest
@@ -56,6 +67,6 @@ void NativeTest::verify() {
 
 
 void NativeTest::print() {
-  std->print_cr("0x%x: test eax, 0x%x", instruction_address(), data());
+  stdOut->print_cr("0x%x: test eax, 0x%x", instruction_address(), data());
 }
 

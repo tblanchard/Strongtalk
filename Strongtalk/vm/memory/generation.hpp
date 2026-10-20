@@ -20,8 +20,13 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_GENERATION_HPP_HPP
+#define VM_MEMORY_GENERATION_HPP_HPP
 
 // A generation is a bunch of spaces of similarly-aged objects
+
+#include "space.hpp"
+#include "virtualspace.hpp"
 
 class generation: ValueObj {
   friend class rSet;
@@ -131,6 +136,13 @@ class oldGeneration: public generation {
     return current_space->allocate(size);
   }
 
+  // Gives back [from, to) if it is the end of the most recent allocation; returns false otherwise.
+  bool shrink_top(oop* from, oop* to) {
+    if (current_space->top() != to) return false;
+    current_space->shrink_top(from);
+    return true;
+  }
+
   // called by Universe
   void initialize(ReservedSpace rs, int initial_size);
 
@@ -186,3 +198,6 @@ class oldGeneration: public generation {
 
 
 
+
+
+#endif // VM_MEMORY_GENERATION_HPP_HPP

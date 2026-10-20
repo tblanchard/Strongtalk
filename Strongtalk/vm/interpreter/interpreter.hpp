@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_INTERPRETER_HPP_HPP
+#define VM_INTERPRETER_INTERPRETER_HPP_HPP
 
 
 class Interpreter: AllStatic {
@@ -80,3 +82,6 @@ class Interpreter: AllStatic {
 
   friend class InterpreterGenerator;
 };
+
+
+#endif // VM_INTERPRETER_INTERPRETER_HPP_HPP

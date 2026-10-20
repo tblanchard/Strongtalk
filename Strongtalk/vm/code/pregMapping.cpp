@@ -21,9 +21,98 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "locations.hpp"
+#include "pregMapping.hpp"
+#include "mapConformance.hpp"
+#include "disassembler.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_PRegMapping.cpp.incl"
 
 
 // Implementation of PRegMapping
@@ -112,7 +201,7 @@ void PRegMapping::ensureOneFreeRegister() {
     // no free registers available => find a register to spill
     int i = spillablePRegIndex();
     if (i < 0) fatal("too many temporaries or locked pregs: out of spillable registers");
-    // std->print("WARNING: Register spilling - check if this works\n");
+    // stdOut->print("WARNING: Register spilling - check if this works\n");
     spillRegister(regLoc(i));
     assert(_locs->freeRegisters(), "at least one register should be available now");
     verify();
@@ -269,7 +358,7 @@ void PRegMapping::kill(PReg* preg) {
   int i = index(preg);
   if (i >= 0) {
     if (PrintPRegMapping) {
-      std->print("kill ");
+      stdOut->print("kill ");
       print(i);
     }
     int rloc = regLoc(i);
@@ -288,7 +377,7 @@ void PRegMapping::killAll(PReg* exception) {
     if (used(i) && _pregs->at(i) != exception) {
       assert(!PRegLocker::locks(_pregs->at(i)), "PReg is locked");
       if (PrintPRegMapping) {
-        std->print("kill ");
+        stdOut->print("kill ");
         print(i);
       }
       int rloc = regLoc(i);
@@ -668,9 +757,9 @@ void PRegMapping::old_makeConformant(PRegMapping* with) {
   }
   char* end_of_code = _assm->pc();
   if (PrintMakeConformantCode && begin_of_code < end_of_code) {
-    std->print_cr("MakeConformant:");
+    stdOut->print_cr("MakeConformant:");
     Disassembler::decode(begin_of_code, end_of_code);
-    std->cr();
+    stdOut->cr();
   }
 
   verify();
@@ -821,9 +910,9 @@ void PRegMapping::new_makeConformant(PRegMapping* with) {
     char* end_of_code = _assm->pc();
     if (PrintMakeConformantCode) {
       chelper.print();
-      std->print_cr("(using R%d & R%d as temporary registers)", temp1.register_number(), temp2.register_number());
+      stdOut->print_cr("(using R%d & R%d as temporary registers)", temp1.register_number(), temp2.register_number());
       Disassembler::decode(begin_of_code, end_of_code);
-      std->cr();
+      stdOut->cr();
     }
 
     // Mapping should not be used anymore now, since it is not representing the
@@ -838,9 +927,9 @@ void PRegMapping::makeConformant(PRegMapping* with) {
   //guarantee(NLRinProgress() == with->NLRinProgress(), "cannot be made conformant");
 
   if (PrintPRegMapping && WizardMode) {
-    std->print("make conformant:\n");
+    stdOut->print("make conformant:\n");
     print();
-    std->print("with ");
+    stdOut->print("with ");
     with->print();
   }
 
@@ -922,42 +1011,42 @@ void PRegMapping::print(int i) {
   assert(used(i), "unused slot");
   int rloc = regLoc(i);
   int sloc = stkLoc(i);
-  std->print("%s -> ", _pregs->at(i)->name());
+  stdOut->print("%s -> ", _pregs->at(i)->name());
   if (rloc >= 0) {
-    std->print(_locs->locationAsRegister(rloc).name());
+    stdOut->print(_locs->locationAsRegister(rloc).name());
   }
   if (sloc >= 0) {
-    if (rloc >= 0) std->print(", ");
+    if (rloc >= 0) stdOut->print(", ");
     int offs = _locs->locationAsByteOffset(sloc);
-    std->print("[ebp%s%d]", (offs < 0 ? "" : "+"), offs);
+    stdOut->print("[ebp%s%d]", (offs < 0 ? "" : "+"), offs);
   }
-  std->cr();
+  stdOut->cr();
 }
 
 
 void PRegMapping::print() {
   if (WizardMode) _locs->print();
   if (nofPRegs() > 0) {
-    std->print("PReg mapping:\n");
+    stdOut->print("PReg mapping:\n");
     for (int i = 0; i < size(); i++) {
       if (used(i)) print(i);
     }
   } else {
-    std->print("PReg mapping is empty\n");
+    stdOut->print("PReg mapping is empty\n");
   }
-  std->cr();
+  stdOut->cr();
   if (_tmpLocs->length() > 0) {
-    std->print("Temporaries in use:\n");
+    stdOut->print("Temporaries in use:\n");
     for (int i = 0; i < _tmpLocs->length(); i++) {
       int loc = _tmpLocs->at(i);
       assert(_locs->isRegister(loc), "temporaries must be in registers");
-      std->print("temp %d -> %d %s\n", i, loc, _locs->locationAsRegister(loc).name());
+      stdOut->print("temp %d -> %d %s\n", i, loc, _locs->locationAsRegister(loc).name());
     }
-    std->cr();
+    stdOut->cr();
   }
   if (NLRinProgress()) {
-    std->print_cr("NLR in progress");
-    std->cr();
+    stdOut->print_cr("NLR in progress");
+    stdOut->cr();
   }
 }
 

@@ -21,11 +21,71 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "klassOop.hpp"
+#include "ic_iterator.hpp"
+#include "compiledPIC.hpp"
+#include "disassembler.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_compiledPIC.cpp.incl"
 
 
 // A PIC implements a Polymorphic Inline Cache for compiled code.
@@ -104,7 +164,7 @@ static const uint16 cmp_opcode  = 0xfa81;	static const int cmp_opcode_size = siz
 static inline void  put_byte(char*& p, u_char b){ *p++ = b; }
 static inline void  put_shrt(char*& p, uint16 s){ *(uint16*)p = s; p += sizeof(uint16); }
 static inline void  put_word(char*& p, int w)	{ *(int*)p = w; p += sizeof(int); }
-static inline void  put_disp(char*& p, char* d)	{ put_word(p, (int)(d - p - sizeof(int))); }
+static inline void  put_disp(char*& p, char* d)	{ put_word(p, x86_imm32(d - p - sizeof(int))); }
 
 static inline int   get_shrt(char* p)		{ return *(uint16*)p; }
 static inline char* get_disp(char* p)		{ return *(int*)p + p + sizeof(int); }
@@ -524,15 +584,15 @@ int PIC::code_for_methodOops_only(char* entry, PIC_contents* c) {
   } else {
     // handle smi methodOop first
     put_disp(p, StubRoutines::PIC_stub_entry(1 + c->m));
-    put_word(p, int(smiKlassObj));
-    put_word(p, int(c->smi_methodOop));
+    put_word(p, x86_imm32(smiKlassObj));
+    put_word(p, x86_imm32(c->smi_methodOop));
     assert(entry + PIC_methodOop_only_offset + PIC_methodOop_entry_size == p, "constant value inconsistent with code pattern");
   }
   char* p1 = p;
   for (int i = 0; i < c->m; i++) {
     assert(c->methodOop_klasses[i] != smiKlassObj, "should not be smiKlassObj");
-    put_word(p, int(c->methodOop_klasses[i]));
-    put_word(p, int(c->methodOops[i]));
+    put_word(p, x86_imm32(c->methodOop_klasses[i]));
+    put_word(p, x86_imm32(c->methodOops[i]));
   }
   assert(p1 + c->m * PIC_methodOop_entry_size == p, "constant value inconsistent with code pattern");
   return p - entry;
@@ -571,7 +631,7 @@ int PIC::code_for_polymorphic_case(char* entry, PIC_contents* c) {
       assert(c->nmethod_klasses[i] != smiKlassObj, "should not be smiKlassObj");
       put_shrt(p, cmp_opcode);
       assert(entry + PIC_nmethod_entry_offset + i*PIC_nmethod_entry_size + PIC_nmethod_klass_offset == p, "constant value inconsistent with code pattern");
-      put_word(p, int(c->nmethod_klasses[i]));
+      put_word(p, x86_imm32(c->nmethod_klasses[i]));
       // je nmethod(j)
       put_shrt(p, jz_opcode);
       assert(entry + PIC_nmethod_entry_offset + i*PIC_nmethod_entry_size + PIC_nmethod_offset == p, "constant value inconsistent with code pattern");
@@ -600,7 +660,7 @@ int PIC::code_for_megamorphic_case(char* entry) {
   put_byte(p, call_opcode);
   put_disp(p, StubRoutines::megamorphic_ic_entry());
   assert(entry + MIC_selector_offset == p, "layout constant inconsistent with code pattern");
-  put_word(p, int(selector()));	// used for fast lookup
+  put_word(p, x86_imm32(selector()));	// used for fast lookup
   assert(entry + MIC_code_size == p, "layout constant inconsistent with code pattern");
   return p - entry;
 }
@@ -759,7 +819,7 @@ void PIC::print() {
     switch (it.state()) {
       case PIC_Iterator::at_smi_nmethod: // fall through
       case PIC_Iterator::at_nmethod    : printf("\t-    nmethod  : %#x (entry %#x)\n", 
-      						    (int)it.compiled_method(), (int)it.get_call_addr()); break;
+      						    x86_imm32(it.compiled_method()), x86_imm32(it.get_call_addr())); break;
       case PIC_Iterator::at_methodOop  : printf("\t-    methodOop: %s\n", it.interpreted_method()->print_value_string()); break;
       default: ShouldNotReachHere();
     }
@@ -776,9 +836,9 @@ void PIC::verify() {
   for (int i = 0; i < k->length() - 1; i++) {
     for (int j = i + 1; j < k->length(); j++) {
       if (k->at(i) == k->at(j)) {
-	std->print("The class ");
-        k->at(i)->klass_part()->print_name_on(std);
-	std->print_cr("is twice in PIC 0x%lx", this);
+	stdOut->print("The class ");
+        k->at(i)->klass_part()->print_name_on(stdOut);
+	stdOut->print_cr("is twice in PIC 0x%lx", this);
         warning("PIC verify error");
       }
     }

@@ -22,9 +22,62 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_space.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "runtime.hpp"
+#include "frame.hpp"
+#include "symbolOop.hpp"
+#include "methodOop.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "location.hpp"
+#include "vframe.hpp"
+#include "processOop.hpp"
+#include "rSet.inline.hpp"
+#include "oopFactory.hpp"
+#include "universe.inline.hpp"
+#include "ageTable.hpp"
+#include "objArrayOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 oop* OldWaterMark::pseudo_allocate(int size) {
   oop* p = _point;
   if (p + size  < _space->end()) {
@@ -49,7 +102,7 @@ void space::switch_pointers(oop from, oop to) {
   fatal("not implemented yet");
 }
 
-void space::initialize(char* name, oop* bottom, oop* end) {
+void space::initialize(const char* name, oop* bottom, oop* end) {
   assert(Universe::on_page_boundary(bottom) && Universe::on_page_boundary(end), "invalid space boundaries");
 
   set_name(name);
@@ -214,6 +267,15 @@ oldSpace::oldSpace(char *name, int &size) {
   initialize_threshold();
 }
 
+void oldSpace::shrink_top(oop* from) {
+  assert(from <= _top, "can only shrink");
+  _top = from;
+  while (next_offset_treshold - card_size_in_oops > from) {
+    next_offset_treshold -= card_size_in_oops;
+    next_offset_index--;
+  }
+}
+
 void oldSpace::update_offset_array(oop* p, oop* p_end) {
   assert( p_end >= next_offset_treshold, "should be past threshold");
   //  [    ][    ][   ]       "card pages"
@@ -277,11 +339,11 @@ void space::oops_do(oopsDoFn f) {
 }
 
 void space::print() {
-  std->print(" %5s %6dK, %d%% used", name(), capacity() / K, used() * 100 / capacity());
+  stdOut->print(" %5s %6dK, %d%% used", name(), capacity() / K, used() * 100 / capacity());
   if (WizardMode) {
-    std->print(" [%#-6lx,%#-6lx[", bottom(), top());
+    stdOut->print(" [%#-6lx,%#-6lx[", bottom(), top());
   }
-  std->cr();
+  stdOut->cr();
 }
 
 void space::object_iterate(ObjectClosure* blk) {
@@ -320,14 +382,14 @@ class VerifyOldOopClosure : public OopClosure {
     if (obj->is_new()) {
       // Make sure the the_obj is in the remembered set
       if (!Universe::remembered_set->is_object_dirty(the_obj)) {
-	std->cr();
-        std->print_cr("New obj reference found in non dirty page.");
-	std->print_cr("- object containing the reference:");
+	stdOut->cr();
+        stdOut->print_cr("New obj reference found in non dirty page.");
+	stdOut->print_cr("- object containing the reference:");
 	the_obj->print();
-	std->print_cr("- the referred object:");
-	std->print("[0x%lx]: 0x%lx = ", o, obj);
+	stdOut->print_cr("- the referred object:");
+	stdOut->print("[0x%lx]: 0x%lx = ", o, obj);
         obj->print_value();
-	std->cr();
+	stdOut->cr();
 	Universe::remembered_set->print_set_for_object(the_obj);
 	warning("gc problem");
       }
@@ -358,7 +420,7 @@ void oldSpace::verify() {
 oop* oldSpace::object_start(oop* p) {
   // Find the page start
   oop* q = p;
-  int b = (int) q;
+  intptr_t b = (intptr_t) q;
   clearBits(b, nthMask(card_shift));
   q = (oop*) b;
   assert(contains(q), "q must be in this space");

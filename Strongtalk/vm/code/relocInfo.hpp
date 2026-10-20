@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_RELOCINFO_HPP_HPP
+#define VM_CODE_RELOCINFO_HPP_HPP
 
 # ifdef DELTA_COMPILER
 // These hold enough information to read or write a value embedded
@@ -39,6 +41,13 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 const int reloc_type_width   =  3;
 const int reloc_offset_width = 13;
+
+class CompiledIC;
+class PrimitiveIC;
+class CompiledDLL_Cache;
+CompiledIC*        CompiledIC_from_relocInfo(char* displacement_address);
+PrimitiveIC*       PrimitiveIC_from_relocInfo(char* displacement_address);
+CompiledDLL_Cache* compiledDLL_Cache_from_relocInfo(char* displacement_address);
 
 class relocInfo : ValueObj {
  protected:
@@ -165,7 +174,7 @@ class relocIterator : StackObj {
 
   char* callDestination() const {
     assert(type() != relocInfo::oop_type, "must be call");
-    return *(char**)addr + int(addr) + 4;	// INTEL-SPECIFIC
+    return addr + sizeof(int32_t) + *(int32_t*)addr;	// INTEL-SPECIFIC: rel32 call displacement
   }
 
   // for uncommon traps only: was it ever executed?
@@ -176,3 +185,6 @@ class relocIterator : StackObj {
 };
 
 #endif
+
+
+#endif // VM_CODE_RELOCINFO_HPP_HPP

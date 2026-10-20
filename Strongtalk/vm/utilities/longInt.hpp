@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_UTILITIES_LONGINT_HPP_HPP
+#define VM_UTILITIES_LONGINT_HPP_HPP
 
 // Support for 64 bit integer operations
 
@@ -39,3 +41,6 @@ class long_int {
 
   static long_int double_conversion(double value);
 };
+
+
+#endif // VM_UTILITIES_LONGINT_HPP_HPP

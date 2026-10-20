@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_REGALLOC_HPP_HPP
+#define VM_COMPILER_REGALLOC_HPP_HPP
 
 // register allocator for the Compiler
 // currently a simple usage count thing
@@ -65,3 +67,6 @@ class RegisterEqClass : public ResourceObj {
 };
 
 # endif
+
+
+#endif // VM_COMPILER_REGALLOC_HPP_HPP

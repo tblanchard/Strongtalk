@@ -22,11 +22,52 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "klassOop.hpp"
+#include "rSet.inline.hpp"
+#include "runtime.hpp"
+#include "universe.inline.hpp"
+#include "ageTable.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 # include <string.h>
 
-# include "incls/_rSet.cpp.incl"
 
 // values of bytes in byte map: during normal operation (incl. scavenge),
 // bytes are either -1 (clean) or 0 (dirty); i.e., the interpreter / compiled code
@@ -57,11 +98,11 @@ rSet::rSet() {
 }
 
 void* rSet::operator new(size_t size) {
-  assert((int(Universe::new_gen.low_boundary) & (card_size - 1)) == 0,
+  assert((intptr_t(Universe::new_gen.low_boundary) & (card_size - 1)) == 0,
 	 "new must start at card boundary");
-  assert((int(Universe::old_gen.low_boundary) & (card_size - 1)) == 0,
+  assert((intptr_t(Universe::old_gen.low_boundary) & (card_size - 1)) == 0,
 	 "old must start at card boundary");
-  assert((int(Universe::old_gen.high_boundary) & (card_size - 1)) == 0,
+  assert((intptr_t(Universe::old_gen.high_boundary) & (card_size - 1)) == 0,
 	 "old must end at card boundary");
   assert(card_size >= 512, "card_size must be at least 512");
   int bmsize =
@@ -194,9 +235,9 @@ class CheckDirtyClosure : public OopClosure {
       is_dirty = true;
       /*
       { FlagSetting fs(PrintObjectID, false);
-        std->print("0x%lx ", o);
+        stdOut->print("0x%lx ", o);
         (*o)->print_value();
-        std->cr();
+        stdOut->cr();
       }
       */
     }
@@ -234,24 +275,24 @@ int rSet::number_of_pages_with_dirty_objects_in(oldSpace* sp) {
 }
 
 void rSet::print_set_for_object(memOop obj) {
-  std->print("Remember set for 0x%lx ", obj);
+  stdOut->print("Remember set for 0x%lx ", obj);
   obj->print_value();
-  std->cr();
+  stdOut->cr();
   if (obj->is_new()) {
-    std->print_cr(" object is in new space!");
+    stdOut->print_cr(" object is in new space!");
   } else {
-    std->sp();
+    stdOut->sp();
     char* current_byte = byte_for(obj->addr());
     char* end_byte     = byte_for(obj->addr() + obj->size());
     while (current_byte <= end_byte) {
       if (*current_byte) {
-        std->print("_");
+        stdOut->print("_");
       } else {
-        std->print("*");
+        stdOut->print("*");
       }
       current_byte++;
     }
-    std->cr();
+    stdOut->cr();
   }
 }
 

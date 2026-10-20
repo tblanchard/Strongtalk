@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RECOMPILER_RECOMPILE_HPP_HPP
+#define VM_RECOMPILER_RECOMPILE_HPP_HPP
 
 
 #ifdef DELTA_COMPILER
@@ -50,16 +52,14 @@ class Recompilation : public VM_Operation {
   Recompilation(oop rcvr, methodOop method) {		    // used if interpreted method triggers counter
     _method = method; _rcvr = rcvr; _nm = NULL; _isUncommon = false; init();
   }
-  Recompilation(oop rcvr, nmethod* nm, bool unc = false) {  // used if compiled method triggers counter
-    _method = nm->method(); _rcvr = rcvr; _nm = nm; _isUncommon = unc; init();
-  }
+  Recompilation(oop rcvr, nmethod* nm, bool unc = false);   // used if compiled method triggers counter
   ~Recompilation()			{ theRecompilation = NULL; }
   void doit();
   bool isCompiled() const		{ return _nm != NULL; }
   bool recompiledTrigger() const	{ return _recompiledTrigger; }
-  char* result() const			{ return _newNM ? _newNM->verifiedEntryPoint() : NULL; }
+  char* result() const;
   oop  receiverOf(deltaVFrame* vf) const;     // same as vf->receiver() but also works for trigger
-  char* name() 				{ return "recompile"; }
+  const char* name() 				{ return "recompile"; }
 
   // entry points dealing with invocation counter overflow
   static char* methodOop_invocation_counter_overflow(oop rcvr, methodOop method); // called by interpreter
@@ -122,3 +122,6 @@ const int MaxVersions = 4 - 1;		// desired max. # nmethod recompilations
 
 
 #endif
+
+
+#endif // VM_RECOMPILER_RECOMPILE_HPP_HPP

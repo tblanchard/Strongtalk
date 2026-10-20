@@ -21,11 +21,65 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "os.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_zoneHeap.cpp.incl"
 
 class HeapChunk : public ValueObj {	// a heap chunk is a consecutive sequence of blocks
  protected:
@@ -168,7 +222,8 @@ void ChunkKlass::markSize(int nChunks, chunkState s) {
       for (int i = minHeaderSize; i < nChunks - minHeaderSize; i++) p[i] = i;
     } else {
       int max = min(nChunks - 4, MaxDistance);
-      for (int i = maxHeaderSize; i < max; i++) p[i] = i;
+      int i;
+      for (i = maxHeaderSize; i < max; i++) p[i] = i;
       // fill rest with large distance values (don't use MaxDistance - 1 because
       // the elems MaxDistance..MaxDistance+maxHeaderSize-1 would point *into*
       // the header)
@@ -216,7 +271,7 @@ bool ChunkKlass::isValid() {
     u_char* e = next()->asByte() - 1;
     int ovfl = isUsed() ? usedOvfl: unusedOvfl;
     ok = p[0] == e[0] &&
-        (p[0] != ovfl || p[1] == e[-3] && p[2] == e[-2] && p[3] == e[-1]);
+      (p[0] != ovfl || (p[1] == e[-3] && p[2] == e[-2] && p[3] == e[-1]));
   }
   return ok;
 }
@@ -267,8 +322,8 @@ Heap::Heap(int s, int bs) {
   while (bs > 1) { bs >>= 1; log2BS++; }
   nfree = 30;
   _base = AllocateHeap(size + blockSize, "zone");
-  base = (char*)((int(_base) + blockSize - 1) / blockSize * blockSize);
-  assert(int(base) % blockSize == 0, "base not aligned to blockSize");
+  base = (char*)(((long)_base + blockSize - 1) / blockSize * blockSize);
+  assert((long)base % blockSize == 0, "base not aligned to blockSize");
   heapKlass = (ChunkKlass*)(AllocateHeap(mapSize() + 2, "zone free map") + 1);
   // + 2 for sentinels
   freeList = NEW_C_HEAP_ARRAY( FreeList, nfree);
@@ -347,9 +402,8 @@ void* Heap::allocFromLists(int wantedBytes) {
   }
   if (! p) {
     HeapChunk* f = bigList->anchor();
-    for (HeapChunk* c = f->next();
-	 c != f && c->size < wantedBlocks;
-	 c = c->next());
+    HeapChunk* c = f->next();
+    for (; c != f && c->size < wantedBlocks; c = c->next());
     if (c == f) {
       if (! combineMode && combineAll() >= wantedBlocks)
 	return allocFromLists(wantedBytes);
@@ -520,7 +574,10 @@ void* Heap::nextUsed(void* p) const {
   ChunkKlass* m = mapAddr(p);
   if (m->isValid() && !lastCombine->contains(m->asByte())) {
     if (VerifyZoneOften) {
-      for (ChunkKlass* m1 = heapKlass; m1 < m; m1 = m1->next()) ;
+        ChunkKlass* m1;
+        for (m1 = heapKlass; m1 < m; m1 = m1->next()) {
+            // Intentionally empty: walk to chunk m to verify it is valid.
+        }
       assert(m1 == m, "m isn't a valid chunk");
     }
     assert(m->verify(), "valid chunk doesn't verify");
@@ -529,11 +586,13 @@ void* Heap::nextUsed(void* p) const {
     // m is pointing into the middle of a block (because of block
     // combination)
 #   ifdef ASSERT
-      for (ChunkKlass* m1 = heapKlass; m1 < lastCombine; m1 = m1->next()) ;
+      ChunkKlass* m1;
+      for (m1 = heapKlass; m1 < lastCombine; m1 = m1->next()) { /* empty */ }
       assert(m1 == lastCombine, "lastCombine not found");
       assert(lastCombine->verify(), "invalid lastCombine");
 #   endif
-    for (ChunkKlass* n = lastCombine; n <= m; n = n->next()) ;
+    ChunkKlass* n = lastCombine;
+    for (; n <= m; n = n->next()) { /* empty */ }
     m = n;
     assert(m->isValid(), "something's wrong");
   }
@@ -549,7 +608,7 @@ void* Heap::nextUsed(void* p) const {
   } else {
     void* next = blockAddr(m);
     assert(next > p, "must be monotonic");
-    assert(!(int(next) & 1), "must be even");
+    assert(!(intptr_t(next) & 1), "must be even");
     return next;
   }
 }
@@ -560,7 +619,7 @@ void* Heap::findStartOfBlock(void* start) const {
     return newHeap->findStartOfBlock(start);
   
   const int  blockSz = blockSize;	
-  start = (void*)(int(start) & ~(blockSz-1));
+  start = (void*)((long)start & ~(blockSz-1));
   assert(contains(start), "start not in this zone");
   ChunkKlass* m = mapAddr(start)->findStart(heapKlass, heapEnd());
   return blockAddr(m);
@@ -571,57 +630,57 @@ int Heap::sizeOfBlock(void* p) const {
 }
 
 void Heap::verify() const {
-  ChunkKlass* m = heapKlass;
-  ChunkKlass* end = heapEnd();
-  if (end->isUnused() || end->size() != 1)
-    error("wrong end-sentinel %d in heap %#lx", *(u_char*)end, this);
-  ChunkKlass* begin = asChunkKlass(heapKlass->asByte() - 1);
-  if (begin->isUnused() || begin->size() != 1)
-    error("wrong begin-sentinel %d in heap %#lx", *(u_char*)begin, this);
-  
-  // verify map structure
-  while (m < end) {
-    if (!m->verify()) lprintf(" in heap %#lx", this);
-    m = m->next();
-  }
-  // verify free lists
-  for (int i = 0; i < nfree; i++) {
+    ChunkKlass* m = heapKlass;
+    ChunkKlass* end = heapEnd();
+    if (end->isUnused() || end->size() != 1)
+        error("wrong end-sentinel %d in heap %#lx", *(u_char*)end, this);
+    ChunkKlass* begin = asChunkKlass(heapKlass->asByte() - 1);
+    if (begin->isUnused() || begin->size() != 1)
+        error("wrong begin-sentinel %d in heap %#lx", *(u_char*)begin, this);
+    
+    // verify map structure
+    while (m < end) {
+        if (!m->verify()) lprintf(" in heap %#lx", this);
+        m = m->next();
+    }
+    // verify free lists
+    for (int i = 0; i < nfree; i++) {
+        int j = 0;
+        int lastSize = 0;
+        HeapChunk* f = freeList[i].anchor();
+        for(HeapChunk* h = f->next(); h != f; h = h->next(), j++) {
+            ChunkKlass* p = mapAddr(h);
+            if (!p->verify())
+                lprintf(" in free list %ld (elem %ld) of heap %#lx", i, j, this);
+            if (p->isUsed()) {
+                error("inconsistent freeList %ld elem %#lx in heap %#lx (map %#lx)",
+                      i, h, this, p);
+            }
+            if (p->size() != lastSize && j != 0) {
+                error("freeList %ld elem %#lx in heap %#lx (map %#lx) has wrong size",
+                      i, h, this, p);
+            }
+            lastSize = p->size();
+            if (h->next() == h) {
+                error("loop in freeList %ld elem %#lx in heap %#lx", i, h, this);
+                break;
+            }
+        }
+    }
     int j = 0;
-    int lastSize = 0;
-    HeapChunk* f = freeList[i].anchor();
+    HeapChunk* f = bigList->anchor();
     for(HeapChunk* h = f->next(); h != f; h = h->next(), j++) {
-      ChunkKlass* p = mapAddr(h);
-      if (!p->verify())
-	lprintf(" in free list %ld (elem %ld) of heap %#lx", i, j, this);
-      if (p->isUsed()) {
-	error("inconsistent freeList %ld elem %#lx in heap %#lx (map %#lx)",
-	       i, h, this, p);
-      }
-      if (p->size() != lastSize && j != 0) {
-	error("freeList %ld elem %#lx in heap %#lx (map %#lx) has wrong size",
-	       i, h, this, p);
-      }
-      lastSize = p->size();
-      if (h->next() == h) {
-	error("loop in freeList %ld elem %#lx in heap %#lx", i, h, this);
-	break;
-      }
+        ChunkKlass* p = mapAddr(h);
+        if (!p->verify())
+            lprintf(" in bigList (elem %ld) of heap %#lx", j, this);
+        if (p->isUsed()) {
+            error("inconsistent freeList %ld elem %#lx in heap %#lx (map 0xlx)",
+                  j, h, this, p);
+        }
+        if (! lastCombine->verify())
+            error("invalid lastCombine in heap %#lx", this);
+        
     }
-  }
-  int j = 0;
-  HeapChunk* f = bigList->anchor();
-  for(HeapChunk* h = f->next(); h != f; h = h->next(), j++) {
-    ChunkKlass* p = mapAddr(h);
-    if (!p->verify())
-      lprintf(" in bigList (elem %ld) of heap %#lx", j, this);
-    if (p->isUsed()) {
-      error("inconsistent freeList %ld elem %#lx in heap %#lx (map 0xlx)",
-	     i, h, this, p);
-    }
-  }
-  if (! lastCombine->verify())
-    error("invalid lastCombine in heap %#lx", this);
-  
 }
 
 void Heap::print() const {

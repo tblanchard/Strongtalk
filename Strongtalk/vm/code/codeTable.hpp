@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_CODETABLE_HPP_HPP
+#define VM_CODE_CODETABLE_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -47,15 +49,15 @@ struct codeTableEntry : ValueObj {
   // methods are tagged, links are not.
   void* nmethod_or_link;
   bool  is_empty()   { return nmethod_or_link == NULL; }
-  bool  is_nmethod() { return (int) nmethod_or_link & 1; }
+  bool  is_nmethod() { return (bool)((unsigned long) nmethod_or_link & 1); }
   void  clear()      { nmethod_or_link = NULL; }
 
   nmethod* get_nmethod() { 
-    return (nmethod*) ((int) nmethod_or_link - 1);
+    return (nmethod*) ((unsigned long) nmethod_or_link - 1);
   }
   void set_nmethod(nmethod* nm) {
     assert_oop_aligned(nm);
-    nmethod_or_link = (void*) ((int) nm + 1); }
+    nmethod_or_link = (void*) ((unsigned long) nm + 1); }
 
   codeTableLink* get_link() { return (codeTableLink*) nmethod_or_link; }
   void set_link(codeTableLink* l) {
@@ -105,3 +107,6 @@ class codeTable : public PrintableCHeapObj{
 };
 
 #endif
+
+
+#endif // VM_CODE_CODETABLE_HPP_HPP

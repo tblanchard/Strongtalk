@@ -21,9 +21,96 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_debug_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "prim_def.hpp"
+#include "oopFactory.hpp"
+#include "doubleOop.hpp"
+#include "vmSymbols.hpp"
+#include "universe.inline.hpp"
+#include "oop.inline.hpp"
+#include "prim_impl.hpp"
+#include "ageTable.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "slist.hpp"
+#include "frame.hpp"
+#include "compUtils.hpp"
+#include "vmOperations.hpp"
+#include "debug_prims.hpp"
+#include "interpreter.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "prettyPrinter.hpp"
+#include "methodPrinter.hpp"
 TRACE_FUNC(TraceDebugPrims, "debug")
 
 int debugPrimitives::number_of_calls;
@@ -74,7 +161,10 @@ PRIM_DECL_2(debugPrimitives::smiAtPut , oop name, oop value) {
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_smi())
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
-  int v = smiOop(value)->value();
+  smi sv = smiOop(value)->value();
+  if (sv < INT_MIN || sv > INT_MAX)	// VM integer flags are ints
+    return markSymbol(vmSymbols::second_argument_has_wrong_type());
+  int v = (int) sv;
   if (debugFlags::intAtPut(byteArrayOop(name)->chars(),
 			   byteArrayOop(name)->length(),
 			   &v))
@@ -132,7 +222,7 @@ PRIM_DECL_2(debugPrimitives::printMethodCodes, oop receiver, oop sel) {
 
 PRIM_DECL_2(debugPrimitives::generateIR, oop receiver, oop sel) {
   PRIMITIVE_FAILS_IN_PRODUCT
-  std->print_cr("primitiveGenerateIR called...");
+  stdOut->print_cr("primitiveGenerateIR called...");
   ResourceMark rm;	// needed to avoid memory leaks!
   PROLOGUE_2("generateIR", receiver, sel)
   if (!sel->is_byteArray())
@@ -142,7 +232,8 @@ PRIM_DECL_2(debugPrimitives::generateIR, oop receiver, oop sel) {
   if (!m) return markSymbol(vmSymbols::not_found());
   LookupKey key(receiver->klass(), s);
 # ifdef DELTA_COMPILER
-  VMProcess::execute(&VM_OptimizeMethod(&key, m));
+  VM_OptimizeMethod op(&key, m);
+  VMProcess::execute(&op);
 # endif
   return receiver;
 }
@@ -215,7 +306,7 @@ PRIM_DECL_1(debugPrimitives::setInterpreterInvocationCounterLimit, oop limit) {
   PROLOGUE_1("setInterpreterInvocationCounterLimit", limit);
   if (!limit->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
-  int value = smiOop(limit)->value();
+  smi value = smiOop(limit)->value();
   if (value < 0 || value > methodOopDesc::_invocation_count_max)
     return markSymbol(vmSymbols::out_of_bounds());
   Interpreter::set_invocation_counter_limit(value);
@@ -267,13 +358,13 @@ PRIM_DECL_1(debugPrimitives::printInvocationCounterHistogram, oop size) {
   // Collect the methods
   CollectMethodClosure blk(col, smiOop(size)->value());
   Universe::object_iterate(&blk);
-  std->print_cr("Collected %d methods", col->length());
+  stdOut->print_cr("Collected %d methods", col->length());
   // Sort the methods based on the invocation counters.
   col->sort(&compare_method_counters);
   // Print out the result
   for (int index = 0; index < col->length(); index++) {
     methodOop m = col->at(index);
-    std->print("[%d] ", m->invocation_count());
+    stdOut->print("[%d] ", m->invocation_count());
     m->pretty_print();
   }
   return trueObj;
@@ -311,7 +402,7 @@ PRIM_DECL_1(debugPrimitives::printNMethodCounterHistogram, oop size) {
   // Collect the nmethods
   FOR_ALL_NMETHOD(nm) col->push(nm);
 
-  std->print_cr("Collected %d nmethods", col->length());
+  stdOut->print_cr("Collected %d nmethods", col->length());
   // Sort the methods based on the invocation counters.
   col->sort(&compare_nmethod_counters);
   // Print out the result
@@ -319,7 +410,7 @@ PRIM_DECL_1(debugPrimitives::printNMethodCounterHistogram, oop size) {
             ? smiOop(size)->value() : col->length();
   for (int index = 0; index < end; index++) {
     nmethod* m = col->at(index);
-    std->print("[%d] ", m->invocation_count());
+    stdOut->print("[%d] ", m->invocation_count());
     m->scopes()->print_partition();
     m->method()->pretty_print();
   }
@@ -403,9 +494,9 @@ class Counter : public ResourceObj {
      number++;
    }
    void print(char* prefix) {
-     std->print("%s%s", prefix, title);
-     std->fill_to(22);
-     std->print_cr("%6d %8d", number, total_size * oopSize);
+     stdOut->print("%s%s", prefix, title);
+     stdOut->fill_to(22);
+     stdOut->print_cr("%6d %8d", number, total_size * oopSize);
    }
    void add(Counter* i) {
      total_size += i->total_size;
@@ -481,9 +572,9 @@ Counter* ObjectHistogram::counter(memOop obj) {
 }
 
 void ObjectHistogram::print() {
-  std->print("Object Histogram");
-  std->fill_to(22);
-  std->print_cr("number    bytes");
+  stdOut->print("Object Histogram");
+  stdOut->fill_to(22);
+  stdOut->print_cr("number    bytes");
   Counter* total = new Counter("Total");
   counters->sort(&Counter::compare);
   for(int index = 0; index < counters->length(); index++) {

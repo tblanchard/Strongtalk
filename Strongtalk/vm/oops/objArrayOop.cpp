@@ -21,9 +21,62 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_objArrayOop.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "symbolOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "ageTable.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "objArrayKlass.hpp"
+#include "bootstrap.hpp"
+#include "runtime.hpp"
+#include "frame.hpp"
+#include "methodOop.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "location.hpp"
+#include "vframe.hpp"
+#include "oopFactory.hpp"
 bool objArrayOopDesc::verify() {
   bool flag = memOopDesc::verify();
   if (flag) {
@@ -46,7 +99,8 @@ void objArrayOopDesc::bootstrap_object(bootstrap* st) {
 objArrayOop objArrayOopDesc::copy_remove(int index, int number) {
   objArrayOop new_array = oopFactory::new_objArray(length() - number);
   // copy [1..index-1]
-  for (int i = 1; i < index ; i++)
+  int i;
+  for (i = 1; i < index ; i++)
     new_array->obj_at_put(i, obj_at(i));
 
   // copy  [index+number..length]
@@ -58,14 +112,16 @@ objArrayOop objArrayOopDesc::copy_remove(int index, int number) {
 
 objArrayOop objArrayOopDesc::copy() {
   objArrayOop new_array = oopFactory::new_objArray(length());
-  for (int i = 1; i <= length(); i++)
+  int i;
+  for (i = 1; i <= length(); i++)
     new_array->obj_at_put(i, obj_at(i));
   return new_array;
 }
 
 objArrayOop objArrayOopDesc::copy_add(oop a) {
   objArrayOop new_array = oopFactory::new_objArray(length() + 1);
-  for (int i = 1; i <= length(); i++)
+  int i;
+  for (i = 1; i <= length(); i++)
     new_array->obj_at_put(i, obj_at(i));
   new_array->obj_at_put(i, a);
   return new_array;
@@ -73,7 +129,8 @@ objArrayOop objArrayOopDesc::copy_add(oop a) {
 
 objArrayOop objArrayOopDesc::copy_add_two(oop a, oop b) {
   objArrayOop new_array = oopFactory::new_objArray(length() + 2);
-  for (int i = 1; i < length(); i++)
+  int i;
+  for (i = 1; i < length(); i++)
     new_array->obj_at_put(i, obj_at(i));
   new_array->obj_at_put(i++, a);
   new_array->obj_at_put(i,   b);
@@ -107,7 +164,8 @@ void objArrayOopDesc::replace_from_to(int from, int to, objArrayOop source, int 
     }
   } else {
     // copy down
-    for (int index = to; index >= from; index--) {
+    int index;
+    for (index = to; index >= from; index--) {
       source->obj_at_put(other_index--, obj_at(index));
     }
   }
@@ -115,7 +173,8 @@ void objArrayOopDesc::replace_from_to(int from, int to, objArrayOop source, int 
 
 void objArrayOopDesc::replace_and_fill(int from, int start, objArrayOop source) {
   // Fill the first part
-  for (int index = 1; index < from; index++) {
+  int index;
+  for (index = 1; index < from; index++) {
     obj_at_put(index, nilObj);
   }
 

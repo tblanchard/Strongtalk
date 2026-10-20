@@ -20,12 +20,17 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_WEAKARRAYKLASS_HPP_HPP
+#define VM_OOPS_WEAKARRAYKLASS_HPP_HPP
 
+#include "objArrayKlass.hpp"
+
+void set_weakArrayKlass_vtbl(Klass* k);
 class weakArrayKlass: public objArrayKlass {
  public:   
   friend void set_weakArrayKlass_vtbl(Klass* k);
 
-  char* name() const { return "weakArray"; }
+  const char* name() const { return "weakArray"; }
 
   // creates invocation
   klassOop create_subclass(mixinOop mixin, Format format);
@@ -121,3 +126,6 @@ class NotificationQueue : AllStatic {
   static int last;
   static int succ(int index);
 };
+
+
+#endif // VM_OOPS_WEAKARRAYKLASS_HPP_HPP

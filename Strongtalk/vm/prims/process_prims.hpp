@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_PROCESS_PRIMS_HPP_HPP
+#define VM_PRIMS_PROCESS_PRIMS_HPP_HPP
 
 // Primitives for processes
 
@@ -194,3 +196,6 @@ class processOopPrimitives : AllStatic {
   static PRIM_DECL_2(stack, oop receiver, oop limit);
 
 };
+
+
+#endif // VM_PRIMS_PROCESS_PRIMS_HPP_HPP

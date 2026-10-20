@@ -20,12 +20,18 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_MARKOOP_HPP
+#define VM_OOPS_MARKOOP_HPP
 
-// Bit-format of markOop:
-//  sentinel:1 near_death:1 tagged_contents:1 age:7 hash:20 tag:2 = 32 bits
+#include "oop.hpp"
+// Bit-format of markOop (most significant bit first):
+//  sentinel:1 near_death:1 tagged_contents:1 age:7 hash:N tag:2 = BitsPerWord bits
+//  where N = BitsPerWord - 12 (20 bits on 32-bit hosts, 52 bits on 64-bit hosts).
 //  - sentinel is needed during pointer reversal in garbage collection 
 //    to distinguish markOops from roots of oops. markOops are used termination
 //    elements in the pointer list.
+//    The sentinel must be the most significant bit: is_oop_root() relies on it
+//    being clear in every (user space) heap address.
 //    During normal execution the sentinel is 1 but the but may be used for
 //    marking during special vm operations like dependency checking.
 //  - near_death is set by the memory system iff weak pointers keep the object alive.
@@ -36,45 +42,49 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 //  - hash contains the identity hash value.
 //  - tag contains the special mark tag
 
+// Mask of the low 'bits' bits of a word (usable in constant expressions).
+constexpr uintptr_t markOop_mask(int bits) { return bits >= BitsPerWord ? ~uintptr_t(0) : (uintptr_t(1) << bits) - 1; }
+
 class markOopDesc: public oopDesc {
  private:
-  unsigned int value()  const { return (unsigned int) this; }
-  friend   int assign_hash(markOop& m);
+  typedef uintptr_t word;
+  word value()  const { return (word) this; }
+  friend   smi assign_hash(markOop& m);
 
-  enum { no_hash    = 0, 
-         first_hash = 1};
+  static constexpr int  no_hash               = 0;
+  static constexpr int  first_hash            = 1;
 
-  enum { sentinel_bits         = 1,
-         near_death_bits       = 1,
-         tagged_contents_bits  = 1,
-         age_bits              = 7,
-         hash_bits             = BitsPerWord - sentinel_bits - near_death_bits - tagged_contents_bits - age_bits - Tag_Size };
+  static constexpr int  sentinel_bits         = 1;
+  static constexpr int  near_death_bits       = 1;
+  static constexpr int  tagged_contents_bits  = 1;
+  static constexpr int  age_bits              = 7;
+  static constexpr int  hash_bits             = BitsPerWord - sentinel_bits - near_death_bits - tagged_contents_bits - age_bits - Tag_Size;
 
-  enum { hash_shift            = Tag_Size,
-         age_shift             = hash_bits             + hash_shift,
-         tagged_contents_shift = age_bits              + age_shift,
-         near_death_shift      = tagged_contents_bits  + tagged_contents_shift,
-         sentinel_shift        = near_death_bits       + near_death_shift };
+  static constexpr int  hash_shift            = Tag_Size;
+  static constexpr int  age_shift             = hash_bits             + hash_shift;
+  static constexpr int  tagged_contents_shift = age_bits              + age_shift;
+  static constexpr int  near_death_shift      = tagged_contents_bits  + tagged_contents_shift;
+  static constexpr int  sentinel_shift        = near_death_bits       + near_death_shift;
+  static_assert(sentinel_shift == BitsPerWord - 1, "sentinel must be the most significant bit");
 
-  enum { hash_mask                     = nthMask(hash_bits),
-         hash_mask_in_place            = hash_mask << hash_shift,
-         age_mask                      = nthMask(age_bits),
-         age_mask_in_place             = age_mask << age_shift,
-         tagged_contents_mask          = nthMask(tagged_contents_bits),
-         tagged_contents_mask_in_place = tagged_contents_mask << tagged_contents_shift,
-         near_death_mask               = nthMask(near_death_bits),
-         near_death_mask_in_place      = near_death_mask << near_death_shift,
-         sentinel_mask                 = nthMask(sentinel_bits),
-	 sentinel_mask_in_place        = sentinel_mask << sentinel_shift };
+  static constexpr word hash_mask                     = markOop_mask(hash_bits);
+  static constexpr word hash_mask_in_place            = hash_mask << hash_shift;
+  static constexpr word age_mask                      = markOop_mask(age_bits);
+  static constexpr word age_mask_in_place             = age_mask << age_shift;
+  static constexpr word tagged_contents_mask          = markOop_mask(tagged_contents_bits);
+  static constexpr word tagged_contents_mask_in_place = tagged_contents_mask << tagged_contents_shift;
+  static constexpr word near_death_mask               = markOop_mask(near_death_bits);
+  static constexpr word near_death_mask_in_place      = near_death_mask << near_death_shift;
+  static constexpr word sentinel_mask                 = markOop_mask(sentinel_bits);
+  static constexpr word sentinel_mask_in_place        = sentinel_mask << sentinel_shift;
 
+  static constexpr word no_hash_in_place           = word(no_hash)    << hash_shift;
+  static constexpr word first_hash_in_place        = word(first_hash) << hash_shift;
+  static constexpr word untagged_contents_in_place = word(1)          << tagged_contents_shift;
 
-  enum { no_hash_in_place           = no_hash     << hash_shift,
-         first_hash_in_place        = first_hash  << hash_shift,
-         untagged_contents_in_place = 1           << tagged_contents_shift };
-
-  enum { sentinel_is_place = 1 << sentinel_shift } ;
+  static constexpr word sentinel_is_place = word(1) << sentinel_shift;
  public:
-  enum { max_age = age_mask };
+  static constexpr int max_age = (int) age_mask;
   // accessors
   bool    has_sentinel()      const { return maskBits(value(), sentinel_mask_in_place) != 0; }
   markOop set_sentinel()      const { return markOop( sentinel_is_place | value()); } 
@@ -92,7 +102,7 @@ class markOopDesc: public oopDesc {
   markOop clear_klass_invalid() const { return set_sentinel(); }
 
   // tells if context has forward reference to an unoptimized context(via sentinel bit)
-  static int context_forward_bit_mask() { return near_death_mask_in_place; }
+  static uintptr_t context_forward_bit_mask() { return near_death_mask_in_place; }
   bool    has_context_forward() const { return is_near_death();  }
   markOop set_context_forward() const { return set_near_death(); }
 
@@ -102,18 +112,18 @@ class markOopDesc: public oopDesc {
   markOop clear_queued() const { return set_sentinel();   }
 
   // age operations
-  int        age()            const { return maskBits(value(), age_mask_in_place)  >> age_shift; }
+  int        age()            const { return (int) (maskBits(value(), age_mask_in_place)  >> age_shift); }
   markOop    set_age(int v)   const {
     assert((v & ~age_mask) == 0, "shouldn't overflow field");
-    return markOop((value() & ~age_mask_in_place) | ((v & age_mask) << age_shift));
+    return markOop((value() & ~age_mask_in_place) | ((word(v) & age_mask) << age_shift));
   }
   markOop    incr_age()       const { return age() == max_age ? markOop(this) : set_age(age() + 1); }
 
   // hash operations
-  int        hash()           const { return maskBits(value(), hash_mask_in_place) >> hash_shift; }
-  markOop    set_hash(int v)  const {
+  smi        hash()           const { return (smi) (maskBits(value(), hash_mask_in_place) >> hash_shift); }
+  markOop    set_hash(smi v)  const {
     if ((v & hash_mask) == 0) v = first_hash; // avoid no_hash
-    markOop val = markOop((value() & ~hash_mask_in_place) | ((v & hash_mask) << hash_shift));
+    markOop val = markOop((value() & ~hash_mask_in_place) | ((word(v) & hash_mask) << hash_shift));
     assert(val->hash() != no_hash, "should have hash now");
     return val;
   }
@@ -132,15 +142,15 @@ class markOopDesc: public oopDesc {
     return markOop(sentinel_is_place | first_hash_in_place | Mark_Tag);
   }
 
-  friend int hash_markOop(markOop& m) {
-    int v = m->hash();
+  friend smi hash_markOop(markOop& m) {
+    smi v = m->hash();
     return v == no_hash ? assign_hash(m) : v;
   }
 
   // printing
   void print_on(outputStream* st);
 
-  static int masked_hash(int v) { return v & hash_mask; }
+  static smi masked_hash(smi v) { return (smi) (word(v) & hash_mask); }
 };
 
 # define badOop markOopDesc::bad()
@@ -148,3 +158,5 @@ class markOopDesc: public oopDesc {
 // tells whether p is a root to an oop or a markOop
 // used during pointer reversal during GC.
 inline bool is_oop_root(oop* p) { return !markOop(p)->has_sentinel(); }
+
+#endif // VM_OOPS_MARKOOP_HPP

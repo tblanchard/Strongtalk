@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_BYTECODES_HPP_HPP
+#define VM_INTERPRETER_BYTECODES_HPP_HPP
 
 // Bytecodes comprises the definition of all bytecodes
 // and provides utility functions working on bytecodes.
@@ -425,7 +427,7 @@ class Bytecodes: AllStatic {
 
  private:
   static char*		_entry_point[number_of_codes];
-  static char*		_name[number_of_codes];
+  static const char*	_name[number_of_codes];
   static Format		_format[number_of_codes];
   static CodeType	_code_type[number_of_codes];
   static ArgumentSpec	_argument_spec[number_of_codes];
@@ -434,9 +436,9 @@ class Bytecodes: AllStatic {
   static bool		_pop_tos[number_of_codes];
   
   static void	def(Code code);
-  static void	def(Code code, char* name, Format format, CodeType code_type, bool single_step, bool pop_tos = false);
-  static void	def(Code code, char* name, Format format, ArgumentSpec argument_spec, SendType send_type, bool pop_tos = false);
-  static void	def(Code code, char* name, Format format, CodeType code_type, bool single_step, ArgumentSpec argument_spec, SendType send_type, bool pop_tos);
+  static void	def(Code code, const char* name, Format format, CodeType code_type, bool single_step, bool pop_tos = false);
+  static void	def(Code code, const char* name, Format format, ArgumentSpec argument_spec, SendType send_type, bool pop_tos = false);
+  static void	def(Code code, const char* name, Format format, CodeType code_type, bool single_step, ArgumentSpec argument_spec, SendType send_type, bool pop_tos);
 
  public:
   // Define entry points
@@ -454,7 +456,7 @@ class Bytecodes: AllStatic {
 
   // Bytecode specification
   static char*		entry_point	(Code code)	{ return _entry_point[code]; }
-  static char*		name		(Code code)	{ return _name[code]; }
+  static const char*	name		(Code code)	{ return _name[code]; }
   static Format		format		(Code code)	{ return _format[code]; }
   static CodeType	code_type	(Code code)	{ return _code_type[code]; }
   static ArgumentSpec	argument_spec	(Code code)	{ return _argument_spec[code]; }
@@ -502,3 +504,6 @@ class Bytecodes: AllStatic {
   static void init();
   static void print();
 };
+
+
+#endif // VM_INTERPRETER_BYTECODES_HPP_HPP

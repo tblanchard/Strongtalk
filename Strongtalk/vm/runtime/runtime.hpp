@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_RUNTIME_HPP_HPP
+#define VM_RUNTIME_RUNTIME_HPP_HPP
 
 
 /*
@@ -53,3 +55,6 @@ inline void Set_Byte_Map_Base(char* base) {byte_map_base = base;}
 
 inline void  setSPMax(char* m)        { MaxSP = m; }
 inline char* currentSPMax()           { return MaxSP; }
+
+
+#endif // VM_RUNTIME_RUNTIME_HPP_HPP

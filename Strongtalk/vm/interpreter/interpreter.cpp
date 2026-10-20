@@ -22,10 +22,72 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_interpreter.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "dispatchTable.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "symbolOop.hpp"
+#include "disclaimer.hpp"
+#include "codeIterator.hpp"
+#include "frame.hpp"
+#include "interpreter.hpp"
+#include "proxyOop.hpp"
+#include "doubleOop.hpp"
+#include "key.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "disassembler.hpp"
+#include "floats.hpp"
+#include "lookupCache.hpp"
+#include "oopFactory.hpp"
+#include "prim.hpp"
+#include "interpretedIC.hpp"
+#include "objArrayOop.hpp"
+#include "blockOop.hpp"
+#include "x86_mapping.hpp"
 // Interpreter stack frame
 //
 // An interpreter stack frame always provides space for at least one temporary (temp_0).
@@ -81,15 +143,15 @@ bool Interpreter::has_timers()          { return InterpreterCodeStatus()[5] == 1
 
 void Interpreter::print_code_status() {
   if (is_optimized()) {
-    std->print_cr("- Interpreter code is optimized");
+    stdOut->print_cr("- Interpreter code is optimized");
   } else {
-    std->print("- Interpreter code is in debug mode: ");
-    if (can_trace_bytecodes()) std->print("trace_bytecodes ");
-    if (can_trace_sends())     std->print("trace_sends ");
-    if (has_assertions())      std->print("assertions ");
-    if (has_stack_checks())    std->print("stack_checks ");
-    if (has_timers())          std->print("timers ");
-    std->cr();
+    stdOut->print("- Interpreter code is in debug mode: ");
+    if (can_trace_bytecodes()) stdOut->print("trace_bytecodes ");
+    if (can_trace_sends())     stdOut->print("trace_sends ");
+    if (has_assertions())      stdOut->print("assertions ");
+    if (has_stack_checks())    stdOut->print("stack_checks ");
+    if (has_timers())          stdOut->print("timers ");
+    stdOut->cr();
   }
 }
 
@@ -111,9 +173,9 @@ void Interpreter::loop_counter_overflow() {
   if (debug) {
     ResourceMark rm;
     int l = loop_counter_limit();
-    std->print("loop counter > %d in ", l);
+    stdOut->print("loop counter > %d in ", l);
     method->print_value();
-    std->cr();
+    stdOut->cr();
   }
 }
 
@@ -161,10 +223,10 @@ extern "C" void verifyPIC(oop pic) {
 extern "C" void trace_send(oop receiver, methodOop method) {
   if (TraceMessageSend) {
     ResourceMark rm;
-    std->print("Trace ");
+    stdOut->print("Trace ");
     receiver->print_value();
     method->selector()->print_value();
-    std->cr();
+    stdOut->cr();
   }
 }
 
@@ -174,8 +236,8 @@ extern "C" void trace_send(oop receiver, methodOop method) {
 void Interpreter::trace_bytecode() {
   if (TraceBytecodes) {
     u_char* ip = DeltaProcess::active()->last_frame().hp();
-    char* name = Bytecodes::name((Bytecodes::Code)*ip);
-    std->print("%9d 0x%x: %02x %s\n", NumberOfBytecodesExecuted, ip, *ip, name);
+    const char* name = Bytecodes::name((Bytecodes::Code)*ip);
+    stdOut->print("%9d 0x%x: %02x %s\n", NumberOfBytecodesExecuted, ip, *ip, name);
   } 
 }
 
@@ -301,12 +363,12 @@ class InterpreterGenerator: StackObj {
   void restore_ebx()		{ _masm->xorl(ebx, ebx); }
 
   // Constant addresses
-  Address nil_addr()		{ return Address(int(&nilObj), relocInfo::external_word_type); }
-  Address true_addr()		{ return Address(int(&trueObj), relocInfo::external_word_type); }
-  Address false_addr()		{ return Address(int(&falseObj), relocInfo::external_word_type); }
-  Address smiKlass_addr()	{ return Address(int(&smiKlassObj), relocInfo::external_word_type); }
-  Address doubleKlass_addr()	{ return Address(int(&doubleKlassObj), relocInfo::external_word_type); }
-  Address contextKlass_addr()	{ return Address(int(&symbolKlassObj), relocInfo::external_word_type); }
+  Address nil_addr()		{ return Address(x86_imm32(&nilObj), relocInfo::external_word_type); }
+  Address true_addr()		{ return Address(x86_imm32(&trueObj), relocInfo::external_word_type); }
+  Address false_addr()		{ return Address(x86_imm32(&falseObj), relocInfo::external_word_type); }
+  Address smiKlass_addr()	{ return Address(x86_imm32(&smiKlassObj), relocInfo::external_word_type); }
+  Address doubleKlass_addr()	{ return Address(x86_imm32(&doubleKlassObj), relocInfo::external_word_type); }
+  Address contextKlass_addr()	{ return Address(x86_imm32(&symbolKlassObj), relocInfo::external_word_type); }
 
   // C calls
   void call_C(Label& L);
@@ -396,7 +458,7 @@ class InterpreterGenerator: StackObj {
   char* generate_instruction(Bytecodes::Code code);
 
   // Generation helper
-  void  info(char* name);
+  void  info(const char* name);
 
   // Generation
   void  generate_all();
@@ -507,10 +569,10 @@ void InterpreterGenerator::next_ebx() {
 
 void InterpreterGenerator::jump_ebx() {
   if (TraceBytecodes || CountBytecodes || StopInterpreterAt > 0) {
-    _masm->incl(Address(int(&NumberOfBytecodesExecuted), relocInfo::external_word_type));
+    _masm->incl(Address(x86_imm32(&NumberOfBytecodesExecuted), relocInfo::external_word_type));
     if (StopInterpreterAt > 0) {
       Label cont;
-      _masm->cmpl(Address(int(&NumberOfBytecodesExecuted), relocInfo::external_word_type), StopInterpreterAt);
+      _masm->cmpl(Address(x86_imm32(&NumberOfBytecodesExecuted), relocInfo::external_word_type), StopInterpreterAt);
       _masm->jcc(Assembler::less, cont);
       _masm->int3();
       _masm->bind(cont);
@@ -523,21 +585,21 @@ void InterpreterGenerator::jump_ebx() {
     load_ebx();
   }
   check_oop(eax);
-  _masm->jmp(Address(noreg, ebx, Address::times_4, (int)dispatchTable::table()));
+  _masm->jmp(Address(noreg, ebx, Address::times_4, x86_imm32(dispatchTable::table())));
 }
 
 
 void InterpreterGenerator::load_edi() {
-  _masm->movl(edi, Address(noreg, ebx, Address::times_4, (int)dispatchTable::table()));
+  _masm->movl(edi, Address(noreg, ebx, Address::times_4, x86_imm32(dispatchTable::table())));
 }
 
 
 void InterpreterGenerator::jump_edi() {
   if (TraceBytecodes || CountBytecodes || StopInterpreterAt > 0) {
-    _masm->incl(Address(int(&NumberOfBytecodesExecuted), relocInfo::external_word_type));
+    _masm->incl(Address(x86_imm32(&NumberOfBytecodesExecuted), relocInfo::external_word_type));
     if (StopInterpreterAt > 0) {
       Label cont;
-      _masm->cmpl(Address(int(&NumberOfBytecodesExecuted), relocInfo::external_word_type), StopInterpreterAt);
+      _masm->cmpl(Address(x86_imm32(&NumberOfBytecodesExecuted), relocInfo::external_word_type), StopInterpreterAt);
       _masm->jcc(Assembler::less, cont);
       _masm->int3();
       _masm->bind(cont);
@@ -1221,7 +1283,7 @@ char* InterpreterGenerator::float_op(int nof_args, bool returns_float) {
   _masm->movb(ebx, Address(esi, -2));		// get float number
   _masm->leal(edx, float_addr(ebx));		// get float address
   _masm->movb(ebx, Address(esi, -1));		// get function number
-  _masm->movl(ecx, Address(noreg, ebx, Address::times_4, int(Floats::_function_table), relocInfo::external_word_type));
+  _masm->movl(ecx, Address(noreg, ebx, Address::times_4, x86_imm32(Floats::_function_table), relocInfo::external_word_type));
   for (int i = 0; i < nof_args; i++) _masm->fld_d(Address(edx, -i*floatSize));
   _masm->call(ecx);				// invoke operation
   load_ebx();					// get next byte code
@@ -1405,7 +1467,7 @@ char* Interpreter::_last_native_called = NULL;		// debugging only - see comment 
 void InterpreterGenerator::call_native(Register entry) {
   // trace_send code should come here - fix this
   save_esi();
-  _masm->movl(Address(int(&Interpreter::_last_native_called), relocInfo::external_word_type), entry);
+  _masm->movl(Address(x86_imm32(&Interpreter::_last_native_called), relocInfo::external_word_type), entry);
   _masm->call(entry);
   _masm->ic_info(_nlr_testpoint, 0);			// ordinary inline cache info
   restore_esi();
@@ -1852,7 +1914,7 @@ void InterpreterGenerator::generate_nonlocal_return_code() {
   _masm->jcc(Assembler::notZero, loop);		// until is_smi(edi)
   _masm->testl(edi, edi);			// if edi = 0 then
   _masm->jcc(Assembler::zero, zapped_context);	//   context has been zapped
-  _masm->movl(Address(int(&nlr_home_context), relocInfo::external_word_type), eax); 
+  _masm->movl(Address(x86_imm32(&nlr_home_context), relocInfo::external_word_type), eax); 
                                                 // else save the context containing the home (edi points to home stack frame)
   _masm->movb(ebx, Address(esi, 1));		// get no. of arguments to pop
   _masm->popl(eax);				// get NLR result back
@@ -2431,11 +2493,11 @@ char* InterpreterGenerator::generate_instruction(Bytecodes::Code code) {
 }
 
 
-void InterpreterGenerator::info(char* name) {
+void InterpreterGenerator::info(const char* name) {
   if (!Disclaimer::is_product() && PrintInterpreter) {
-    std->print("%s\n", name);
+    stdOut->print("%s\n", name);
     _masm->code()->decode();
-    std->cr();
+    stdOut->cr();
   }
 }
 
@@ -2477,10 +2539,10 @@ void InterpreterGenerator::generate_all() {
       if (!Disclaimer::is_product() && PrintInterpreter) {
       #ifndef PRODUCT
         int length = _masm->pc() - start_point;
-	char* name = Bytecodes::name((Bytecodes::Code)i);
-        std->print("Bytecode 0x%02x: %s (%d bytes), entry point = 0x%x\n", i, name, length, entry_point);
+	const char* name = Bytecodes::name((Bytecodes::Code)i);
+        stdOut->print("Bytecode 0x%02x: %s (%d bytes), entry point = 0x%x\n", i, name, length, entry_point);
 	_masm->code()->decode();
-	std->cr();
+	stdOut->cr();
       #endif
       }
     }
@@ -2507,14 +2569,14 @@ static char interpreter_code[interpreter_size];
 void interpreter_init() {
   const bool debug = false; // change this to switch between debug/optimized version
   if (!Disclaimer::is_product() && PrintInterpreter) {
-    std->print("\nBytecode Interpreter\n\n");
+    stdOut->print("\nBytecode Interpreter\n\n");
   }
 
   CodeBuffer* code = new CodeBuffer(&interpreter_code[0], interpreter_size);
   InterpreterGenerator g(code, debug);
 
   if (!Disclaimer::is_product() && PrintInterpreter) {
-    std->print("%d bytes generated for the interpreter\n", code->code_size());
+    stdOut->print("%d bytes generated for the interpreter\n", code->code_size());
     exit(0);
   }
 

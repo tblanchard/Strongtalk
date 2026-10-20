@@ -21,10 +21,35 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_floats.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "nativeInstruction.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "floats.hpp"
+#include "disclaimer.hpp"
+#include "debug.hpp"
+#include "vmSymbols.hpp"
 char* Floats::_function_table[max_number_of_functions];
 char* Floats::_function_names[] = {
   "zero", "one",
@@ -93,9 +118,9 @@ void Floats::generate_tst(MacroAssembler* masm, Assembler::Condition cc) {
   masm->fnstsw_ax();
   masm->fpop();		// explicitly pop argument
   masm->testl(eax, mask);
-  masm->movl(eax, Address((int)&trueObj, relocInfo::external_word_type));
+  masm->movl(eax, Address(x86_imm32(&trueObj), relocInfo::external_word_type));
   masm->jcc(cond, L);
-  masm->movl(eax, Address((int)&falseObj, relocInfo::external_word_type));
+  masm->movl(eax, Address(x86_imm32(&falseObj), relocInfo::external_word_type));
   masm->bind(L);
 }
 
@@ -109,9 +134,9 @@ void Floats::generate_cmp(MacroAssembler* masm, Assembler::Condition cc) {
   masm->fwait();
   masm->fnstsw_ax();
   masm->testl(eax, mask);
-  masm->movl(eax, Address((int)&trueObj, relocInfo::external_word_type));
+  masm->movl(eax, Address(x86_imm32(&trueObj), relocInfo::external_word_type));
   masm->jcc(cond, L);
-  masm->movl(eax, Address((int)&falseObj, relocInfo::external_word_type));
+  masm->movl(eax, Address(x86_imm32(&falseObj), relocInfo::external_word_type));
   masm->bind(L);
 }
 
@@ -164,10 +189,10 @@ void Floats::generate(MacroAssembler* masm, Function f) {
 
   if (!Disclaimer::is_product() && PrintInterpreter) {
     int length = masm->pc() - entry_point;
-    char* name = function_name_for(f);
-    std->print("Float function %d: %s (%d bytes), entry point = 0x%x\n", f, name, length, entry_point);
+    const char* name = function_name_for(f);
+    stdOut->print("Float function %d: %s (%d bytes), entry point = 0x%x\n", f, name, length, entry_point);
     masm->code()->decode();
-    std->cr();
+    stdOut->cr();
   }
 }
 
@@ -187,9 +212,9 @@ void Floats::init(MacroAssembler* masm) {
   for (int i = max_number_of_functions; i-- > 0;) _function_table[i] = masm->pc();
   masm->hlt();
   if (!Disclaimer::is_product() && PrintInterpreter) {
-    std->print("Undefined float functions entry point\n");
+    stdOut->print("Undefined float functions entry point\n");
     masm->code()->decode();
-    std->cr();
+    stdOut->cr();
   }
 
   // nullary functions
@@ -233,12 +258,12 @@ void Floats::init(MacroAssembler* masm) {
 
 void Floats::print() {
   if (_is_initialized) {
-    std->print_cr("Float functions:");
+    stdOut->print_cr("Float functions:");
     for (int i = 0; i < number_of_functions; i++) {
-      std->print("%3d: 0x%x %s\n", i, _function_table[i], function_name_for(Function(i)));
+      stdOut->print("%3d: 0x%x %s\n", i, _function_table[i], function_name_for(Function(i)));
     }
   } else {
-    std->print_cr("Floats not yet initialized");
+    stdOut->print_cr("Floats not yet initialized");
   }
-  std->cr();
+  stdOut->cr();
 }

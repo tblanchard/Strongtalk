@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_DOUBLEKLASS_HPP_HPP
+#define VM_OOPS_DOUBLEKLASS_HPP_HPP
 
+void set_doubleKlass_vtbl(Klass* k);
 class doubleKlass: public memOopKlass {
  public:
   // testers
@@ -50,7 +53,7 @@ class doubleKlass: public memOopKlass {
   // printing operations
   void oop_short_print_on(oop obj, outputStream* st);
   void oop_print_value_on(oop obj, outputStream* st);
-  char* name() const { return "double"; }
+  const char* name() const { return "double"; }
 
   // iterators
   void oop_layout_iterate(oop obj, ObjectLayoutClosure* blk);
@@ -62,3 +65,6 @@ class doubleKlass: public memOopKlass {
   // class creation
   friend void set_doubleKlass_vtbl(Klass* k);
 };
+
+
+#endif // VM_OOPS_DOUBLEKLASS_HPP_HPP

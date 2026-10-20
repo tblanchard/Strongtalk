@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_NODE_INLINE_HPP_HPP
+#define VM_COMPILER_NODE_INLINE_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -27,3 +29,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 // don't delete -- we'll need it later, but during initial development don't use inlines  --Urs
 
 #endif
+
+
+#endif // VM_COMPILER_NODE_INLINE_HPP_HPP

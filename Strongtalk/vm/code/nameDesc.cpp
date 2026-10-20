@@ -21,39 +21,93 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "stackChunk.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "frame.hpp"
+#include "symbolOop.hpp"
+#include "methodOop.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "oopFactory.hpp"
+#include "scopeDesc.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_nameDesc.cpp.incl"
 
 void LocationNameDesc::print() {
-  std->print("@%s (%d)", location().name(), offset);
+  stdOut->print("@%s (%d)", location().name(), offset);
 }
 
 void ValueNameDesc::print() {
-  std->print("=");
+  stdOut->print("=");
   value()->print_value();
-  std->print(" (%d)", offset);
+  stdOut->print(" (%d)", offset);
 }
 
 void BlockValueNameDesc::print() {
-  std->print("[=");
+  stdOut->print("[=");
   block_method()->print_value();
-  std->print("]");
-  std->print(" (%d)", offset);
+  stdOut->print("]");
+  stdOut->print(" (%d)", offset);
 }
 
 void MemoizedBlockNameDesc::print() {
-  std->print("[@%s =", location().name());
+  stdOut->print("[@%s =", location().name());
   block_method()->print_value();
-  std->print("]");
-  std->print(" (%d)", offset);
+  stdOut->print("]");
+  stdOut->print(" (%d)", offset);
 }
 
 void IllegalNameDesc::print() {
-  std->print("###illegal###");
-  std->print(" (%d)", offset);
+  stdOut->print("###illegal###");
+  stdOut->print(" (%d)", offset);
 }
 
 bool LocationNameDesc::equal(NameDesc* other) const {

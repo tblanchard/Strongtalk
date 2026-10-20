@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_DISASM_DISASSEMBLER_HPP_HPP
+#define VM_DISASM_DISASSEMBLER_HPP_HPP
 
 # ifdef DELTA_COMPILER
 // A disassembler prints out intel 386 code annotated
@@ -35,3 +37,6 @@ class Disassembler : AllStatic {
 };
 
 # endif
+
+
+#endif // VM_DISASM_DISASSEMBLER_HPP_HPP

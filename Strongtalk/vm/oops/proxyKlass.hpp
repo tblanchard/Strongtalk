@@ -20,8 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_PROXYKLASS_HPP_HPP
+#define VM_OOPS_PROXYKLASS_HPP_HPP
 
 
+void set_proxyKlass_vtbl(Klass* k);
 class proxyKlass: public memOopKlass {
  public:
   // testers
@@ -54,8 +57,11 @@ class proxyKlass: public memOopKlass {
   int oop_header_size() const { return proxyOopDesc::header_size(); }
 
   // printing support
-  char* name() const { return "proxy"; }
+  const char* name() const { return "proxy"; }
 
   // class creation
   friend void set_proxyKlass_vtbl(Klass* k);
 };
+
+
+#endif // VM_OOPS_PROXYKLASS_HPP_HPP

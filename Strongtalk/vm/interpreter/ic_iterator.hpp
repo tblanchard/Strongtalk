@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_IC_ITERATOR_HPP_HPP
+#define VM_INTERPRETER_IC_ITERATOR_HPP_HPP
 
 // IC_Shape describes the (logical) shape in which an IC at a particular
 // call site apears; i.e. how many receivers have been registered in that
@@ -126,3 +128,5 @@ class IC: public PrintableResourceObj {
   // Debugging
   void		print();
 };
+
+#endif // VM_INTERPRETER_IC_ITERATOR_HPP_HPP

@@ -21,6 +21,9 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
+#ifndef oopsHierarchy_hpp
+#define oopsHierarchy_hpp
+
 // OBJECT hierarchy
 // This hierarchy is a representation hierarchy, i.e. if A is a superclass
 // of B, A's representation is a prefix of B's representation.
@@ -71,5 +74,4 @@ class          mixinKlass;
 class          vframeKlass;
 class        smiKlass;
 
-
-
+#endif // oopsHierarchy_hpp

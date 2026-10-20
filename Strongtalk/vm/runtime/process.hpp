@@ -20,6 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_PROCESS_HPP_HPP
+#define VM_RUNTIME_PROCESS_HPP_HPP
+
+#include "growableArray.hpp"
+class nmethod;
 
 // unwindInfo is a wrapper calls allowing a primitive like unwindprotect
 // to call delta even though a non local return is in progress.
@@ -27,7 +32,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 class unwindInfo : public StackObj {
  private:
   // NLR state
-  int        _nlr_home;
+  intptr_t   _nlr_home;
   int        _nlr_home_id;
   contextOop _nlr_home_context; 
  public:
@@ -50,7 +55,7 @@ class unwindInfo : public StackObj {
   unwindInfo* next() const        { return _next; }   
   void set_next(unwindInfo* next) { _next = next; }
 
-  int        nlr_home()         const { return _nlr_home;         }
+  intptr_t   nlr_home()         const { return _nlr_home;         }
   int        nlr_home_id()      const { return _nlr_home_id;      }
   contextOop nlr_home_context() const { return _nlr_home_context; }
   void update_nlr_targets(compiledVFrame* f, contextOop con);
@@ -162,7 +167,7 @@ class DeltaProcess: public Process {
   processOop    _processObj;         // the Delta level process object.
   ProcessState  _state;              // process state.
 
-  int*          _last_Delta_fp;
+  intptr_t* _last_Delta_fp;
   oop*          _last_Delta_sp;
   char*         _last_Delta_pc;      // For now only used for stack overflow
 
@@ -200,8 +205,8 @@ class DeltaProcess: public Process {
   void inc_time_stamp()  { _time_stamp++; }
 
   // last_Delta_fp
-  int* last_Delta_fp() const;
-  void set_last_Delta_fp(int* fp);
+  intptr_t* last_Delta_fp() const;
+  void set_last_Delta_fp(intptr_t* fp);
 
   // last_Delta_sp
   oop* last_Delta_sp() const;
@@ -449,7 +454,7 @@ class Processes: AllStatic {
 // "semaphore" to protect some vm critical sections (process transfer etc.)
 extern "C" bool processSemaphore; 
 
-extern "C" int* last_Delta_fp;
+extern "C" intptr_t* last_Delta_fp;
 extern "C" oop* last_Delta_sp;
 
 extern int CurrentHash;
@@ -478,3 +483,6 @@ enum InterpreterErrorConstants {
   float_expected		 = 13 + start_of_runtime_system_errors,
 };
 
+
+
+#endif // VM_RUNTIME_PROCESS_HPP_HPP

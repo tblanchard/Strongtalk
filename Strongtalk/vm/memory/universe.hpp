@@ -20,7 +20,13 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_UNIVERSE_HPP
+#define VM_MEMORY_UNIVERSE_HPP
 
+#include "allocation.hpp"
+#include "generation.hpp"
+#include "rSet.hpp"
+#include "error.hpp"
 
 extern bool NeedScavenge;       // set when eden overflows
 
@@ -147,7 +153,7 @@ class Universe: AllStatic {
   static int major_version()    { return 1; }
   static int minor_version()    { return 1; }
   //static int minor_version()    { return 0; }
-  static char* beta_version()   { return "alpha5"; }
+  static const char* beta_version()   { return "alpha5"; }
   static int snapshot_version() { return 3; }
 
   // Check root is not badOop
@@ -293,8 +299,8 @@ public:
   static char* klass_name(klassOop k);
   static klassOop method_holder_of(methodOop m);
   static symbolOop find_global_key_for(oop value, bool* meta);
-  static oop find_global(char* name, bool must_be_constant = false);
-  static associationOop find_global_association(char* name);
+  static oop find_global(const char* name, bool must_be_constant = false);
+  static associationOop find_global_association(const char* name);
 
  public:
   static void scavenge_oop(oop* p);
@@ -428,3 +434,5 @@ class VerifyNoAllocation : public VerifyNoScavenge {
 
 # define SPACE_VERIFY_OOP_TEMPLATE(s)                                         \
     if (s->contains(p)) return true;
+
+#endif // VM_MEMORY_UNIVERSE_HPP

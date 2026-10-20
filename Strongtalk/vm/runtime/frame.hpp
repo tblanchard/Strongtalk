@@ -20,6 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_FRAME_HPP_HPP
+#define VM_RUNTIME_FRAME_HPP_HPP
+
+#include "oopsHierarchy.hpp"
+#include "allocation.hpp"
 
 // A frame represents a physical stack frame (an activation).  Frames can be
 // C or Delta frames, and the Delta frames can be interpreted or compiled.
@@ -53,24 +58,29 @@ const int frame_sender_sp_offset     =  2;
 const int frame_real_sender_sp_offset   = -2; // For deoptimized frames only
 const int frame_frame_array_offset      = -1; // For deoptimized frames only
 
+// Temporaries on the stack (offsets in words relative to the frame pointer)
+const int first_temp_offset	= -1;			// offset of first temporary relative to fp if there are no floats
+const int first_float_offset	= -4;			// offset of first float relative to 8byte aligned fp value (= base)
+
 const int interpreted_frame_float_magic_offset = frame_temp_offset - 1;
 const int compiled_frame_magic_oop_offset      = -1;
 const int minimum_size_for_deoptimized_frame   = 4;
     
+// Stack slots are one machine word (intptr_t); frame offsets above are in words.
 class frame : ValueObj {
  private:
   oop*  _sp; // stack pointer
-  int*  _fp; // frame pointer
+  intptr_t*  _fp; // frame pointer
   char* _pc; // program counter
 
  public:
   // Constructors
   frame() {}
-  frame(oop* sp, int* fp, char* pc) { 
+  frame(oop* sp, intptr_t* fp, char* pc) { 
     _sp = sp; _fp = fp; _pc = pc;
   }
 
-  frame(oop* sp, int* fp) { 
+  frame(oop* sp, intptr_t* fp) { 
     _sp = sp;
     _fp = fp;
     _pc = (char*) sp[-1];
@@ -78,18 +88,18 @@ class frame : ValueObj {
 
   // accessors for the instance variables
   oop*  sp() const 			{ return _sp; }
-  int*  fp() const 			{ return _fp; }
+  intptr_t*  fp() const 			{ return _fp; }
   char* pc() const 			{ return _pc; }
 
   // patching operations
   void patch_pc(char* pc); // patch the return address of the frame below.
-  void patch_fp(int*  fp); // patch the link of the frame below.
+  void patch_fp(intptr_t*  fp); // patch the link of the frame below.
 
-  int*   addr_at(int index) const 	{ return &fp()[index];    }
-  int    at(int index) const      	{ return *addr_at(index); }
+  intptr_t*   addr_at(int index) const 	{ return &fp()[index];    }
+  intptr_t    at(int index) const      	{ return *addr_at(index); }
 
  private:
-  int**  link_addr() const        	{ return (int**) addr_at(frame_link_offset); }
+  intptr_t**  link_addr() const        	{ return (intptr_t**) addr_at(frame_link_offset); }
   char** return_addr_addr() const 	{ return (char**) addr_at(frame_return_addr_offset); }
 
   // support for interpreter frames
@@ -102,8 +112,8 @@ class frame : ValueObj {
   oop* sender_sp() const 		{ return (oop*)  addr_at(frame_sender_sp_offset); }
 
   // Link
-  int*     link() const            	{ return *link_addr(); }
-  void set_link(int* addr) 		{ *link_addr() = addr; }
+  intptr_t*     link() const            	{ return *link_addr(); }
+  void set_link(intptr_t* addr) 		{ *link_addr() = addr; }
 
   // Return address
   char*    return_addr() const          { return *return_addr_addr(); }
@@ -170,7 +180,7 @@ class frame : ValueObj {
   // tells whether there is another chunk of Delta stack above (entry frames only)
   bool has_next_Delta_fp() const;
   // returns the next C entry frame (entry frames only)
-  int* next_Delta_fp()     const;
+  intptr_t* next_Delta_fp()     const;
   oop* next_Delta_sp()     const;
 
   bool is_first_frame() const;			// oldest frame? (has no sender)
@@ -223,3 +233,6 @@ class frame : ValueObj {
     return frame_return_addr_offset - frame_temp_offset + locals;
   }
 };
+
+
+#endif // VM_RUNTIME_FRAME_HPP_HPP

@@ -20,18 +20,29 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
-
-
-# include "incls/_precompiled.incl"			
-# include "incls/_shell.cpp.incl"
+#include "shell.hpp"
+#include "init.hpp"
+#include "arguments.hpp"
+#include "allocation.hpp"
+#include <iostream>
+#include <string>
+#include "ostream.hpp"
+#include "debug.hpp"
+#include "inliningdb.hpp"
+#include "vmSymbols.hpp"
+#include "timer.hpp"
+#include "bootstrap.hpp"
+#include "process.hpp"
+#include "win32Shim.hpp"
 
 #ifdef _WINDOWS
 int my_main(int argc, char* argv[]) {
 #else
 int main(int argc, char* argv[]) {
+  win32_shim_set_arguments(argc, argv);	// the image reads the command line via GetCommandLineA
 #endif
   parse_arguments(argc, argv);		// overrides default flag settings
-  init_globals();
+    init_globals();
 
   {
     ResourceMark rm;

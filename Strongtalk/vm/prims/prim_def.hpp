@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_PRIM_DEF_HPP_HPP
+#define VM_PRIMS_PRIM_DEF_HPP_HPP
 
 // Macros for the primitive definitions.
 // NB: Borland C++ requires reversed arguments.
@@ -43,3 +45,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #define PRIM_DECL_10(name, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) oop PRIM_API name(a10, a9, a8, a7, a6, a5, a4, a3, a2, a1)
 
 
+
+
+#endif // VM_PRIMS_PRIM_DEF_HPP_HPP

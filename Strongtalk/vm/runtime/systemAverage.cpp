@@ -21,22 +21,76 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_systemAverage.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "task.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "symbolOop.hpp"
+#include "ncode.hpp"
+#include "methodOop.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "systemAverage.hpp"
+#include "zoneHeap.hpp"
+#include "compiledPIC.hpp"
+#include "compiler.hpp"
 char         SlidingSystemAverage::buffer[buffer_size];
 unsigned int SlidingSystemAverage::stat[number_of_cases];
 unsigned int SlidingSystemAverage::pos;
 
 void SlidingSystemAverage::reset() {
-  for (int index = 0; index < buffer_size; index++) {
+  int index;
+  for (index = 0; index < buffer_size; index++) {
     buffer[index] = nowhere;
   }
 }
 
 unsigned int* SlidingSystemAverage::update() {
   // clear the array;
-  for (unsigned int index = 0; index < number_of_cases; index++) {
+  unsigned int index;
+  for (index = 0; index < number_of_cases; index++) {
     stat[index] = 0;
   }
 

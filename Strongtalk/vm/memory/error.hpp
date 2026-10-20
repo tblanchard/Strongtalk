@@ -20,8 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_ERROR_HPP_HPP
+#define VM_MEMORY_ERROR_HPP_HPP
 
-#define DEBUG_EXCEPTION _asm { int 3 }
+#include "macros.hpp"
+
+#define DEBUG_EXCEPTION __builtin_trap()
 
 
 #ifdef PRODUCT
@@ -63,12 +67,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #define Unimplemented()          { report_unimplemented          (FILE_INFO, LINE_INFO); DEBUG_EXCEPTION; }
 
 
-void report_assertion_failure(char* code_str, char* file_name, int line_no, char* message);
-void report_fatal(char* file_name, int line_no, char* format, ...);
-void report_should_not_call(char* file_name, int line_no);
-void report_should_not_reach_here(char* file_name, int line_no);
-void report_subclass_responsibility(char* file_name, int line_no);
-void report_unimplemented(char* file_name, int line_no);
+void report_assertion_failure(const char* code_str, const char* file_name, int line_no, const char* message);
+void report_fatal(const char* file_name, int line_no, const char* format, ...);
+void report_should_not_call(const char* file_name, int line_no);
+void report_should_not_reach_here(const char* file_name, int line_no);
+void report_subclass_responsibility(const char* file_name, int line_no);
+void report_unimplemented(const char* file_name, int line_no);
 void report_vm_state();
 
 
@@ -76,3 +80,6 @@ extern "C" {
   void breakpoint();		// called at every warning
   void error_breakpoint();	// called at every error or fatal
 }
+
+
+#endif // VM_MEMORY_ERROR_HPP_HPP

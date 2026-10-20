@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_PRETTYPRINTER_HPP_HPP
+#define VM_INTERPRETER_PRETTYPRINTER_HPP_HPP
 
 // This file contains the interface to the vm pretty printer.
 //    prettyPrintStream describes the output media.
@@ -53,7 +55,7 @@ class prettyPrintStream : public PrintableResourceObj {
   int position ()   { return pos; }
 
   // Printing
-  virtual void print(char* str)   = 0;
+  virtual void print(const char* str)   = 0;
   virtual void print_char(char c) = 0;
   virtual void newline()          = 0;
   void dec_newline() { dec_indent(); newline(); }
@@ -65,7 +67,7 @@ class prettyPrintStream : public PrintableResourceObj {
   // Layout
   virtual int width()                    = 0;
   virtual int remaining()                = 0;
-  virtual int width_of_string(char* str) = 0;
+  virtual int width_of_string(const char* str) = 0;
   virtual int width_of_char(char c)      = 0;
   virtual int width_of_space()           = 0;
   virtual int infinity()                 = 0;
@@ -79,9 +81,9 @@ class defaultPrettyPrintStream : public prettyPrintStream {
  public:
   defaultPrettyPrintStream() : prettyPrintStream() {}
   void indent();
-  void print(char* str);
+  void print(const char* str);
   void print_char(char c);
-  int width_of_string(char* str);
+  int width_of_string(const char* str);
   void space();
   void newline();
   void begin_highlight();
@@ -132,3 +134,6 @@ class prettyPrinter : AllStatic {
   					 klassOop  klass  = NULL,
   					 int       bci    = -1);
 };
+
+
+#endif // VM_INTERPRETER_PRETTYPRINTER_HPP_HPP

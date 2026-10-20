@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_UNIVERSE_INLINE_HPP_HPP
+#define VM_MEMORY_UNIVERSE_INLINE_HPP_HPP
 
 
 inline oop* Universe::allocate_in_survivor_space(memOop p,
@@ -33,3 +35,6 @@ inline oop* Universe::allocate_in_survivor_space(memOop p,
     return old_gen.allocate(size);
   } 
 }
+
+
+#endif // VM_MEMORY_UNIVERSE_INLINE_HPP_HPP

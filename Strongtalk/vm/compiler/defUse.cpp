@@ -21,11 +21,96 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
 # ifdef DELTA_COMPILER
 
-# include "incls/_defUse.cpp.incl"
 
 
   void DUInfo::propagateTo(BB* useBB, Use* use, const NonTrivialNode* fromNode, 
@@ -56,9 +141,9 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
       bool ok = toNode->copyPropagate(useBB, use, fromPR);
       if (CompilerDebug) {
 	// the original code broke the MSC++ 3.0 optimizer, so now it looks a bit weird.  -Urs 7/96
-	char* glob = global ? "global" : "local";
-	char* prop = ok ? "" : " couldn't propagate";
-	char* name = def->node->src()->name();	    // using fromNode or fromPR here will break
+	const char* glob = global ? "global" : "local";
+	const char* prop = ok ? "" : " couldn't propagate";
+	const char* name = def->node->src()->name();	    // using fromNode or fromPR here will break
 	void* from = PrintHexAddresses ? fromNode : 0;
 	void* to   = PrintHexAddresses ? toNode : 0;
 	cout(PrintCopyPropagation)->print("*%s cp:%s %s from N%ld (%#lx) to N%ld (%#lx)\n",

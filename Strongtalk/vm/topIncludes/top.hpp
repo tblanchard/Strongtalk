@@ -20,7 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_TOPINCLUDES_TOP_HPP_HPP
+#define VM_TOPINCLUDES_TOP_HPP_HPP
 
 
 // This is the canonical top file of the include hierarchy.
 // Not actually the top, but the one to be sure you depend on in includeDB.
+
+
+#endif // VM_TOPINCLUDES_TOP_HPP_HPP

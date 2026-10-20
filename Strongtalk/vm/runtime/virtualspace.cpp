@@ -21,9 +21,21 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-#include "incls/_precompiled.incl"
-#include "incls/_virtualspace.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "os.hpp"
+#include "ostream.hpp"
+#include "virtualspace.hpp"
 ReservedSpace::ReservedSpace(int size) {
   assert((size % os::vm_page_size()) == 0, "size not page aligned");
   _base = os::reserve_memory(size);
@@ -144,11 +156,11 @@ void VirtualSpace::shrink(int size) {
 }
 
 void VirtualSpace::print() {  
-  std->print_cr("Virtual space:");
-  std->print_cr(" - committed: %d", committed_size());
-  std->print_cr(" - reserved: %d",  reserved_size());
-  std->print_cr(" - [low, high]: [0x%lx, 0x%lx]",  low(), high());
-  std->print_cr(" - [low_b, high_b]: [0x%lx, 0x%lx]",  low_boundary(), high_boundary());
+  stdOut->print_cr("Virtual space:");
+  stdOut->print_cr(" - committed: %d", committed_size());
+  stdOut->print_cr(" - reserved: %d",  reserved_size());
+  stdOut->print_cr(" - [low, high]: [0x%lx, 0x%lx]",  low(), high());
+  stdOut->print_cr(" - [low_b, high_b]: [0x%lx, 0x%lx]",  low_boundary(), high_boundary());
 }
 
 
@@ -192,7 +204,7 @@ int VirtualSpaces::uncommitted_size() {
 }
 
 void VirtualSpaces::print() {
-  std->print_cr("VirtualSpaces:");
+  stdOut->print_cr("VirtualSpaces:");
   for(VirtualSpace* p = head; p; p = p->next)
     p->print();
 }

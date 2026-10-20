@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_PROCESSKLASS_HPP_HPP
+#define VM_OOPS_PROCESSKLASS_HPP_HPP
 
+void set_processKlass_vtbl(Klass* k);
 class processKlass: public memOopKlass {
  public:
   friend void set_processKlass_vtbl(Klass* k);
@@ -58,8 +61,11 @@ class processKlass: public memOopKlass {
   int oop_header_size() const { return processOopDesc::header_size(); }
 
   // printing support
-  char* name() const { return "process"; }
+  const char* name() const { return "process"; }
   
   // sizing
   int object_size() const;
 };
+
+
+#endif // VM_OOPS_PROCESSKLASS_HPP_HPP

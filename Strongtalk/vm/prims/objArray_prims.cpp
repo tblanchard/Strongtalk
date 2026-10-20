@@ -21,9 +21,52 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_objArray_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "prim_def.hpp"
+#include "symbolOop.hpp"
+#include "klassOop.hpp"
+#include "objArray_prims.hpp"
+#include "oopFactory.hpp"
+#include "universe.inline.hpp"
+#include "doubleOop.hpp"
+#include "objArrayOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "handle.hpp"
+#include "prim_impl.hpp"
 TRACE_FUNC(TraceObjArrayPrims, "objArray")
 
 int objArrayPrimitives::number_of_calls;
@@ -39,6 +82,8 @@ PRIM_DECL_2(objArrayPrimitives::allocateSize, oop receiver, oop argument) {
 
   if (smiOop(argument)->value() < 0)
     return markSymbol(vmSymbols::negative_size());
+  if (smiOop(argument)->value() > max_array_bytes / oopSize)
+    return markSymbol(vmSymbols::argument_is_invalid());
 
   klassOop k        = klassOop(receiver);
   int      ni_size  = k->klass_part()->non_indexable_size();
@@ -135,7 +180,7 @@ PRIM_DECL_5(objArrayPrimitives::replace_from_to, oop receiver, oop from, oop to,
     return markSymbol(vmSymbols::third_argument_has_wrong_type());
 
   // check from > 0
-  if (smiOop(from) <= 0)
+  if (smiOop(from)->value() <= 0)
     return markSymbol(vmSymbols::out_of_bounds());
 
   // check to < self size
@@ -173,11 +218,11 @@ PRIM_DECL_4(objArrayPrimitives::copy_size, oop receiver, oop from, oop start, oo
     return markSymbol(vmSymbols::third_argument_has_wrong_type());
 
   // check from > 0
-  if (smiOop(from) <= 0)
+  if (smiOop(from)->value() <= 0)
     return markSymbol(vmSymbols::out_of_bounds());
 
   // check start > 0
-  if (smiOop(start) <= 0)
+  if (smiOop(start)->value() <= 0)
     return markSymbol(vmSymbols::out_of_bounds());
   
   // Check size is positive

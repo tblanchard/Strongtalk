@@ -21,9 +21,23 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_growableArray.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
 GenericGrowableArray::GenericGrowableArray(int initial_size, bool c_heap) {
   len = 0;
   max = initial_size;
@@ -143,4 +157,4 @@ void GenericGrowableArray::raw_sort(int f(const void *, const void *)) {
   qsort(data, length(), sizeof(void*), f);
 }
 
-void GenericGrowableArray::print_short() { std->print("Growable Array %#lx", this); }
+void GenericGrowableArray::print_short() { stdOut->print("Growable Array %#lx", this); }

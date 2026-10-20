@@ -20,7 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_ZONE_HPP_HPP
+#define VM_CODE_ZONE_HPP_HPP
 
+#include "zoneHeap.hpp"
+#include "codeTable.hpp"
+#include "jumpTable.hpp"
 #ifdef DELTA_COMPILER
 
 // The zone implements the code cache for optimized methods and contains:
@@ -162,3 +167,6 @@ class LRUcount : ValueObj {
 extern LRUcount* LRUtable;	// for optimized methods
 extern int* LRUflag;	// == LRUtable, just different type for convenience
 #endif
+
+
+#endif // VM_CODE_ZONE_HPP_HPP

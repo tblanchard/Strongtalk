@@ -21,20 +21,25 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "mapConformance.hpp"
+#include "growableArray.hpp"
+#include "ostream.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_mapConformance.cpp.incl"
 
 void Variable::print() {
   if (in_register()) {
-    std->print("R%d", offset());
+    stdOut->print("R%d", offset());
   } else if (on_stack()) {
-    std->print("S[%d]", offset());
+    stdOut->print("S[%d]", offset());
   } else if (is_unused()) {
-    std->print("UN");
+    stdOut->print("UN");
   } else if (is_top_of_stack()){
-    std->print("tos");
+    stdOut->print("tos");
   } else {
     fatal("invalid variable");
   }
@@ -312,16 +317,16 @@ void MappingTask::generate_code(MapConformance* mc) {
 }
 
 void MappingTask::print(int index) {
-  std->print("  %2d: ", index);
+  stdOut->print("  %2d: ", index);
   src.print();
-  std->print(" -> ");
+  stdOut->print(" -> ");
   dst.print();
   if (_what_happend != NULL) {
-    std->set_indentation(35);
-    std->indent();
-    std->print("%s", _what_happend);
+    stdOut->set_indentation(35);
+    stdOut->indent();
+    stdOut->print("%s", _what_happend);
   }
-  std->cr();
+  stdOut->cr();
 }
 
 MapConformance::MapConformance() {
@@ -348,27 +353,27 @@ void MapConformance::generate(Variable free_register1, Variable free_register2) 
 }
 
 void MapConformance::move(Variable src, Variable dst) {
-  std->print("	move  ");
+  stdOut->print("	move  ");
   src.print();
-  std->print(",	");
+  stdOut->print(",	");
   dst.print();
-  std->cr();
+  stdOut->cr();
 }
 
 void MapConformance::push(Variable src) {
-  std->print("	push  ");
+  stdOut->print("	push  ");
   src.print();
-  std->cr();
+  stdOut->cr();
 }
 
 void MapConformance::pop(Variable dst) {
-  std->print("	pop  ");
+  stdOut->print("	pop  ");
   dst.print();
-  std->cr();
+  stdOut->cr();
 }
 
 void MapConformance::print() {
-  std->print_cr("MapConformance");
+  stdOut->print_cr("MapConformance");
   for (int index = 0; index < mappings->length(); index++) {
     mappings->at(index)->print(index);
   }

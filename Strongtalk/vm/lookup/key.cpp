@@ -21,9 +21,51 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_key.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "symbolOop.hpp"
+#include "klassOop.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "key.hpp"
+#include "methodOop.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 int LookupKey::hash() const {
   return klass()->identity_hash() ^ selector_or_method()->identity_hash();
 }
@@ -90,7 +132,7 @@ void LookupKey::print_inlining_database_on(outputStream* st) const {
 }
 
 void LookupKey::print() const {
-  print_on(std);
+  print_on(stdOut);
 }
 
 char* LookupKey::print_string() const {

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_SLIST_HPP_HPP
+#define VM_COMPILER_SLIST_HPP_HPP
 
 // Yet another version of lists, this one allowing efficient insert/delete in the middle.
 
@@ -152,3 +154,6 @@ template <class T> class SList : public GenericSList {
 };
 
 # endif
+
+
+#endif // VM_COMPILER_SLIST_HPP_HPP

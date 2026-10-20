@@ -20,11 +20,14 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_SYMBOLKLASS_HPP_HPP
+#define VM_OOPS_SYMBOLKLASS_HPP_HPP
 
 
 // symbolOops are canonical symbols; all symbolOops are registered in the
 // symbol table
 
+void set_symbolKlass_vtbl(Klass* k);
 class symbolKlass: public byteArrayKlass {
  public:
   // testers
@@ -46,7 +49,7 @@ class symbolKlass: public byteArrayKlass {
   bool can_be_subclassed()           const { return false; }
 
   // allocation operation
-  symbolOop allocateSymbol(char* name, int len);
+  symbolOop allocateSymbol(const char* name, int len);
 
   // copy operation
   oop oop_shallow_copy(oop obj, bool tenured);
@@ -57,9 +60,12 @@ class symbolKlass: public byteArrayKlass {
 
   // printing operations
   void oop_print_value_on(oop obj, outputStream* st);
-  char* name() const { return "symbol"; }
+  const char* name() const { return "symbol"; }
   void print(oop obj);
 
   // class creation
   friend void set_symbolKlass_vtbl(Klass* k);
 };
+
+
+#endif // VM_OOPS_SYMBOLKLASS_HPP_HPP

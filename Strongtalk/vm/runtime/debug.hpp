@@ -20,7 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_DEBUG_HPP_HPP
+#define VM_RUNTIME_DEBUG_HPP_HPP
 
+
+class outputStream;
 // Debug flags control various aspects of the VM and are
 // accessible by Delta programs.
 
@@ -38,17 +42,17 @@ class FlagSetting {
 
 class debugFlags {
  public:
-  static bool boolAt(char* name, int len, bool* value);
-  static bool boolAt(char* name, bool* value)		{ return boolAt(name, strlen(name), value); }
+  static bool boolAt(const char* name, int len, bool* value);
+  static bool boolAt(const char* name, bool* value)		{ return boolAt(name, strlen(name), value); }
 
-  static bool boolAtPut(char* name, int len, bool* value);
-  static bool boolAtPut(char* name, bool* value)	{ return boolAtPut(name, strlen(name), value); }
+  static bool boolAtPut(const char* name, int len, bool* value);
+  static bool boolAtPut(const char* name, bool* value)	{ return boolAtPut(name, strlen(name), value); }
 
-  static bool intAt(char* name, int len, int* value);
-  static bool intAt(char* name, int* value)		{ return intAt(name, strlen(name), value); }
+  static bool intAt(const char* name, int len, int* value);
+  static bool intAt(const char* name, int* value)		{ return intAt(name, strlen(name), value); }
 
-  static bool intAtPut(char* name, int len, int* value);
-  static bool intAtPut(char* name, int* value)		{return intAtPut(name, strlen(name), value); }
+  static bool intAtPut(const char* name, int len, int* value);
+  static bool intAtPut(const char* name, int* value)		{return intAtPut(name, strlen(name), value); }
 
   static void printFlags();
   static void print_on(outputStream* st);
@@ -130,6 +134,7 @@ class debugFlags {
   develop(TraceBytecodes                     , false, "Trace byte code execution"                                                   ) \
   develop(TraceAllocation                    , false, "Trace allocation"                                                            ) \
   develop(TraceBootstrap                     , false, "Trace the bootstrap readin"                                                  ) \
+  develop(VerifyFileOut                      , false, "Verify the file out form of all methods when quitting"                      ) \
   develop(TraceMethodPrims                   , false, "Trace method prims"                                                          ) \
   develop(TraceMixinPrims                    , false, "Trace mixin prims"                                                           ) \
   develop(TraceVMOperation                   , false, "Trace vm operations"                                                         ) \
@@ -331,3 +336,6 @@ extern "C" char* vmDate;
 // debug() is intended as a "start debugging" hook to be called from the
 // C++ debugger.It sets up everything for debugging.
 extern "C" void debug();
+
+
+#endif // VM_RUNTIME_DEBUG_HPP_HPP

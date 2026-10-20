@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_KLASSOOP_HPP_HPP
+#define VM_OOPS_KLASSOOP_HPP_HPP
 
 // A klassOop is the C++ equivalent of a Delta class.
 // Part of a klassOopDesc is a Klass which handle the 
@@ -57,3 +59,6 @@ class klassOopDesc : public memOopDesc {
   void bootstrap_object(bootstrap* st);
 };
 
+
+
+#endif // VM_OOPS_KLASSOOP_HPP_HPP

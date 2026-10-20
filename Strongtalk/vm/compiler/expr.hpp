@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_EXPR_HPP_HPP
+#define VM_COMPILER_EXPR_HPP_HPP
 
 # ifdef DELTA_COMPILER
 
@@ -302,3 +304,6 @@ class ExprStack : public GrowableArray<Expr*> {
 # undef PFLAG_DEF
 
 # endif
+
+
+#endif // VM_COMPILER_EXPR_HPP_HPP

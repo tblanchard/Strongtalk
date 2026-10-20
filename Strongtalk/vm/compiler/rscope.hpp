@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_RSCOPE_HPP_HPP
+#define VM_COMPILER_RSCOPE_HPP_HPP
 
 
 // RScopes represent the inlined scopes of a nmethod during recompilation.
@@ -144,7 +146,7 @@ class RNonDummyScope : public RScope {
 
  protected:
   virtual void constructSubScopes(bool trusted);
-  virtual int scopeID() const				{ ShouldNotCallThis(); return 0; }
+  virtual smi scopeID() const				{ ShouldNotCallThis(); return 0; }
   static bool trustPICs(methodOop m);
   void printSubScopes() const;
   static RNonDummyScope* constructRScopes(const nmethod* nm, bool trusted = true, int level = 0);
@@ -197,7 +199,7 @@ class RInlinedScope : public RNonDummyScope {
   void print_inlining_database_on(outputStream* st, GrowableArray<PcDesc*>* uncommon, int bci, int level);
  protected:
   void constructSubScopes()		{ ShouldNotCallThis(); }
-  int scopeID() const			{ return desc->offset(); }
+  smi scopeID() const			{ return desc->offset(); }
 };
 
 
@@ -234,7 +236,7 @@ class RPICScope : public RNonDummyScope {
   void print_short();
 
  protected:
-  int scopeID() const			{ return pcDesc->scope; }
+  smi scopeID() const			{ return pcDesc->scope; }
   static bool trustPICs(const nmethod* nm);
   friend RNonDummyScope* RNonDummyScope::constructRScopes(const nmethod* nm, bool trusted, int level);
 };
@@ -282,7 +284,7 @@ class RUntakenScope : public RNonDummyScope {
   void print();
   void print_short();
  protected:
-  int scopeID() const				{ return pc->scope; }
+  smi scopeID() const				{ return pc->scope; }
 };
 
 
@@ -299,3 +301,6 @@ class RUncommonBranch : public PrintableResourceObj {
 };
 
 # endif
+
+
+#endif // VM_COMPILER_RSCOPE_HPP_HPP

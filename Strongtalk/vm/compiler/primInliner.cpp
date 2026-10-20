@@ -21,10 +21,113 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "primInliner.hpp"
+#include "objArrayOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "byteArrayKlass.hpp"
+#include "prim_def.hpp"
+#include "behavior_prims.hpp"
+#include "oopFactory.hpp"
+#include "doubleOop.hpp"
+#include "objArrayKlass.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+
+static inline bool equal(const char* s, const char* t) { return strcmp(s, t) == 0; }
 # ifdef DELTA_COMPILER
-# include "incls/_primInliner.cpp.incl"
 
 inline bool equal(char* s, char* t) { return strcmp(s, t) == 0; }
 
@@ -441,7 +544,7 @@ Expr* PrimInliner::smi_Shift(Expr* arg1, Expr* arg2) {
 }
 
 
-static BranchOpCode not(BranchOpCode cond) {
+static BranchOpCode negated(BranchOpCode cond) {
   switch (cond) {
     case EQBranchOp : return NEBranchOp;
     case NEBranchOp : return EQBranchOp;
@@ -467,7 +570,7 @@ Expr* PrimInliner::generate_cond(BranchOpCode cond, NodeBuilder* gen, PReg* resP
 //       when compiling whileTrue loops - gri 6/26/96
 
   // n2: conditional branch
-  BranchNode* n2 = NodeFactory::new_BranchNode(not(cond));
+  BranchNode* n2 = NodeFactory::new_BranchNode(negated(cond));
   gen->append(n2);
 
   // tAsgn: true branch
@@ -827,7 +930,7 @@ Expr* PrimInliner::tryInline() {
   // the failure block.
   // NB: The comparisons below should be replaced with pointer comparisons
   // comparing with the appropriate vmSymbol. Should fix this at some point.
-  char* name  = _pdesc->name();
+  const char* name  = _pdesc->name();
   Expr* res = NULL;
   switch (_pdesc->group()) {
     case IntArithmeticPrimitive:
@@ -990,7 +1093,7 @@ Expr* PrimInliner::genCall(bool canFail) {
 
 
 void PrimInliner::print() {
-  std->print("a PrimInliner\n");
+  stdOut->print("a PrimInliner\n");
 }
 
 

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_PCDESC_HPP_HPP
+#define VM_CODE_PCDESC_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -61,3 +63,6 @@ class PcDesc : public ValueObj {
 };
 
 #endif
+
+
+#endif // VM_CODE_PCDESC_HPP_HPP

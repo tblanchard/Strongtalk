@@ -22,14 +22,35 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-#include "incls/_precompiled.incl"
-#include "incls/_savedRegisters.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "iterator.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "savedRegisters.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "x86_mapping.hpp"
+#include "assembler.hpp"
 // Need to be static so they can be accessed in assembly code
 // of SavedRegisters::save_registers() (compiler doesn't accept
 // static class variables).
-static int* stored_frame_pointer = NULL;
+static intptr_t* stored_frame_pointer = NULL;
 static oop  saved_eax;
 static oop  saved_ecx;
 static oop  saved_edx;
@@ -38,10 +59,10 @@ static oop  saved_esi;
 static oop  saved_edi;
 
 
-oop SavedRegisters::fetch(int register_number, int* frame_pointer) {
+oop SavedRegisters::fetch(int register_number, intptr_t* frame_pointer) {
   if (frame_pointer != stored_frame_pointer) {
-    std->print_cr("Cannot fetch register from non-bottom frame:");
-    std->print_cr(" register number = %d, fp = 0x%lx", register_number, frame_pointer);
+    stdOut->print_cr("Cannot fetch register from non-bottom frame:");
+    stdOut->print_cr(" register number = %d, fp = 0x%lx", register_number, frame_pointer);
     fatal("vm aborted");
   }
   if (register_number == eax.number()) return saved_eax;
@@ -60,6 +81,7 @@ void SavedRegisters::clear() {
 }
 
 
+#if defined(_MSC_VER) && defined(_M_IX86)
 #define Naked __declspec( naked )
 Naked void SavedRegisters::save_registers() {
   __asm {
@@ -79,3 +101,10 @@ Naked void SavedRegisters::save_registers() {
   }
 }
 #undef Naked
+#else
+void SavedRegisters::save_registers() {
+  // Called only from generated x86 code (see StubRoutines); the x86 backend
+  // does not run on this architecture.
+  fatal("SavedRegisters::save_registers is only available with the x86-32 backend");
+}
+#endif

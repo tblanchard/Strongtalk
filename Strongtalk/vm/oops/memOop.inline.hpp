@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_MEMOOP_INLINE_HPP_HPP
+#define VM_OOPS_MEMOOP_INLINE_HPP_HPP
 
 inline smi memOopDesc::identity_hash() {
   // don't clean up the addr()->_mark below to mark(), 
@@ -128,3 +130,6 @@ inline int memOopDesc::gc_retrieve_size() {
     return Universe::remembered_set->get_size(this);
   return mark()->age();
 }
+
+
+#endif // VM_OOPS_MEMOOP_INLINE_HPP_HPP

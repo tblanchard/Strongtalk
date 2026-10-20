@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_OOP_INLINE_HPP_HPP
+#define VM_OOPS_OOP_INLINE_HPP_HPP
 
 
 inline klassOop oopDesc::klass() const {
@@ -88,3 +90,6 @@ inline oop oopDesc::primitive_allocate_size(int size) {
 inline oop oopDesc::shallow_copy(bool tenured) {
   return blueprint()->oop_shallow_copy(this, tenured);
 }
+
+
+#endif // VM_OOPS_OOP_INLINE_HPP_HPP

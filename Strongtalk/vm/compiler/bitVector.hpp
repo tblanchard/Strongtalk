@@ -20,7 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_BITVECTOR_HPP_HPP
+#define VM_COMPILER_BITVECTOR_HPP_HPP
 
+
+class LongRegisterMask;
+int findFirstUnused(LongRegisterMask** strings, int len, int start);
 // General bit vectors; space is allocated for maxLength bits, but only
 // the portion up to length bits is used.
 // SimpleBitVector: simple version that fits into a word (for speed)
@@ -129,3 +134,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   };
   
 # endif
+
+
+#endif // VM_COMPILER_BITVECTOR_HPP_HPP

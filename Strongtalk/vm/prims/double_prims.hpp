@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_DOUBLE_PRIMS_HPP_HPP
+#define VM_PRIMS_DOUBLE_PRIMS_HPP_HPP
 
 // Primitives for doubles
 //
@@ -390,3 +392,6 @@ extern "C" oop PRIM_API double_add(oop receiver, oop argument);
 //%
 extern "C" oop PRIM_API double_multiply(oop receiver, oop argument);
   
+
+
+#endif // VM_PRIMS_DOUBLE_PRIMS_HPP_HPP

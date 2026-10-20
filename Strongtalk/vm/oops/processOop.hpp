@@ -20,10 +20,13 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_PROCESSOOP_HPP_HPP
+#define VM_OOPS_PROCESSOOP_HPP_HPP
 
 // A processOop is the Delta level process.
 // It is a proxy for a vm c-heap allocate Process (see process.hpp).
 
+processOop as_processOop(void* p);
 class processOopDesc: public memOopDesc {
  protected:
   DeltaProcess*  _process;
@@ -59,3 +62,6 @@ class processOopDesc: public memOopDesc {
   friend class processKlass;
 };
 
+
+
+#endif // VM_OOPS_PROCESSOOP_HPP_HPP

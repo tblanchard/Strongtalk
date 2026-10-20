@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_CALLBACK_HPP_HPP
+#define VM_RUNTIME_CALLBACK_HPP_HPP
 
 class callBack : AllStatic {
  public:
@@ -28,3 +30,6 @@ class callBack : AllStatic {
   static void* registerCCall(int index);
   static void  unregister(void* block);
 };
+
+
+#endif // VM_RUNTIME_CALLBACK_HPP_HPP

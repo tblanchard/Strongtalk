@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_ZONEHEAP_HPP_HPP
+#define VM_CODE_ZONEHEAP_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -103,7 +105,7 @@ class Heap: public CHeapObj {
   ChunkKlass* mapAddr(void* p) const {
     char* pp = (char*)p;
     assert(pp >= base && pp < base + size, "not in this heap");
-    assert(int(pp) % blockSize == 0, "must be block-aligned");
+    assert(intptr_t(pp) % blockSize == 0, "must be block-aligned");
     u_char* fm = (u_char*)heapKlass;
     return (ChunkKlass*)(fm + ((pp - base) >> log2BS));
   }
@@ -120,3 +122,6 @@ class Heap: public CHeapObj {
 };
 
 #endif
+
+
+#endif // VM_CODE_ZONEHEAP_HPP_HPP

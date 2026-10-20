@@ -20,8 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_INTERPRETEDIC_HPP_HPP
+#define VM_INTERPRETER_INTERPRETEDIC_HPP_HPP
 
 
+#include "ic_iterator.hpp"
 // The InterpretedIC describes the contents of an inline cache in the
 // byte codes of a method. The inline cache holds a combination of
 // selector/method and 0/class oops and is read and modified during
@@ -43,15 +46,15 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 //    halt byte codes for alignment
 //    ...
 // 0: selector/method/jump table entry	<-----	first_word_addr()
-// 4: 0/klass/objArray			<-----	second_word_addr()
+// oopSize: 0/klass/objArray			<-----	second_word_addr()
 // 8: ...
 
 class InterpretedIC: ValueObj {
  public:
   enum {
-    size               = 8,			// inline cache size in words
+    size               = 2 * oopSize,		// inline cache size in bytes
     first_word_offset  = 0,			// layout info: first word
-    second_word_offset = 4,			// layout info: second word
+    second_word_offset = oopSize,		// layout info: second word
   } InterpretedICConstants;
 
   // Conversion (Bytecode* -> InterpretedIC*)
@@ -169,3 +172,6 @@ class InterpretedIC_Iterator: public IC_Iterator {
   // Debugging
   void		print();
 };
+
+
+#endif // VM_INTERPRETER_INTERPRETEDIC_HPP_HPP

@@ -21,10 +21,37 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-#include "incls/_precompiled.incl"
-#include "incls/_assembler.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "util.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "iCache.hpp"
+#include "nativeInstruction.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "debug.hpp"
+#include "process.hpp"
+#include "smiOop.hpp"
 // A Displacement describes the 32bit immediate field of an instruction which
 // may be used together with a Label in order to refer to a yet unknown code
 // position. Displacements stored in the instruction stream are used to describe
@@ -103,7 +130,7 @@ class Displacement : public ValueObj {
       case ic_info         : s = "nlr "; break;
       default              : s = "????"; break;
     }
-    std->print("%s (info = 0x%x)", s, info());
+    stdOut->print("%s (info = 0x%x)", s, info());
   }
 
   friend class Assembler;
@@ -122,7 +149,7 @@ class Displacement : public ValueObj {
 // Implementation of Register
 char* registerNames[nofRegisters] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"};
 
-char* Register::name() const {
+const char* Register::name() const {
   return isValid() ? registerNames[_number] : "noreg";
 }
 
@@ -237,7 +264,7 @@ void Assembler::emit_arith(int op1, int op2, Register dst, oop obj) {
   assert((op1 & 0x02) == 0, "sign-extension bit should not be set");
   emit_byte(op1);
   emit_byte(op2 | dst.number());
-  emit_data((int)obj, relocInfo::oop_type);
+  emit_data(x86_imm32(obj), relocInfo::oop_type);
 }
 
 
@@ -364,7 +391,7 @@ void Assembler::pushl(int imm32) {
   
 void Assembler::pushl(oop obj) {
   emit_byte(0x68);
-  emit_data((int)obj, relocInfo::oop_type);
+  emit_data(x86_imm32(obj), relocInfo::oop_type);
 }
 
   
@@ -433,7 +460,7 @@ void Assembler::movl(Register dst, int imm32) {
 
 void Assembler::movl(Register dst, oop obj) {
   emit_byte(0xB8 | dst.number());
-  emit_data((int)obj, relocInfo::oop_type);
+  emit_data(x86_imm32(obj), relocInfo::oop_type);
 }
 
 
@@ -459,7 +486,7 @@ void Assembler::movl(Address dst, int imm32) {
 void Assembler::movl(Address dst, oop obj) {
   emit_byte(0xC7);
   emit_operand(eax, dst);
-  emit_data((int)obj, relocInfo::oop_type);
+  emit_data(x86_imm32(obj), relocInfo::oop_type);
 }
 
 
@@ -565,7 +592,7 @@ void Assembler::cmpl(Address dst, int imm32) {
 void Assembler::cmpl(Address dst, oop obj) {
   emit_byte(0x81);
   emit_operand(edi, dst);
-  emit_data((int)obj, relocInfo::oop_type);
+  emit_data(x86_imm32(obj), relocInfo::oop_type);
 }
 
 
@@ -856,21 +883,21 @@ void Assembler::ret(int imm16) {
 
 void Assembler::print(Label& L) {
   if (L.is_unused()) {
-    std->print_cr("undefined label");
+    stdOut->print_cr("undefined label");
   } else if (L.is_bound()) {
-    std->print_cr("bound label to %d", L.pos());
+    stdOut->print_cr("bound label to %d", L.pos());
   } else if (L.is_unbound()) {
     Label l = L;
-    std->print_cr("unbound label");
+    stdOut->print_cr("unbound label");
     while (l.is_unbound()) {
       Displacement disp = disp_at(l);
-      std->print("@ %d ", l.pos());
+      stdOut->print("@ %d ", l.pos());
       disp.print();
-      std->cr();
+      stdOut->cr();
       disp.next(l);
     }
   } else {
-    std->print_cr("label in inconsistent state (pos = %d)", L._pos);
+    stdOut->print_cr("label in inconsistent state (pos = %d)", L._pos);
   }
 }
 
@@ -963,7 +990,7 @@ void Assembler::bind(Label& L) {
       // previous instruction is jump jumping immediately after it => eliminate it
       const int long_size = 5;
       assert(byte_at(offset() - long_size) == 0xE9, "jmp expected");
-      if (PrintJumpElimination) std->print_cr("@ %d jump to next eliminated", L.pos());
+      if (PrintJumpElimination) stdOut->print_cr("@ %d jump to next eliminated", L.pos());
       // remove first entry from label list
       disp_at(L).next(L);
       // eliminate instruction (set code pointers back)
@@ -1002,7 +1029,7 @@ void Assembler::call(Label& L) {
 
 void Assembler::call(char* entry, relocInfo::relocType rtype) {
   emit_byte(0xE8);
-  emit_data((int)entry - ((int)_code_pos + sizeof(long)), rtype);
+  emit_data(x86_imm32(entry) - (x86_imm32(_code_pos) + sizeof(long)), rtype);
 }
 
 
@@ -1020,7 +1047,7 @@ void Assembler::call(Address adr) {
 
 void Assembler::jmp(char* entry, relocInfo::relocType rtype) {
   emit_byte(0xE9);
-  emit_data((int)entry - ((int)_code_pos + sizeof(long)), rtype);
+  emit_data(x86_imm32(entry) - (x86_imm32(_code_pos) + sizeof(long)), rtype);
 }
 
 
@@ -1055,8 +1082,8 @@ void Assembler::jmp(Label& L) {
     if (EliminateJumpsToJumps && _unbound_label.is_unbound() && _binding_pos == offset()) {
       // current position is target of jumps
       if (PrintJumpElimination) {
-        std->print_cr("eliminated jumps/calls to %d", _binding_pos);
-        std->print("from ");
+        stdOut->print_cr("eliminated jumps/calls to %d", _binding_pos);
+        stdOut->print("from ");
         print(_unbound_label);
       }
       link_to(L, _unbound_label);
@@ -1101,7 +1128,7 @@ void Assembler::jcc(Condition cc, char* dst, relocInfo::relocType rtype) {
   // 0000 1111 1000 tttn #32-bit disp
   emit_byte(0x0F);
   emit_byte(0x80 | cc);
-  emit_data((int)dst - ((int)_code_pos + sizeof(long)), rtype);
+  emit_data(x86_imm32(dst) - (x86_imm32(_code_pos) + sizeof(long)), rtype);
 }
 
 
@@ -1323,7 +1350,7 @@ void MacroAssembler::leave() {
 
 void MacroAssembler::inline_oop(oop o) {
   emit_byte(0xA9);
-  emit_data((int)o, relocInfo::oop_type);
+  emit_data(x86_imm32(o), relocInfo::oop_type);
 }
 
 
@@ -1334,8 +1361,8 @@ void MacroAssembler::inline_oop(oop o) {
 // allow proper stack traversal.
 
 void MacroAssembler::set_last_Delta_frame_before_call() {
-  movl(Address((int)&last_Delta_fp, relocInfo::external_word_type), ebp);
-  movl(Address((int)&last_Delta_sp, relocInfo::external_word_type), esp);
+  movl(Address(x86_imm32(&last_Delta_fp), relocInfo::external_word_type), ebp);
+  movl(Address(x86_imm32(&last_Delta_sp), relocInfo::external_word_type), esp);
 }
 
 
@@ -1347,7 +1374,7 @@ void MacroAssembler::set_last_Delta_frame_after_call() {
 
 
 void MacroAssembler::reset_last_Delta_frame() {
-  movl(Address((int)&last_Delta_fp, relocInfo::external_word_type), 0);
+  movl(Address(x86_imm32(&last_Delta_fp), relocInfo::external_word_type), 0);
 }
 
 
@@ -1489,7 +1516,7 @@ void MacroAssembler::store_check(Register obj, Register tmp) {
   // in the code - however relocation would be necessary whenever the
   // base changes. Advantage: only one instead of two instructions.
   assert(obj != tmp, "registers must be different");
-  movl(tmp, Address((int)&byte_map_base, relocInfo::external_word_type));
+  movl(tmp, Address(x86_imm32(&byte_map_base), relocInfo::external_word_type));
   shrl(obj, card_shift);
   movb(Address(tmp, obj, Address::times_1), 0);
 }
@@ -1516,41 +1543,41 @@ void MacroAssembler::fpop() {
 
 // debugging
 
-void MacroAssembler::print_reg(char* name, oop obj) {
-  std->print("%s = ", name);
+void MacroAssembler::print_reg(const char* name, oop obj) {
+  stdOut->print("%s = ", name);
   if (obj == NULL) {
-    std->print_cr("NULL");
+    stdOut->print_cr("NULL");
   } else if (obj->is_smi()) {
-    std->print_cr("smi (%d)", smiOop(obj)->value());
+    stdOut->print_cr("smi (%d)", smiOop(obj)->value());
   } else if (obj->is_mem() && Universe::is_heap((oop*)obj)) {
     // use explicit checks to avoid crashes even in a broken system
     if (obj == Universe::nilObj()) {
-      std->print_cr("nil (0x%08x)", obj);
+      stdOut->print_cr("nil (0x%08x)", obj);
     } else if (obj == Universe::trueObj()) {
-      std->print_cr("true (0x%08x)", obj);
+      stdOut->print_cr("true (0x%08x)", obj);
     } else if (obj == Universe::falseObj()) {
-      std->print_cr("false (0x%08x)", obj);
+      stdOut->print_cr("false (0x%08x)", obj);
     } else {
-      std->print_cr("memOop (0x%08x)", obj);
+      stdOut->print_cr("memOop (0x%08x)", obj);
     }
   } else {
-    std->print_cr("0x%08x", obj);
+    stdOut->print_cr("0x%08x", obj);
   }
 }
 
 
 void MacroAssembler::inspector(oop edi, oop esi, oop ebp, oop esp, oop ebx, oop edx, oop ecx, oop eax, char* eip) {
   char* title = (char*)(nativeTest_at(eip)->data());
-  if (title != NULL) std->print_cr("%s", title);
+  if (title != NULL) stdOut->print_cr("%s", title);
   print_reg("eax", eax);
   print_reg("ebx", ebx);
   print_reg("ecx", ecx);
   print_reg("edx", edx);
   print_reg("edi", edi);
   print_reg("esi", esi);
-  std->print_cr("ebp = 0x%08x", ebp);
-  std->print_cr("esp = 0x%08x", esp);
-  std->cr();
+  stdOut->print_cr("ebp = 0x%08x", ebp);
+  stdOut->print_cr("esp = 0x%08x", esp);
+  stdOut->cr();
 }
 
 
@@ -1558,9 +1585,9 @@ void MacroAssembler::inspect(char* title) {
   char* entry = StubRoutines::call_inspector_entry();
   if (entry != NULL) {
     call(entry, relocInfo::runtime_call_type);			// call stub invoking the inspector
-    testl(eax, int(title));					// additional info for inspector
+    testl(eax, x86_imm32(title));					// additional info for inspector
   } else {
-    char* s = (title == NULL) ? "" : title;
-    std->print_cr("cannot call inspector for \"%s\" - no entry point yet", s);
+    const char* s = (title == NULL) ? "" : title;
+    stdOut->print_cr("cannot call inspector for \"%s\" - no entry point yet", s);
   }
 }

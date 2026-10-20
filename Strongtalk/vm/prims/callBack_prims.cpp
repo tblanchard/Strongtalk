@@ -21,9 +21,52 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_callBack_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "prim_def.hpp"
+#include "symbolOop.hpp"
+#include "callBack_prims.hpp"
+#include "klassOop.hpp"
+#include "proxyOop.hpp"
+#include "oopFactory.hpp"
+#include "universe.inline.hpp"
+#include "doubleOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "callBack.hpp"
+#include "prim_impl.hpp"
 TRACE_FUNC(TraceCallBackPrims, "callBack")
 
 int callBackPrimitives::number_of_calls;
@@ -67,7 +110,7 @@ PRIM_DECL_1(callBackPrimitives::unregister, oop proxy) {
   return proxy;
 }
 
-typedef int (__stdcall *mytype)(int a, int b);
+typedef int (*mytype)(int a, int b);
 
 PRIM_DECL_1(callBackPrimitives::invokePascal, oop proxy) {
   PROLOGUE_1("invokePascal", proxy);
@@ -82,6 +125,6 @@ PRIM_DECL_1(callBackPrimitives::invokeC, oop proxy) {
   if (!proxy->is_proxy())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   fntype f = (fntype) proxyOop(proxy)->get_pointer();
-  return as_smiOop( (int) (*f) (10, 5));
+  return as_smiOop( (smi) (intptr_t) (*f) (10, 5));
 }
 

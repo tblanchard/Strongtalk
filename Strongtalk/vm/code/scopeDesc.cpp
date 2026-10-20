@@ -21,11 +21,80 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "expr.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "methodKlass.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_scopeDesc.cpp.incl"
 
 char* ScopeDesc::invalid_pc = (char*) -1;
 
@@ -277,12 +346,12 @@ bool ScopeDesc::verify() {
   // don't do a full verify of parent/sender -- too many redundant verifies
   ScopeDesc* s = sender();
   if (s && !s->shallow_verify()) {
-    std->print("invalid sender %#lx of ScopeDesc %#lx", s, this);
+    stdOut->print("invalid sender %#lx of ScopeDesc %#lx", s, this);
     ok = false;
   }
   ScopeDesc* p = parent();
   if (p && !p->shallow_verify()) {
-    std->print("invalid parent %#lx of ScopeDesc %#lx", p, this);
+    stdOut->print("invalid parent %#lx of ScopeDesc %#lx", p, this);
     ok = false;
   }
   return ok;
@@ -310,11 +379,11 @@ class PrintNameDescClosure: public NameDescClosure {
   char* _pc0;
 
   void print(char* title, int no, NameDesc* nd, char* pc) {
-    std->fill_to(_indent);
+    stdOut->fill_to(_indent);
     if (UseNewBackend) {
-      std->print("%5d: ", pc - _pc0);
+      stdOut->print("%5d: ", pc - _pc0);
     }
-    std->print("%s[%d]\t", title, no); nd->print(); std->cr();
+    stdOut->print("%s[%d]\t", title, no); nd->print(); stdOut->cr();
   }
 
  public:
@@ -328,31 +397,31 @@ class PrintNameDescClosure: public NameDescClosure {
 
 
 void ScopeDesc::print(int indent, bool all_pcs) {
-  std->fill_to(indent);
+  stdOut->fill_to(indent);
   printName();
-  std->print("ScopeDesc @%d%s: ", offset(), is_lite() ? ", lite" : "");
-  std->print(" (ID %ld) ", scopeID());
+  stdOut->print("ScopeDesc @%d%s: ", offset(), is_lite() ? ", lite" : "");
+  stdOut->print(" (ID %ld) ", scopeID());
   method()->selector()->print_symbol_on();
-  std->print(" %#x", method());
-  std->cr();
+  stdOut->print(" %#x", method());
+  stdOut->cr();
   ScopeDesc* s = sender();
   if (s != NULL) {
-    std->fill_to(indent);
-    std->print("sender: (%d) @ %ld", s->offset(), long(senderBCI()));
+    stdOut->fill_to(indent);
+    stdOut->print("sender: (%d) @ %ld", s->offset(), long(senderBCI()));
   }
   ScopeDesc* p = parent();
   if (p != NULL) {
     if (s != NULL) {
-      std->print("; ");
+      stdOut->print("; ");
     } else {
-      std->fill_to(indent);
+      stdOut->fill_to(indent);
     }
-    std->print("parent: (%d)", p->offset());
+    stdOut->print("parent: (%d)", p->offset());
   }
   if (s != NULL || p != NULL) {
-    std->cr();
+    stdOut->cr();
   }
-  std->fill_to(indent);
+  stdOut->fill_to(indent);
   printSelf();
   PrintNameDescClosure blk(indent+2, _scopes->my_nmethod()->insts());
   if (all_pcs) {
@@ -393,15 +462,15 @@ MethodScopeDesc::MethodScopeDesc(const nmethodScopes* scopes, int offset, char* 
 
 
 void MethodScopeDesc::printName() {
-  std->print("Method");
+  stdOut->print("Method");
 }
 
 
 void MethodScopeDesc::printSelf() {
   printIndent();
-  std->print("self: ");
+  stdOut->print("self: ");
   self()->print();
-  std->cr();
+  stdOut->cr();
 }
 
 
@@ -413,7 +482,7 @@ void MethodScopeDesc::print_value_on(outputStream* st) const {
 
 void BlockScopeDesc::printSelf() {
   ScopeDesc::printSelf();
-  std->cr();
+  stdOut->cr();
 }
 
 
@@ -430,7 +499,7 @@ bool BlockScopeDesc::s_equivalent(ScopeDesc* s) const {
 
 
 void BlockScopeDesc::printName() {
-  std->print("Block");
+  stdOut->print("Block");
 }
 
 
@@ -479,11 +548,11 @@ NonInlinedBlockScopeDesc::NonInlinedBlockScopeDesc(const nmethodScopes* scopes, 
 
 
 void NonInlinedBlockScopeDesc::print() {
-  std->print("NonInlinedBlockScopeDesc\n");
-  std->print(" - method: "); 
+  stdOut->print("NonInlinedBlockScopeDesc\n");
+  stdOut->print(" - method: "); 
   method()->print_value();
-  std->cr();
-  std->print(" - parent offset: %d\n", _parentScopeOffset);
+  stdOut->cr();
+  stdOut->print(" - parent offset: %d\n", _parentScopeOffset);
 }
 
 
@@ -502,9 +571,9 @@ TopLevelBlockScopeDesc::TopLevelBlockScopeDesc(const nmethodScopes* scopes, int 
 
 void TopLevelBlockScopeDesc::printSelf() {
   ScopeDesc::printSelf(); 
-  std->print("self: ");
+  stdOut->print("self: ");
   self()->print();
-  std->cr();
+  stdOut->cr();
 }
 
 
@@ -525,7 +594,7 @@ bool TopLevelBlockScopeDesc::s_equivalent(ScopeDesc* s) const {
 
 
 void TopLevelBlockScopeDesc::printName() {
-  std->print("TopLevelBlock");
+  stdOut->print("TopLevelBlock");
 }
 
 

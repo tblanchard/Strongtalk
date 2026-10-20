@@ -21,19 +21,66 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_abort.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "dispatchTable.hpp"
+#include "runtime.hpp"
+#include "frame.hpp"
+#include "symbolOop.hpp"
+#include "methodOop.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "location.hpp"
+#include "vframe.hpp"
+#include "os.hpp"
+#include "abort.hpp"
+#include "lookupCache.hpp"
 // The following variables are used to do NLRs through C code
 extern "C" bool       have_nlr_through_C;
 extern "C" oop        nlr_result;
-extern "C" int        nlr_home;
+extern "C" intptr_t   nlr_home;
 extern "C" int        nlr_home_id;
 extern "C" contextOop nlr_home_context;
 
 bool        have_nlr_through_C = false;
 oop         nlr_result;
-int         nlr_home;
+intptr_t    nlr_home;
 int         nlr_home_id;
 contextOop  nlr_home_context;
 
@@ -41,7 +88,7 @@ void ErrorHandler::abort_compilation() {
   Unimplemented();
 }
 
-extern "C" void provoke_nlr_at(int* frame_pointer, oop* stack_pointer);
+extern "C" void provoke_nlr_at(intptr_t* frame_pointer, oop* stack_pointer);
 
 void ErrorHandler::abort_current_process() {
   nlr_home    = 0;
@@ -51,7 +98,7 @@ void ErrorHandler::abort_current_process() {
   ShouldNotReachHere();
 }
 
-extern "C" void continue_nlr_in_delta(int* frame_pointer, oop* stack_pointer);
+extern "C" void continue_nlr_in_delta(intptr_t* frame_pointer, oop* stack_pointer);
 
 void ErrorHandler::continue_nlr_in_delta() {
   ::continue_nlr_in_delta(DeltaProcess::active()->last_Delta_fp(), DeltaProcess::active()->last_Delta_sp());

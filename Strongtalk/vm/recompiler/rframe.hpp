@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RECOMPILER_RFRAME_HPP_HPP
+#define VM_RECOMPILER_RFRAME_HPP_HPP
 
 
 // rframes ("recompiler frames") decorate stack frames with some extra information
@@ -127,3 +129,6 @@ class InterpretedRFrame : public RFrame {	// interpreter frame
 };
 
 #endif
+
+
+#endif // VM_RECOMPILER_RFRAME_HPP_HPP

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_BEHAVIOR_PRIMS_HPP_HPP
+#define VM_PRIMS_BEHAVIOR_PRIMS_HPP_HPP
 
 // primitives for classes
 
@@ -227,3 +229,6 @@ extern "C" oop primitiveNew8(oop receiver);
 //              name  = 'primitiveNew9' }
 //%
 extern "C" oop primitiveNew9(oop receiver);
+
+
+#endif // VM_PRIMS_BEHAVIOR_PRIMS_HPP_HPP

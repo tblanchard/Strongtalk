@@ -13,13 +13,19 @@ following conditions are met:
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT 
 NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
-THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES 
 (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
 INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
 OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 
 
 */
+
+#ifndef VM_TOPINCLUDES_BITS_HPP
+#define VM_TOPINCLUDES_BITS_HPP
+
+#include "config.hpp"
+#include "error.hpp"
 
 # define AllBits	~0
 # define NoBits		0
@@ -31,21 +37,22 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 # define clearBits(x, m) ((x) &= ~(m))
 # define maskBits(x, m)	((x) & (m))
 # define anySet(x, m)	(maskBits((x), (m)) != NoBits)
-# define nthBit(n)	(OneBit << (n))
+# define nthBit(n)	(intptr_t(OneBit) << (n))
 # define addNth(x, n)	addBits((x), nthBit(n))
 # define setNth(x, n)	setBits((x), nthBit(n))
 # define clearNth(x, n)	clearBits((x), nthBit(n))
 # define subNth(x, n)	subBits((x), nthBit(n))
 # define isSet(x, n)	anySet((x), nthBit(n))
-# define nthMask(n)	(n == 32 ? AllBits : (nthBit(n) - OneBit))
+# define nthMask(n)	((n) >= BitsPerWord ? intptr_t(AllBits) : (nthBit(n) - OneBit))
 # define lowerBits(x, n) maskBits((x), nthMask(n))
 
 # define roundMask(x, m) (((x) + (m)) & ~(m))
 # define roundBits(x, n) roundMask((x), nthMask(n))
 # define roundTo(x, v)	roundMask((x), (v) - OneBit)
 
-inline int arithmetic_shift_right(int value, int shift) { return value >> shift; }
-inline int logic_shift_right(int value, int shift)      { return value << shift; }
+
+inline intptr_t arithmetic_shift_right(intptr_t value, int shift) { return value >> shift; }
+inline intptr_t logic_shift_right(intptr_t value, int shift)      { return intptr_t(uintptr_t(value) >> shift); }
 
 
 inline int get_unsigned_bitfield(int value, int start_bit_no, int field_length) {
@@ -61,6 +68,8 @@ inline int get_signed_bitfield(int value, int start_bit_no, int field_length) {
 
 inline int set_unsigned_bitfield(int value, int start_bit_no, int field_length, unsigned int new_field_value) {
   assert(addBits(new_field_value, ~nthMask(field_length)) == 0, "range check");
-  int mask = nthMask(field_length) << start_bit_no;
+  int mask = (int) (nthMask(field_length) << start_bit_no);
   return addBits(subBits(value, mask), maskBits(new_field_value << start_bit_no, mask));
 }
+
+#endif // VM_TOPINCLUDES_BITS_HPP

@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_DLL_HPP_HPP
+#define VM_PRIMS_DLL_HPP_HPP
 
+#include "nativeInstruction.hpp"
 // Support routines for Dynamic Link Libraries (DLLs)
 
 class InterpretedDLL_Cache: public ValueObj {
@@ -69,7 +72,7 @@ class CompiledDLL_Cache: public NativeCall {
   symbolOop function_name()			{ return symbolOop(test_at(test_2_instruction_offset)->data()); }
   dll_func  entry_point()			{ return (dll_func)mov_at(mov_edx_instruction_offset)->data(); }
   bool      async() const;
-  void	    set_entry_point(dll_func f)		{ mov_at(mov_edx_instruction_offset)->set_data(int(f)); }
+  void	    set_entry_point(dll_func f)		{ mov_at(mov_edx_instruction_offset)->set_data((long)f); }
 
   // Debugging
   void      verify();
@@ -113,3 +116,5 @@ class DLLs: AllStatic {
   static void exit_async_call(DeltaProcess** addr);	// called after each asynchronous DLL call
   static void exit_sync_call(DeltaProcess** addr);	// called after each synchronous DLL call
 };
+
+#endif // VM_PRIMS_DLL_HPP_HPP

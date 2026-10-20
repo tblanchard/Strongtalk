@@ -21,12 +21,49 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_generation.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "klassOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "abort.hpp"
 void generation::print() {
-  std->print(" total %6dK, %d%% used ", capacity()/K, (100 * used())/capacity());
-  std->print_cr(" [%#x, %#x[", low_boundary, high_boundary);
+  stdOut->print(" total %6dK, %d%% used ", capacity()/K, (100 * used())/capacity());
+  stdOut->print_cr(" [%#x, %#x[", low_boundary, high_boundary);
 }
 
 void newGeneration::swap_spaces() {
@@ -116,7 +153,7 @@ void newGeneration::switch_pointers(oop f, oop t) {
 
 void newGeneration::print() {
   if (WizardMode) {
-    std->print_cr(" New generation");
+    stdOut->print_cr(" New generation");
     generation::print();
   }
   eden()->print();
@@ -200,7 +237,7 @@ void oldGeneration::switch_pointers(oop from, oop to) {
 // Returns the amount actually allocated (0, maybe, if expansion isn't
 // possible; or more than asked for, due to rounding).
 int oldGeneration::expand(int size) {
-  EventMarker em("expanding heap by %d", (void*)size);
+  EventMarker em("expanding heap by %d", (void*)(intptr_t)size);
   assert(size >= 0, "negative expansion?");
   char *name= "old";
   oldSpace *s = new oldSpace(name, size); // modifies size for amount allocated
@@ -271,7 +308,7 @@ oop* oldGeneration::allocate_in_next_space(int size) {
 
 void oldGeneration::print() {
   if (WizardMode) {
-    std->print_cr(" Old generation");
+    stdOut->print_cr(" Old generation");
     generation::print();
   }
   FOR_EACH_OLD_SPACE(s) s->print();

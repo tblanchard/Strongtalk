@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_INIT_HPP_HPP
+#define VM_RUNTIME_INIT_HPP_HPP
 
 // init_globals replaces C++ global objects so we can use the standard linker
 // to link Delta (which is at least twice as fast as using the GNU C++ linker). 
@@ -30,3 +32,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 // to init_foo in init.cpp.
 
 void init_globals();	    	// call constructors at startup
+
+
+#endif // VM_RUNTIME_INIT_HPP_HPP

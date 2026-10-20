@@ -21,12 +21,38 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_integerOps.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "integerOps.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
 static const int   maxD = 36;
-static const int   logB = sizeof(Digit)*8;
 static const Digit hlfB = 0x80000000;
 static const Digit oneB = 0xFFFFFFFF;
 
@@ -217,12 +243,12 @@ smiOop Integer::as_smi(bool& ok) const {
   ok = true;
   switch (_signed_length) {
     case -1:
-      if (_first_digit <= -smi_min) return as_smiOop(-int(_first_digit));
+      if (_first_digit <= -smi_min) return as_smiOop(-smi(_first_digit));
       break;
     case  0:
       return as_smiOop(0);
     case  1:
-      if (_first_digit <=  smi_max) return as_smiOop( int(_first_digit));
+      if (_first_digit <=  smi_max) return as_smiOop( smi(_first_digit));
       break;
   }
   ok = false;
@@ -235,7 +261,7 @@ void Integer::print() {
   IntegerOps::Integer_to_string(*this, 10, s);
   int i = 0;
   while (s[i] != '\x0') {
-    std->print("%c", s[i]);
+    stdOut->print("%c", s[i]);
     i++;
   }
 }
@@ -260,86 +286,36 @@ inline char IntegerOps::as_char(int i) {
 
 inline Digit IntegerOps::xpy(Digit x, Digit y, Digit& carry) {
   // returns (x + y + c) mod B; sets carry = (x + y + c) div B
-  Digit c = carry;	// make sure that carry is used below and not &carry
-  Digit r;
-  assert(c <= 1, "wrong carry");
-  __asm {
-    //push eax		// save eax
-    mov eax, x		// eax = x
-    add eax, y		// eax = (x + y    ) mod B,	0 <= carry = (x + y    ) div B <= 1
-    adc eax, c		// eax = (x + y + c) mod B,	0 <= carry = (x + y + c) div B <= 1
-    mov r, eax		// eax is result
-    mov eax, 0		// cannot use xor because that clears carry bit!
-    adc eax, 0		// eax = carry
-    mov c, eax		// save carry
-    //pop eax		// restore eax
-  }
-  carry = c;
-  return r;
+  assert(carry <= 1, "wrong carry");
+  uint64_t r = (uint64_t) x + y + carry;
+  carry = (Digit) (r >> logB);
+  return (Digit) r;
 }
 
 
 inline Digit IntegerOps::xmy(Digit x, Digit y, Digit& carry) {
   // returns (x - y - c) mod B; sets carry = -((x - y - c) div B)
-  Digit c = carry;	// make sure that carry is used below and not &carry
-  Digit r;
-  assert(c <= 1, "wrong carry");
-  __asm {
-    //push eax		// save eax
-    mov eax, x		// eax = x
-    sub eax, y		// eax = (x - y    ) mod B,	0 <= carry = (x - y    ) div B <= 1
-    sbb eax, c		// eax = (x - y - c) mod B,	0 <= carry = (x - y - c) div B <= 1
-    mov r, eax		// eax is result
-    mov eax, 0		// cannot use xor because that clears carry bit!
-    adc eax, 0		// eax = carry
-    mov c, eax		// save carry
-    //pop eax		// restore eax
-  }
-  carry = c;
-  return r;
+  assert(carry <= 1, "wrong carry");
+  uint64_t r = (uint64_t) x - y - carry;
+  carry = (Digit) (r >> logB) & 1;	// borrow
+  return (Digit) r;
 }
 
 
 inline Digit IntegerOps::axpy(Digit a, Digit x, Digit y, Digit& carry) {
   // returns (a*x + y + c) mod B; sets carry = (a*x + y + c) div B
-  Digit c = carry;	// make sure that carry is used below and not &carry
-  Digit r;
-  __asm {
-    //push eax		// save eax
-    //push edx		// save edx
-    mov eax, a		// eax = a
-    mul x		// edx:eax = a*x
-    add eax, y		//
-    adc edx, 0		// edx:eax = a*x + y
-    add eax, c		//
-    adc edx, 0		// edx:eax = a*x + y + c
-    mov r, eax		// eax is result
-    mov c, edx		// save carry
-    //pop edx		// restore edx
-    //pop eax		// restore eax
-  }
-  carry = c;
-  return r;
+  uint64_t r = (uint64_t) a * x + y + carry;	// cannot overflow: (B-1)*(B-1) + 2*(B-1) < B*B
+  carry = (Digit) (r >> logB);
+  return (Digit) r;
 }
 
 
 inline Digit IntegerOps::xdy(Digit x, Digit y, Digit& carry) {
   // returns (carry*B + x) div y; sets carry = (carry*B + x) mod y
-  Digit c = carry;	// make sure that carry is used below and not &carry
-  Digit r;
-  __asm {
-    //push eax		// save eax
-    //push edx		// save edx
-    mov eax, x		// eax = x
-    mov edx, c		// edx:eax =  carry*B + x
-    div y		// edx:eax = (carry*B + x) mod y : (carry*B + x) div y
-    mov r, eax		// eax is result
-    mov c, edx		// save carry
-    //pop edx		// restore edx
-    //pop eax		// restore eax
-  }
-  carry = c;
-  return r;
+  assert(carry < y, "quotient would overflow");
+  uint64_t n = ((uint64_t) carry << logB) | x;
+  carry = (Digit) (n % y);
+  return (Digit) (n / y);
 }
 
 
@@ -793,7 +769,7 @@ void IntegerOps::mod(Integer& x, Integer& y, Integer& z) {
 }
 
 
-void IntegerOps::and(Integer& x, Integer& y, Integer& z) {
+void IntegerOps::and_(Integer& x, Integer& y, Integer& z) {
   if (x.is_positive() && y.is_positive()) {
     int l  = min(x.length(), y.length());
     int i  = 0;
@@ -805,7 +781,7 @@ void IntegerOps::and(Integer& x, Integer& y, Integer& z) {
 }
 
 
-void IntegerOps::or(Integer& x, Integer& y, Integer& z) {
+void IntegerOps::or_(Integer& x, Integer& y, Integer& z) {
   if (x.is_positive() && y.is_positive()) {
     int xl = x.length();
     int yl = y.length();
@@ -821,7 +797,7 @@ void IntegerOps::or(Integer& x, Integer& y, Integer& z) {
 }
 
 
-void IntegerOps::xor(Integer& x, Integer& y, Integer& z) {
+void IntegerOps::xor_(Integer& x, Integer& y, Integer& z) {
   if (x.is_positive() && y.is_positive()) {
     int xl = x.length();
     int yl = y.length();
@@ -976,9 +952,9 @@ static void factorial(int n) {
     IntegerOps::mul(x, y, z);
     assert(z.size_in_bytes() <= sizeof(z), "result too big");
   };
-  std->print("%d! = ", n);
+  stdOut->print("%d! = ", n);
   z.print();
-  std->cr();
+  stdOut->cr();
 }
 
 
@@ -999,9 +975,9 @@ static void unfactorial(int n) {
     assert(z.size_in_bytes() <= sizeof(z), "result too big");
   };
 
-  std->print("%dun! = ", n);
+  stdOut->print("%dun! = ", n);
   z.print();
-  std->cr();
+  stdOut->cr();
 }
 
 
@@ -1009,25 +985,25 @@ static void convert_to_double(int n) {
   Integer z;
   IntegerOps::int_to_Integer(n, z);
   bool ok;
-  std->print_cr("%d = %f", n, z.as_double(ok));
+  stdOut->print_cr("%d = %f", n, z.as_double(ok));
 }
 
 
 static void convert_to_integer(double x) {
   Integer z;
   IntegerOps::double_to_Integer(x, z);
-  std->print("%f = ", x);
+  stdOut->print("%f = ", x);
   z.print();
-  std->cr();
+  stdOut->cr();
 }
 
 
 static void convert_from_string(char* s) {
   Integer z;
   IntegerOps::string_to_Integer(s, 10, z);
-  std->print("%s = ", s);
+  stdOut->print("%s = ", s);
   z.print();
-  std->cr();
+  stdOut->cr();
 }
 
 
@@ -1117,7 +1093,7 @@ void IntegerOps::self_test() {
   convert_from_string("12345678901255678912345676601234567891234567890123456789");
 
   // end
-  std->print_cr("IntegerOps::self_test() done");
+  stdOut->print_cr("IntegerOps::self_test() done");
   exit(0);
 }
 

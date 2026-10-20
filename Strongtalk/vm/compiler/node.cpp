@@ -21,10 +21,112 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "processOop.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "prim_def.hpp"
+#include "smi_prims.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "behavior_prims.hpp"
+#include "locations.hpp"
+#include "pregMapping.hpp"
+#include "loopOpt.hpp"
+#include "node.inline.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "split.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_node.cpp.incl"
 
 int BasicNode::currentID;
 int BasicNode::currentCommentID;
@@ -520,7 +622,8 @@ void Node::removeNext(Node* n) {
 
 Node* Node::endOfList() const {
   if (_next == NULL) return (Node*)this;
-  for (Node* n = _next; n->_next; n = n->_next) {
+  Node* n;
+  for (n = _next; n->_next; n = n->_next) {
       assert(n->hasSingleSuccessor(), ">1 successors");
   }
   return n;
@@ -543,7 +646,8 @@ void AbstractMergeNode::movePrev(Node* from, Node* to) {
 }
 
 bool AbstractMergeNode::isPredecessor(const Node* n) const {
-  for (int i = _prevs->length() - 1; i >= 0; i--) {
+  int i;
+  for (i = _prevs->length() - 1; i >= 0; i--) {
     if (_prevs->at(i) == n) return true;
   }
   return false;
@@ -564,7 +668,8 @@ void AbstractBranchNode::removeNext(Node* n) {
     n->removePrev(this);
     _next = NULL;
   } else {
-    for (int i = 0; i < _nxt->length() && _nxt->at(i) != n; i++) ;
+    int i;
+    for (i = 0; i < _nxt->length() && _nxt->at(i) != n; i++) ;
     assert(i < _nxt->length(), "not found");
     n->removePrev(this);
     for ( ; i < _nxt->length() - 1; i++) _nxt->at_put(i, _nxt->at(i+1));
@@ -585,7 +690,8 @@ void AbstractBranchNode::moveNext(Node* from, Node* to) {
   if (_next == from) {
     _next = to;
   } else {
-    for (int i = 0; i < _nxt->length() && _nxt->at(i) != from; i++) ;
+    int i;
+    for (i = 0; i < _nxt->length() && _nxt->at(i) != from; i++) ;
     assert(i < _nxt->length(), "not found");
     _nxt->at_put(i, to);
   }
@@ -595,7 +701,8 @@ bool AbstractBranchNode::isSuccessor(const Node* n) const {
   if (_next == n) {
     return true;
   } else {
-    for (int i = 0; i < _nxt->length() && _nxt->at(i) != n; i++) ;
+    int i;
+    for (i = 0; i < _nxt->length() && _nxt->at(i) != n; i++) ;
     return i < _nxt->length();
   }
 }
@@ -604,7 +711,8 @@ BB* BasicNode::newBB() {
   if (_bb == NULL) {
     int len = 0;
     _bb = new BB((Node*)this, (Node*)this, 1);     
-    for (Node* n = (Node*)this; !n->endsBB() && n->next() != NULL; n = n->next()) {
+    Node* n;
+    for (n = (Node*)this; !n->endsBB() && n->next() != NULL; n = n->next()) {
       n->_num = len++; n->_bb = _bb;
     }
     n->_num = len++; n->_bb = _bb;
@@ -815,7 +923,8 @@ void ContextInitNode::notifyNoContext() {
   _src->removeUse(bb(), srcUse);
   _src = NULL;
   if (_materializedBlocks) {
-    for (int i = _materializedBlocks->length() - 1; i >= 0; i--) {
+    int i;
+    for (i = _materializedBlocks->length() - 1; i >= 0; i--) {
       // remove the block materialization node
       BlockMaterializeNode* n = _materializedBlocks->at(i);
       n->eliminate(n->bb(), NULL, true, false); 
@@ -1164,7 +1273,8 @@ void PrologueNode::makeUses(BB* bb) {
     bb->addDef(this, s->context());
   }
   // build initial defs for incoming args
-  for (int i = 0; i < _nofArgs; i++) {
+  int i;
+  for (i = 0; i < _nofArgs; i++) {
     Expr* a = s->argument(i);
     if (a) bb->addDef(this, a->preg());
   }
@@ -1273,7 +1383,8 @@ void CallNode::makeUses(BB* bb) {
 	if (home->isSenderOrSame(scope())) {
 	  // ok, this block is live
 	  GrowableArray<PReg*>* uplevelRead = blk->uplevelRead();
-	  for (int j = uplevelRead->length() - 1; j >= 0; j--) {
+	  int j;
+	  for (j = uplevelRead->length() - 1; j >= 0; j--) {
 	    PReg* r = uplevelRead->at(j);
 	    uplevelUses->append(bb->addUse(this, r));
 	    uplevelUsed->append(r);
@@ -1313,7 +1424,8 @@ void ContextCreateNode::makeUses(BB* bb) {
   if (_parentContexts) {
     int len = _parentContexts->length();
     _parentContextUses = new GrowableArray<Use*>(len, len, NULL);
-    for (int i = _parentContexts->length() - 1; i>= 0; i--) {
+    int i;
+    for (i = _parentContexts->length() - 1; i>= 0; i--) {
       Use* u = bb->addUse(this, _parentContexts->at(i));
       _parentContextUses->at_put(i, u);
     }
@@ -1447,12 +1559,14 @@ void CallNode::removeUses(BB* bb) {
   _dest->removeDef(bb, destDef);
   if (argUses) {
     int len = args->length();
-    for (int i = 0; i < len; i++) {
+    int i;
+    for (i = 0; i < len; i++) {
       args->at(i)->removeUse(bb, argUses->at(i));
     }
   }
   if (uplevelUses) {
-    for (int i = uplevelUses->length() - 1; i >= 0; i--) uplevelUsed->at(i)->removeUse(bb, uplevelUses->at(i));
+    int i;
+    for (i = uplevelUses->length() - 1; i >= 0; i--) uplevelUsed->at(i)->removeUse(bb, uplevelUses->at(i));
     for (i = uplevelDefs->length() - 1; i >= 0; i--) uplevelDefd->at(i)->removeDef(bb, uplevelDefs->at(i));
   }
   NonTrivialNode::removeUses(bb);
@@ -1604,7 +1718,8 @@ inline void BlockMaterializeNode::eliminate(BB* bb, PReg* r, bool rem, bool cp) 
 
 void BasicNode::removeUpToMerge() {
   BB* thisBB = _bb;
-  for (Node* n = (Node*)this; n && n->hasSinglePredecessor(); ) {
+  Node* n;
+  for (n = (Node*)this; n && n->hasSinglePredecessor(); ) {
     while (n->nSuccessors() > 1) {
       int i = n->nSuccessors() - 1;
       Node* succ = n->next(i);
@@ -1766,7 +1881,7 @@ void ContextInitNode::eliminate(BB* bb, PReg* r, bool removing, bool cp) {
   NonTrivialNode::eliminate(bb, r, removing, cp);
 }
 
-void BranchNode::eliminateBranch(int op1, int op2, int res) {
+void BranchNode::eliminateBranch(intptr_t op1, intptr_t op2, intptr_t res) {
   // the receiver can be eliminated because the result it is testing
   // is a constant (res)
   bool ok;
@@ -1988,9 +2103,10 @@ bool ArithNode::copyPropagate(BB* bb, Use* u, PReg* d, bool replace) {
   if (_src->isConstPReg() && operIsConst()) {
     assert(success, "CP must have worked");
     // can constant-fold this operation
-    int c1 = (int)((ConstPReg*)_src)->constant;
-    int c2 = (int)operConst();
-    int res;
+    // constants are tagged smi values (words)
+    intptr_t c1 = (intptr_t) ((ConstPReg*)_src)->constant;
+    intptr_t c2 = (intptr_t) operConst();
+    intptr_t res;
     switch (_op) {
     case AddArithOp:
       res = c1 + c2; break;
@@ -2333,7 +2449,7 @@ SimpleBitVector CallNode::trashedMask() 	{ return SimpleBitVector(-1); }
 // computeEscapingBlocks: find escaping blocks
 // ==================================================================================
 
-inline void computeEscapingBlocks(Node* n, PReg* src, GrowableArray<BlockPReg*>* l, char* msg) {
+inline void computeEscapingBlocks(Node* n, PReg* src, GrowableArray<BlockPReg*>* l, const char* msg) {
   // helper function for computing exposed blocks
   if (src->isBlockPReg()) {
     BlockPReg* r = (BlockPReg*)src;
@@ -3028,7 +3144,8 @@ void Node::verify() const {
       !isCommentNode())   // for the "rest of method omitted (dead)" comment
     error("Node %#lx has no successor", this);
   if (next() != NULL && isExitNode()) {
-    for (Node* n = next();
+    Node* n;
+    for (n = next();
 	 n && (n->isCommentNode() || n->isDeadEndNode());
 	 n = n->next()) ;
       if (n) error("exit node %#lx has a successor (%#lx)", this, next());

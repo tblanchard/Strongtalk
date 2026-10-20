@@ -21,9 +21,19 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_longInt.cpp.incl"
 
+#include "config.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "error.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
 inline long_int::long_int() {}
 
 long_int::long_int(unsigned int low, unsigned int high) {
@@ -38,49 +48,43 @@ long_int::long_int(double value) {
 }
 
 long_int long_int::operator +(long_int arg) {
-  long_int receiver = *this;
-  long_int result;
-  __asm {
-    mov eax, receiver.low
-    mov edx, receiver.high
-    add eax, arg.low
-    adc edx, arg.high
-    mov result.low,  eax
-    mov result.high, edx
-  }
-  return result;
+  // Portable replacement for the MSVC inline assembly that added the two
+  // 64-bit integers (split into low/high 32-bit halves).
+  unsigned long long receiver = ((unsigned long long)high << 32) | low;
+  unsigned long long a        = ((unsigned long long)arg.high << 32) | arg.low;
+  unsigned long long result   = receiver + a;
+  long_int r;
+  r.low  = (unsigned int)result;
+  r.high = (unsigned int)(result >> 32);
+  return r;
 }
 
 long_int long_int::operator -(long_int arg) {
-  long_int receiver = *this;
-  long_int result;
-  __asm {
-    mov eax, receiver.low
-    mov edx, receiver.high
-    sub eax, arg.low
-    sbb edx, arg.high
-    mov result.low,  eax
-    mov result.high, edx
-  }
-  return result;
+  // Portable replacement for the MSVC inline assembly that subtracted the
+  // two 64-bit integers (split into low/high 32-bit halves).
+  unsigned long long receiver = ((unsigned long long)high << 32) | low;
+  unsigned long long a        = ((unsigned long long)arg.high << 32) | arg.low;
+  unsigned long long result   = receiver - a;
+  long_int r;
+  r.low  = (unsigned int)result;
+  r.high = (unsigned int)(result >> 32);
+  return r;
 }
 
 double long_int::as_double() {
-  long_int receiver = *this;  
-  double result;
-  __asm {
-    fild receiver
-    fstp result
-  }
-  return result;
+  // Portable replacement for the MSVC inline assembly (fild/fstp) that
+  // converted the 64-bit integer to a double.
+  long long value = (long long)(((unsigned long long)high << 32) | low);
+  return (double)value;
 }
 
 long_int long_int::double_conversion(double value) {
-  register long_int result;
-  __asm {
-    fld   value
-    fistp result
-  }
+  // Portable replacement for the MSVC inline assembly (fld/fistp) that
+  // converted a double to a 64-bit integer.
+  long long v = (long long)value;
+  long_int result;
+  result.low  = (unsigned int)v;
+  result.high = (unsigned int)(v >> 32);
   return result;
 }
 

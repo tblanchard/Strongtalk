@@ -22,11 +22,101 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "inliningdb.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "timer.hpp"
+#include "sweeper.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "recompiler.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "slist.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "frame.hpp"
+#include "compUtils.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "interpreter.hpp"
+#include "delta.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "rframe.hpp"
 #ifdef DELTA_COMPILER
 
-#include "incls/_recompile.cpp.incl"
 
 nmethod* recompilee = NULL;	    	// method being recompiled
 Recompilation* theRecompilation;
@@ -50,7 +140,7 @@ char* Recompilation::methodOop_invocation_counter_overflow(oop rcvr, methodOop m
   if (!ok) {
     // Possibly caused by a method sweeper bug: inline cache has been modified during the send.
     // To check: method is a jumpTable entry to an nmethod instead of a methodOop.
-    char* msg = oop(method)->is_smi() ? "(method might be jump table entry)" : "";
+    const char* msg = oop(method)->is_smi() ? "(method might be jump table entry)" : "";
     LOG_EVENT3("invocation counter overflow with broken methodOop 0x%x (recv = 0x%x) %s", method, rcvr, msg);
     fatal("invocation counter overflow with illegal method - internal error");
     // fatal("invocation counter overflow with illegal method - tell Robert");
@@ -111,9 +201,9 @@ nmethod* compile_method(LookupKey* key, methodOop m) {
       VM_OptimizeRScope op(rscope);
       VMProcess::execute(&op);
       if (TraceInliningDatabase) {
-        std->print_cr("Inlining database compile ");
-	key->print_on(std);
-	std->cr();
+        stdOut->print_cr("Inlining database compile ");
+	key->print_on(stdOut);
+	stdOut->cr();
       }
       return op.result();
     }
@@ -124,8 +214,18 @@ nmethod* compile_method(LookupKey* key, methodOop m) {
 }
 
 
+Recompilation::Recompilation(oop rcvr, nmethod* nm, bool unc) {
+  _method = nm->method(); _rcvr = rcvr; _nm = nm; _isUncommon = unc; init();
+}
+
+
+char* Recompilation::result() const {
+  return _newNM ? _newNM->verifiedEntryPoint() : NULL;
+}
+
+
 void Recompilation::init() {
-  _newNM = NULL; 
+  _newNM = NULL;
   _triggerVF = NULL;
   _recompiledTrigger = false;
   assert(!theRecompilation, "already set");

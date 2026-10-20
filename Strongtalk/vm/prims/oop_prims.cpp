@@ -21,9 +21,78 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_oop_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "prim_def.hpp"
+#include "bytecodes.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "objArrayOop.hpp"
+#include "delta.hpp"
+#include "oopFactory.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "doubleOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objectIDTable.hpp"
+#include "oop_prims.hpp"
+#include "markSweep.hpp"
+#include "prim_impl.hpp"
+#include "memOop.inline.hpp"
 TRACE_FUNC(TraceOopPrims, "oop")
 
 int oopPrimitives::number_of_calls;
@@ -40,7 +109,7 @@ PRIM_DECL_2(oopPrimitives::instVarAt, oop receiver, oop index) {
   if (!index->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  int raw_index = smiOop(index)->value() - 1;
+  smi raw_index = smiOop(index)->value() - 1;
 
   if (!memOop(receiver)->is_within_instVar_bounds(raw_index))
     markSymbol(vmSymbols::out_of_bounds());
@@ -55,7 +124,7 @@ PRIM_DECL_2(oopPrimitives::instance_variable_name_at, oop obj, oop index) {
   if (!index->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  int raw_index = smiOop(index)->value() - 1;
+  smi raw_index = smiOop(index)->value() - 1;
 
   if (!memOop(obj)->is_within_instVar_bounds(raw_index))
     markSymbol(vmSymbols::out_of_bounds());
@@ -70,7 +139,7 @@ PRIM_DECL_3(oopPrimitives::instVarAtPut, oop receiver, oop index, oop value) {
   if (!index->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  int raw_index = smiOop(index)->value() - 1;
+  smi raw_index = smiOop(index)->value() - 1;
 
   if (!memOop(receiver)->is_within_instVar_bounds(raw_index))
     markSymbol(vmSymbols::out_of_bounds());
@@ -110,6 +179,8 @@ PRIM_DECL_2(oopPrimitives::not_equal, oop receiver, oop argument){
 
 PRIM_DECL_1(oopPrimitives::oop_size, oop receiver) {
   PROLOGUE_1("oop_size", receiver)
+  // used for file out (Object>>fileOutSize): methods are filed out in the external (32-bit) code layout
+  if (receiver->is_method()) return as_smiOop(methodOop(receiver)->fileout_object_size());
   return as_smiOop(receiver->is_mem() ? memOop(receiver)->size() : 0);
 }
 

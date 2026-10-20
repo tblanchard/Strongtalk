@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_SPACESIZE_HPP_HPP
+#define VM_MEMORY_SPACESIZE_HPP_HPP
 
 
 // default sizes for heaps & zone
@@ -42,3 +44,6 @@ public:
   void initialize();
 };
 
+
+
+#endif // VM_MEMORY_SPACESIZE_HPP_HPP

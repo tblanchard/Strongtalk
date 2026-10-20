@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_PRINTLAYOUT_HPP_HPP
+#define VM_MEMORY_PRINTLAYOUT_HPP_HPP
 
 class PrintObjectClosure : public ObjectLayoutClosure {
  private:
@@ -42,3 +44,6 @@ class PrintObjectClosure : public ObjectLayoutClosure {
   void do_indexable_long(int index, long* l);
 };
 
+
+
+#endif // VM_MEMORY_PRINTLAYOUT_HPP_HPP

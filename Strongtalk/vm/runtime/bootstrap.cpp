@@ -21,12 +21,121 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_bootstrap.cpp.incl"
 
-#include <io.h>
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "klassKlass.hpp"
+#include "vframeOop.hpp"
+#include "symbolOop.hpp"
+#include "associationKlass.hpp"
+#include "bytecodes.hpp"
+#include "dByteArrayOop.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "ageTable.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "objArrayKlass.hpp"
+#include "bootstrap.hpp"
+#include "vframeKlass.hpp"
+#include "processOop.hpp"
+#include "dValueArrayOop.hpp"
+#include "dValueArrayKlass.hpp"
+#include "mixinOop.hpp"
+#include "mixinKlass.hpp"
+#include "proxyOop.hpp"
+#include "runtime.hpp"
+#include "proxyKlass.hpp"
+#include "doubleOop.hpp"
+#include "weakArrayKlass.hpp"
+#include "frame.hpp"
+#include "symbolTable.hpp"
+#include "methodOop.hpp"
+#include "smiKlass.hpp"
+#include "doubleKlass.hpp"
+#include "methodKlass.hpp"
+#include "byteArrayKlass.hpp"
+#include "symbolKlass.hpp"
+#include "dByteArrayKlass.hpp"
+#include "blockOop.hpp"
+#include "processKlass.hpp"
+#include "blockKlass.hpp"
+#include <unistd.h>
 
-bootstrap::bootstrap(char* name) {
+// Debugging: walks the objects of old space, reports the first place where it is not parsable.
+static bootstrap* the_bootstrap = NULL;
+static void check_old_space() {
+  oop* bottom = Universe::old_gen.bottom_mark()._point;
+  oop* top    = Universe::old_gen.top_mark()._point;
+  oop* p = bottom;
+  oop* prev = NULL;
+  int count = 0;
+  while (p < top) {
+    if (!oop(*p)->is_mark()) {
+      lprintf("\nheap not parsable at %p (object #%d, offset %ld words)\n", p, count, (long) (p - bottom));
+      if (prev != NULL) {
+        memOop pm = as_memOop(prev);
+        lprintf("previous object %p: size %d, klass %p method %d byteArray %d symbol %d double %d objArray %d klass %d\n",
+                prev, pm->size(), (void*) pm->klass(), pm->is_method(), pm->is_byteArray(), pm->is_symbol(),
+                pm->is_double(), pm->is_objArray(), pm->is_klass());
+      }
+      for (int i = -4; i < 6; i++) lprintf("  [%d] %p\n", i, (void*) p[i]);
+      the_bootstrap->print_fillers_near(p);
+      return;
+    }
+    prev = p;
+    p += as_memOop(p)->size();
+    count++;
+  }
+  lprintf(" [old space parsable: %d objects]", count);
+}
+
+void bootstrap::print_fillers_near(oop* p) {
+  for (int i = 0; i < _number_of_fillers; i++) {
+    if (_fillers[i].start >= p - 16 && _fillers[i].start <= p + 16)
+      lprintf("  filler %d at %p (%+ld words), %d words\n", i, _fillers[i].start, (long) (_fillers[i].start - p), _fillers[i].words);
+  }
+  lprintf("  %d fillers in total\n", _number_of_fillers);
+}
+
+bootstrap::bootstrap(const char* name) {
+  the_bootstrap = this;
   file_name = name;
   _has_error = false;
   open_file();
@@ -34,11 +143,17 @@ bootstrap::bootstrap(char* name) {
     initialize_tables(file_size > 0 ? (file_size / 32) : (10 * K));
     parse_file();
     close_file();
+    if (VerifyBeforeGC) { check_old_space(); lprintf(" [verifying heap after bootstrap"); Universe::verify(); lprintf("]"); }
+    if (VerifyFileOut) methodOopDesc::verify_fileout_against_image();
     Universe  ::cleanup_after_bootstrap();
   }
 }
 
 void bootstrap::initialize_tables(int initial_table_size) {
+  _current_capacity      = 0;
+  _number_of_fillers     = 0;
+  _max_number_of_fillers = 1024;
+  _fillers               = NEW_C_HEAP_ARRAY(Filler, _max_number_of_fillers);
   oop_table          = NEW_C_HEAP_ARRAY(oop, initial_table_size);
   max_number_of_oops = initial_table_size;
   number_of_oops     = 0;
@@ -47,6 +162,49 @@ void bootstrap::initialize_tables(int initial_table_size) {
 
 bootstrap::~bootstrap() {
   FreeHeap(oop_table);
+  FreeHeap(_fillers);
+}
+
+void bootstrap::add_filler(oop* start, int words) {
+  if (_number_of_fillers == _max_number_of_fillers) {
+    Filler* f = NEW_C_HEAP_ARRAY(Filler, _max_number_of_fillers * 2);
+    for (int i = 0; i < _number_of_fillers; i++) f[i] = _fillers[i];
+    FreeHeap(_fillers);
+    _fillers = f;
+    _max_number_of_fillers *= 2;
+  }
+  _fillers[_number_of_fillers].start = start;
+  _fillers[_number_of_fillers].words = words;
+  _number_of_fillers++;
+}
+
+// The unused end of an object allocated with an upper bound is given back if the object
+// was the last allocation, otherwise it becomes a (garbage) filler object, so that old
+// space stays parsable.
+void bootstrap::shrink(memOop m, int capacity, int size) {
+  oop* start = (oop*) m->addr();
+  if (size > capacity) fatal2("bootstrap: object needs %d words, only %d allocated", size, capacity);
+  if (size == capacity) return;
+  if (TraceBootstrap) lprintf("  shrink %p: capacity %d size %d top %p\n", start, capacity, size, Universe::old_gen.top_mark()._point);
+  if (Universe::old_gen.shrink_top(start + size, start + capacity)) return;
+  if (capacity - size < 3) fatal("bootstrap: gap too small for a filler object");
+  add_filler(start + size, capacity - size);
+}
+
+// Fillers are empty-looking object arrays; they can only be created once the Array class is known.
+void bootstrap::create_fillers() {
+  klassOop k = Universe::objArrayKlassObj();
+  assert(k->klass_part()->non_indexable_size() == memOopDesc::header_size(), "unexpected Array layout");
+  for (int i = 0; i < _number_of_fillers; i++) {
+    oop* p     = _fillers[i].start;
+    int  words = _fillers[i].words;
+    p[0] = (oop) markOopDesc::tagged_prototype();
+    p[1] = (oop) k;
+    p[2] = (oop) as_smiOop(words - 3);
+    for (int j = 3; j < words; j++) p[j] = smiOop_zero;
+  }
+  if (_number_of_fillers > 0)
+    lprintf(" (%d filler objects)", _number_of_fillers);
 }
 
 oop bootstrap::at(int index) {
@@ -77,8 +235,9 @@ void bootstrap::open_file() {
     lprintf("\nCould not open file (%s) for reading!\n", file_name);
     exit(-1);
   }
-  int no    = _fileno(stream);
-  file_size = _filelength(no);
+  fseek(stream, 0, SEEK_END);
+  file_size = ftell(stream);
+  fseek(stream, 0, SEEK_SET);
 }
 
 char bootstrap::get_char() {
@@ -142,6 +301,8 @@ void bootstrap::parse_file() {
   contextKlassObj                        = klassOop(get_object());
   Universe::_asciiCharacters             = objArrayOop(get_object());
   Universe::_vframeKlassObj              = HasActivationClass ? klassOop(get_object()) : klassOop(nilObj);
+
+  create_fillers();
 }
 
 void bootstrap::insert_symbol(memOop obj) {
@@ -165,29 +326,38 @@ oop bootstrap::get_object() {
   
   if (type == '0') {
     int v = get_integer();
-    // if (TraceBootstrap) std->print_cr("i %d", v);
+    if (TraceBootstrap) lprintf("@%d i %d\n", position, v);
     return as_smiOop(v);
   }
   if (type == '-') { 
     int v = get_integer();
-    // if (TraceBootstrap) std->print_cr("i %d", -v);
+    if (TraceBootstrap) lprintf("@%d i %d\n", position, -v);
     return as_smiOop(-v);
   }
   if (type == '3') {
     int v = get_integer();
-    // if (TraceBootstrap) std->print_cr("r %d", v);
+    if (TraceBootstrap) lprintf("@%d r %d\n", position, v);
     return at(v);
   }
 
-  int    size = get_integer();
-  memOop m    = as_memOop(Universe::allocate_tenured(size));
+  // The size is in words of the image's (32-bit) layout. Objects with untagged contents
+  // need fewer native words (bytes are packed 8 per word, a double takes one word);
+  // methods may need more after their byte codes are converted to the native layout.
+  int size     = get_integer();
+  int capacity = size;
+  switch (type) {
+    case 'd': case 'e': case 'g': case 'h': capacity = size + 3;     break;	// +3: room for a filler
+    case 'j':                               capacity = 2 * size + 3; break;
+  }
+  memOop m = as_memOop(Universe::allocate_tenured(capacity));
 
-  // Clear eventual padding area for byteArray, symbol, doubleByteArray.
-  m->raw_at_put(size-1, smiOop_zero);
+  // Clear the object (padding areas of byteArray, symbol, doubleByteArray must be zero).
+  set_oops((oop*) m->addr(), capacity, smiOop_zero);
 
-  // if (TraceBootstrap) lprintf("%c %d = 0x%lx\n", type, size, m);
+  if (TraceBootstrap) lprintf("@%d %c size %d #%d = %p\n", position, type, size, number_of_oops, m);
 
   add(m);
+  _current_capacity = capacity;
   switch (type) {
     // Classes
     case 'A': KLASS_CASE(set_klassKlass_vtbl)
@@ -197,7 +367,7 @@ oop bootstrap::get_object() {
     case 'E': KLASS_CASE(set_doubleByteArrayKlass_vtbl)
     case 'F': KLASS_CASE(set_objArrayKlass_vtbl)
     case 'G': KLASS_CASE(set_symbolKlass_vtbl)
-    case 'H': KLASS_CASE(set_doubleKlass_vtbl)
+    case 'H': KLASS_CASE(set_doubleKlass_vtbl)	// note: non_indexable_size is fixed below
     case 'I': KLASS_CASE(set_associationKlass_vtbl)
     case 'J': KLASS_CASE(set_methodKlass_vtbl)
     case 'K': KLASS_CASE(set_blockClosureKlass_vtbl)
@@ -226,6 +396,18 @@ oop bootstrap::get_object() {
     case 'o': OBJECT_ERROR("weakArrayOop")
     case 'p': OBJECT_CASE(processOop)
     default: fatal("unknown object type");
+  }
+
+  if (type == 'H') {
+    // the image gives the 32-bit size of Double instances (header + 2 words)
+    klassOop(m)->klass_part()->set_non_indexable_size(doubleOopDesc::header_size());
+  }
+  if (capacity != size || type == 'h') {
+    // doubles: the Double class may still be being read (its size is fixed above when done)
+    shrink(m, capacity, type == 'h' ? doubleOopDesc::object_size() : m->size());
+  } else if (m->size() != size) {
+    // all other objects must have the same number of words in both layouts
+    fatal3("bootstrap: object of type '%c' has %d words in the image but needs %d", type, size, m->size());
   }
 
   return m;

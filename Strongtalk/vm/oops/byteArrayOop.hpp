@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_BYTEARRAYOOP_HPP_HPP
+#define VM_OOPS_BYTEARRAYOOP_HPP_HPP
 
+#include "klass.hpp"
 class Integer;
 
 // byteArrays are arrays containing bytes
@@ -32,6 +35,7 @@ class Integer;
 //    [length      ]
 //    [bytes       ]* = bytes(1) .. bytes(length) + padding
 
+byteArrayOop as_byteArrayOop(void* p);
 class byteArrayOopDesc: public memOopDesc {
   public:
   // constructor
@@ -44,7 +48,7 @@ class byteArrayOopDesc: public memOopDesc {
   byteArrayOopDesc* addr() const {
     return (byteArrayOopDesc*) memOopDesc::addr(); }
 
-  bool is_within_bounds(int index) const { return 1 <= index && index <= length(); }
+  bool is_within_bounds(smi index) const { return 1 <= index && index <= length(); }
 
   oop* addr_as_oops() const { return (oop*)addr(); }
 
@@ -105,11 +109,11 @@ class byteArrayOopDesc: public memOopDesc {
     // Identical to copy_null_terminated but allocates the resulting string
     // in the C heap instead of in the resource area.
 
-  bool equals(char* name) {
+  bool equals(const char* name) {
     return equals(name, strlen(name));
   }
 
-  bool equals(char* name, int len) {
+  bool equals(const char* name, int len) {
     return len == length() && strncmp(chars(), name, len) == 0; }
   bool equals(byteArrayOop s) {
     return equals(s->chars(), s->length()); }
@@ -137,3 +141,6 @@ inline byteArrayOop as_byteArrayOop(void* p)
 {
     return byteArrayOop(as_memOop(p));
 }
+
+
+#endif // VM_OOPS_BYTEARRAYOOP_HPP_HPP

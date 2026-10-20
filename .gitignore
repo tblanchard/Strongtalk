@@ -1,0 +1,6 @@
+# Xcode build products and per-user state
+build/
+xcuserdata/
+.DS_Store
+# compiler temporaries
+*.o.tmp

@@ -21,9 +21,20 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_dispatchTable.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "bytecodes.hpp"
+#include "dispatchTable.hpp"
 //
 // The following defines the dispatch table for the interpreter.
 // - inserted by Lars to please the Microsoft VC++ 2.0 linker.
@@ -37,8 +48,8 @@ extern "C" void single_step_stub();
 
 #define L(num) interpreter_case_##num
 #define M(num) &interpreter_case_##num
-#define D(num) extern "C" void L(num)##();
-#define _(num) extern "C" void L(num)##() { illegal(); }
+#define D(num) extern "C" void L(num)();
+#define _(num) extern "C" void L(num)() { illegal(); }
 
 //0      1      2      3      4      5      6      7      8      9      A      B      C      D      E      F
 _(0)   _(1)   _(2)   _(3)   _(4)   _(5)   _(6)   _(7)   _(8)   _(9)   _(10)  _(11)  _(12)  _(13)  _(14)  _(15)  // 0
@@ -89,7 +100,7 @@ doFn original_table[Bytecodes::number_of_codes] = {
 };
 
 
-extern "C" int* frame_breakpoint = (int*) -1;
+extern "C" intptr_t* frame_breakpoint = (intptr_t*) -1;
 
 dispatchTable::Mode dispatchTable::mode;
 
@@ -122,12 +133,12 @@ void dispatchTable::intercept_for_step() {
   if (!in_step_mode()) {
     patch_with_sst_stub();
     mode = step_mode;
-    frame_breakpoint = (int*) -1;
+    frame_breakpoint = (intptr_t*) -1;
   }
 }
 
 
-void dispatchTable::intercept_for_next(int* fr) {
+void dispatchTable::intercept_for_next(intptr_t* fr) {
   frame_breakpoint = fr;
   if (!in_next_mode()) {
     patch_with_sst_stub();
@@ -155,7 +166,7 @@ static Bytecodes::Code return_codes[] = {
 };
 
 
-void dispatchTable::intercept_for_return(int* fr)  {
+void dispatchTable::intercept_for_return(intptr_t* fr)  {
   frame_breakpoint = fr;
   if (!in_return_mode()) {
     reset();

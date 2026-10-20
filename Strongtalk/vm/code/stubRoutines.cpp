@@ -22,8 +22,70 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_stubRoutines.cpp.incl"
+
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "symbolOop.hpp"
+#include "disclaimer.hpp"
+#include "proxyOop.hpp"
+#include "ncode.hpp"
+#include "methodOop.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "savedRegisters.hpp"
+#include "key.hpp"
+#include "vmOperations.hpp"
+#include "zoneHeap.hpp"
+#include "abort.hpp"
+#include "recompile.hpp"
+#include "compiledPIC.hpp"
+#include "uncommonBranch.hpp"
+#include "codeIterator.hpp"
+#include "blockOop.hpp"
+#include "jumpTable.hpp"
+#include "x86_mapping.hpp"
 
 const int max_fast_allocate_size = 9;
 
@@ -74,11 +136,11 @@ void StubRoutines::trace_DLL_call_1(dll_func function, oop* last_argument, int n
   oop* arg_ptr = last_argument + (nof_arguments - 1);
   for (i = 1; i <= nof_arguments; i++, arg_ptr--) {
     oop arg = *arg_ptr;
-    std->print("%6d. ", i);
+    stdOut->print("%6d. ", i);
     if (arg->is_smi()) {
-      std->print("smi   value = %d\n", ((smiOop)arg)->value());
+      stdOut->print("smi   value = %d\n", ((smiOop)arg)->value());
     } else {
-      std->print("proxy value = 0x%08x (proxy = 0x%08x)\n", ((proxyOop)arg)->get_pointer(), arg);
+      stdOut->print("proxy value = 0x%08x (proxy = 0x%08x)\n", ((proxyOop)arg)->get_pointer(), arg);
     }
   }
 }
@@ -86,13 +148,13 @@ void StubRoutines::trace_DLL_call_1(dll_func function, oop* last_argument, int n
 
 void StubRoutines::trace_DLL_call_2(int result) {
   if (!TraceDLLCalls) return; // in case it has been turned off during run-time
-  std->print("    result = 0x%08x\n", result);
+  stdOut->print("    result = 0x%08x\n", result);
 }
 
 
 void StubRoutines::wrong_DLL_call() {
   { ResourceMark rm;
-    std->print("DLL call error: number of arguments probably wrong\n");
+    stdOut->print("DLL call error: number of arguments probably wrong\n");
   }
   if (DeltaProcess::active()->is_scheduler()) {
     DeltaProcess::active()->trace_stack();
@@ -287,7 +349,7 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   Label is_smi, probe_primary_cache, probe_secondary_cache, call_method, is_methodOop, do_lookup;
 
   masm->bind(is_smi);				// smi case (assumed to be infrequent)
-  masm->movl(ecx, Address((int)&smiKlassObj, relocInfo::external_word_type));
+  masm->movl(ecx, Address(x86_imm32(&smiKlassObj), relocInfo::external_word_type));
   masm->jmp(probe_primary_cache);
 
   // eax    : receiver
@@ -332,7 +394,7 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   // call methodOop - setup registers
   masm->bind(is_methodOop);
   masm->xorl(ebx, ebx);				// clear ebx for interpreter
-  masm->movl(edx, Address(int(&method_entry_point), relocInfo::external_word_type));
+  masm->movl(edx, Address((x86_imm32(&method_entry_point)), relocInfo::external_word_type));
   // (Note: cannot use value in method_entry_point directly since interpreter is generated afterwards)
   //
   // eax: receiver
@@ -773,7 +835,7 @@ char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
   // edx: receiver klass
   // tos: return address of polymorphic send in compiled code
   masm->bind(found);
-  masm->movl(edx, Address(int(&method_entry_point), relocInfo::external_word_type));
+  masm->movl(edx, Address(x86_imm32(&method_entry_point), relocInfo::external_word_type));
   // (Note: cannot use value in method_entry_point directly since interpreter is generated afterwards)
   masm->xorl(ebx, ebx);
   // eax: receiver
@@ -787,7 +849,7 @@ char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
   // tos + 8: last argument/receiver
   char* entry_point = masm->pc();
   masm->popl(ebx);				// get return address (PIC table pointer)
-  masm->movl(edx, Address((int)&smiKlassObj, relocInfo::external_word_type));
+  masm->movl(edx, Address(x86_imm32(&smiKlassObj), relocInfo::external_word_type));
   masm->test(eax, Mem_Tag);			// check if smi
   masm->jcc(Assembler::zero, loop);		// if so, class is already in ecx
   masm->movl(edx, Address(eax, memOopDesc::klass_byte_offset()));	// otherwise, load receiver class
@@ -843,10 +905,10 @@ char* StubRoutines::generate(MacroAssembler* masm, char* title, char* gen(MacroA
   char* entry_point = gen(masm);
   char* new_pc = masm->pc();
   if (!Disclaimer::is_product() && PrintStubRoutines) {
-    std->print("Stub routine: %s", title);
-    std->print(" (%d bytes), entry point = 0x%x\n", new_pc - old_pc, entry_point);
+    stdOut->print("Stub routine: %s", title);
+    stdOut->print(" (%d bytes), entry point = 0x%x\n", new_pc - old_pc, entry_point);
     masm->code()->decode();
-    std->cr();
+    stdOut->cr();
   }
   return entry_point;
 }
@@ -857,10 +919,10 @@ char* StubRoutines::generate(MacroAssembler* masm, char* title, char* gen(MacroA
   char* entry_point = gen(masm, argument);
   char* new_pc = masm->pc();
   if (!Disclaimer::is_product() && PrintStubRoutines) {
-    std->print("Stub routine: %s %d", title, argument);
-    std->print(" (%d bytes), entry point = 0x%x\n", new_pc - old_pc, entry_point);
+    stdOut->print("Stub routine: %s %d", title, argument);
+    stdOut->print(" (%d bytes), entry point = 0x%x\n", new_pc - old_pc, entry_point);
     masm->code()->decode();
-    std->cr();
+    stdOut->cr();
   }
   return entry_point;
 }
@@ -903,7 +965,7 @@ void StubRoutines::init() {
   masm->finalize();
   _is_initialized = true;
   if (!Disclaimer::is_product() && PrintStubRoutines) {
-    std->print("%d bytes generated for stub routines\n", masm->offset());
+    stdOut->print("%d bytes generated for stub routines\n", masm->offset());
     exit(0);
   }
 };

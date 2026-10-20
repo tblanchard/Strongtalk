@@ -20,7 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_NMETHOD_HPP_HPP
+#define VM_CODE_NMETHOD_HPP_HPP
 
+#include "key.hpp"
+#include "ncode.hpp"
 #ifdef DELTA_COMPILER
 
 // nmethods (native methods) are the compiled code versions of Delta
@@ -51,6 +55,8 @@ struct nmFlags {
 //  5) debugging information
 //  6) dependency information
 
+nmethod* findNMethod(void* start);
+nmethod* new_nmethod(Compiler* c);
 class nmethod : public OopNCode {
  protected:
   uint16 _special_handler_call_offset;	// offset (in bytes) of call to special handler (*) (see comment below)
@@ -293,7 +299,7 @@ class nmethod : public OopNCode {
   inline void decay_invocation_count(double decay_factor);
 
  public: 
-  static int invocationCountOffset()	{ return (int)&((nmethod*)0)->_invocation_count; }
+  static int invocationCountOffset()	{ return (long)&((nmethod*)0)->_invocation_count; }
 
    // Support for preemption:
 
@@ -312,3 +318,6 @@ inline nmethod* nmethod_from_insts(char* insts)
 }
 
 #endif
+
+
+#endif // VM_CODE_NMETHOD_HPP_HPP

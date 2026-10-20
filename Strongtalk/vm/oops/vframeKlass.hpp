@@ -20,8 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_VFRAMEKLASS_HPP_HPP
+#define VM_OOPS_VFRAMEKLASS_HPP_HPP
 
 
+void set_vframeKlass_vtbl(Klass* k);
 class vframeKlass: public memOopKlass {
  public:
   // testers
@@ -54,8 +57,11 @@ class vframeKlass: public memOopKlass {
   int oop_header_size() const { return vframeOopDesc::header_size(); }
 
   // printing support
-  char* name() const { return "vframe"; }
+  const char* name() const { return "vframe"; }
 
   // class creation
   friend void set_vframeKlass_vtbl(Klass* k);
 };
+
+
+#endif // VM_OOPS_VFRAMEKLASS_HPP_HPP

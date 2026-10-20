@@ -22,9 +22,96 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_system_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "inliningdb.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "processOop.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "proxyOop.hpp"
+#include "prim.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "prim_def.hpp"
+#include "oopFactory.hpp"
+#include "doubleOop.hpp"
+#include "vmSymbols.hpp"
+#include "universe.inline.hpp"
+#include "oop.inline.hpp"
+#include "prim_impl.hpp"
+#include "ageTable.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "system_prims.hpp"
+#include "nmethodScopes.hpp"
+#include "objArrayOop.hpp"
+#include "vmOperations.hpp"
+#include "systemAverage.hpp"
+#include "nmethod.hpp"
+#include "objArrayKlass.hpp"
+#include "weakArrayKlass.hpp"
+#include "reflection.hpp"
+#include "timer.hpp"
+#include "dByteArrayOop.hpp"
+#include "snapshot.hpp"
+#include "fprofiler.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "mixinOop.hpp"
 TRACE_FUNC(TraceSystemPrims, "system")
 
 int systemPrimitives::number_of_calls;
@@ -145,7 +232,7 @@ PRIM_DECL_0(systemPrimitives::breakpoint) {
 
 PRIM_DECL_0(systemPrimitives::halt) {
   PROLOGUE_0("halt")
-  __asm hlt
+  __builtin_debugtrap();	// was "hlt" (traps into the debugger on Win32)
   return trueObj;
 }
 
@@ -186,7 +273,7 @@ PRIM_DECL_0(systemPrimitives::elapsedTime) {
 PRIM_DECL_1(systemPrimitives::writeSnapshot, oop fileName) {
   PROLOGUE_1("writeSnapshot", fileName);
   SnapshotDesc sd;
-  char* name = "fisk.snap";
+  const char* name = "fisk.snap";
   sd.write_on(name);
   if (sd.has_error()) return markSymbol(sd.error_symbol());
   return fileName;
@@ -286,6 +373,7 @@ PRIM_DECL_0(systemPrimitives::smalltalk_array) {
 
 PRIM_DECL_0(systemPrimitives::quit) {
   PROLOGUE_0("quit");
+  if (VerifyFileOut) methodOopDesc::verify_fileout_all();
   exit(0);
   return badOop;
 }
@@ -312,9 +400,9 @@ PRIM_DECL_1(systemPrimitives::defWindowProc, oop resultProxy) {
   PROLOGUE_1("defWindowProc", resultProxy);
   if (!resultProxy->is_proxy())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
-  std->print_cr("Please use the new Platform DLLLookup system to retrieve DefWindowProcA");
+  stdOut->print_cr("Please use the new Platform DLLLookup system to retrieve DefWindowProcA");
   dll_func func = DLLs::lookup(oopFactory::new_symbol("user"), oopFactory::new_symbol("DefWindowProcA"));
-  proxyOop(resultProxy)->set_pointer(func);
+  proxyOop(resultProxy)->set_pointer((void*) func);
   return resultProxy;
 }
 
@@ -443,7 +531,7 @@ PRIM_DECL_3(systemPrimitives::dll_lookup, oop name, oop library, oop result) {
 
   dll_func res = DLLs::lookup(symbolOop(name), (DLL*) proxyOop(library)->get_pointer());
   if (res) {
-    proxyOop(result)->set_pointer(res);
+    proxyOop(result)->set_pointer((void*) res);
     return result;
   } else {
     return markSymbol(vmSymbols::not_found());
@@ -550,15 +638,15 @@ PRIM_DECL_1(systemPrimitives::inlining_database_compile, oop file_name) {
     VMProcess::execute(&op);
 
     if (TraceInliningDatabase) {
-      std->print_cr("compiling {%s} completed", str);
-      std->print_cr("[Database]");
-      rs->print_inlining_database_on(std, NULL, -1, 0);
-      std->print_cr("[Compiled method]");
-      op.result()->print_inlining_database_on(std);
+      stdOut->print_cr("compiling {%s} completed", str);
+      stdOut->print_cr("[Database]");
+      rs->print_inlining_database_on(stdOut, NULL, -1, 0);
+      stdOut->print_cr("[Compiled method]");
+      op.result()->print_inlining_database_on(stdOut);
     }
   } else {
     if (TraceInliningDatabase) {
-       std->print_cr("compiling {%s} failed", str);
+       stdOut->print_cr("compiling {%s} failed", str);
     }
   }
   return trueObj;
@@ -576,9 +664,9 @@ PRIM_DECL_0(systemPrimitives::inlining_database_compile_next) {
     VM_OptimizeRScope op(rs);
     VMProcess::execute(&op);
     if (TraceInliningDatabase) {
-      std->print("Compiling ");
-      op.result()->key.print_on(std);
-      std->print_cr(" in background = 0x%lx", op.result());
+      stdOut->print("Compiling ");
+      op.result()->key.print_on(stdOut);
+      stdOut->print_cr(" in background = 0x%lx", op.result());
     }
   }
   return end_of_table ? falseObj : trueObj;

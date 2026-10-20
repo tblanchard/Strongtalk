@@ -21,10 +21,67 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
-# include "incls/_inliningdb.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "inliningdb.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "timer.hpp"
 char* InliningDatabase::_directory = NULL;
 
 char* InliningDatabase::default_directory() {
@@ -42,6 +99,9 @@ char* InliningDatabase::directory() {
 }
 
 # include <ctype.h>
+#include "oopFactory.hpp"
+#include "os.hpp"
+#include "klassOop.hpp"
 
 const char  quote = '_';
 const char* quote_string = "_\\/:; *?~|><,+=@%&!-";
@@ -205,7 +265,7 @@ bool InliningDatabase::file_out(nmethod* nm, outputStream* index_st) {
   if (file_name == NULL) return false;
 
   if (TraceInliningDatabase) {
-    std->print_cr("Dumping %s", file_name);
+    stdOut->print_cr("Dumping %s", file_name);
   }
   fileStream out(file_name);
   if (out.is_open()) {
@@ -472,24 +532,24 @@ void InliningDatabase::load_index_file() {
       if (first.is_block_type()) {
         if (fgets( line, 1000, stream)) {
           if (scan_key(line, &second)) {
-	    // std->print("Block ");
-            // first.print_on(std);
-	    // std->print(" outer ");
-            // second.print_on(std);
-            // std->cr();
+	    // stdOut->print("Block ");
+            // first.print_on(stdOut);
+	    // stdOut->print(" outer ");
+            // second.print_on(stdOut);
+            // stdOut->cr();
             add_lookup_entry(&second, &first);
 	  } else {
-            std->print_cr("Index file parsing block failed for %s", line);
+            stdOut->print_cr("Index file parsing block failed for %s", line);
 	  }
 	}
       } else {
-	// std->print("Method ");
-        // first.print_on(std);
-        // std->cr();
+	// stdOut->print("Method ");
+        // first.print_on(stdOut);
+        // stdOut->cr();
         add_lookup_entry(&first);
       }
     } else {
-      std->print_cr("Index file parsing failed for %s", line);
+      stdOut->print_cr("Index file parsing failed for %s", line);
     }
   }
   fclose(stream);
@@ -545,26 +605,26 @@ RScope* InliningDatabase::file_in(LookupKey* outer, LookupKey* inner) {
   char* file_name = compute_file_name(outer, inner, false);
   if (file_name == NULL) {
     if (TraceInliningDatabase) {
-      std->print("Failed opening file for ");
+      stdOut->print("Failed opening file for ");
       if (inner) {
         inner->print();
-        std->print(" ");
+        stdOut->print(" ");
       }
       outer->print();
-      std->cr();
+      stdOut->cr();
     }
     return NULL;
   }
   RScope* result = file_in(file_name);
   
   if (TraceInliningDatabase && result == NULL) {
-    std->print("Failed parsing file for ");
+    stdOut->print("Failed parsing file for ");
     if (inner) {
       inner->print();
-      std->print(" ");
+      stdOut->print(" ");
     }
     outer->print();
-    std->cr();
+    stdOut->cr();
   }
  
   return result;
@@ -649,7 +709,7 @@ RScope* InliningDatabase::select_and_remove(bool* end_of_table) {
 
 void InliningDatabase::allocate_table(unsigned int size) {
   if (TraceInliningDatabase) {
-    std->print_cr("InliningDatabase::allocate_table(%d)", size);
+    stdOut->print_cr("InliningDatabase::allocate_table(%d)", size);
   }
   table_size      = size;
   table_size_mask = size - 1;
@@ -693,13 +753,13 @@ void InliningDatabase::add_lookup_entry(LookupKey* outer, LookupKey* inner) {
   table_no++;
 
   if (TraceInliningDatabase) {
-    std->print_cr("InliningDatabase::add_lookup_entry @ %d", index);
+    stdOut->print_cr("InliningDatabase::add_lookup_entry @ %d", index);
     if (inner) {
       inner->print();
-      std->print(" ");
+      stdOut->print(" ");
     }
     outer->print();
-    std->cr();
+    stdOut->cr();
   }
 }
 

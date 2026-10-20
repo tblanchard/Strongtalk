@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_SYSTEM_PRIMS_HPP_HPP
+#define VM_PRIMS_SYSTEM_PRIMS_HPP_HPP
 
 
 // Misc. system primitives
@@ -524,3 +526,6 @@ class systemPrimitives : AllStatic {
   //%
   static PRIM_DECL_0(flush_dead_code);
 };
+
+
+#endif // VM_PRIMS_SYSTEM_PRIMS_HPP_HPP

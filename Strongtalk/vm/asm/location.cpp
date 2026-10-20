@@ -21,11 +21,34 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "util.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "iCache.hpp"
+#include "nativeInstruction.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "location.hpp"
+#include "x86_mapping.hpp"
 # ifdef DELTA_COMPILER
 
-# include "incls/_location.cpp.incl"
 
 static char* specialLocNames[nofSpecialLocations] = {
   "illegalLocation", "unAllocated", "noRegister", "topOfStack", "resultOfNLR", "topOfFloatStack"
@@ -51,30 +74,34 @@ Location::Location(Mode mode, int f1, int f2, int f3) {
 }
 
 
-char* Location::name() const {
-  char* s;
+const char* Location::name() const {
+  const char* s;
   switch (mode()) {
     case specialLoc : s = specialLocNames[id()]; break;
     case registerLoc: s = Mapping::asRegister(*this).name(); break;
     case stackLoc   : {
-        s = NEW_RESOURCE_ARRAY(char, 8);
-        sprintf(s, "S%d", offset());
+        char* buf = NEW_RESOURCE_ARRAY(char, 8);
+        sprintf(buf, "S%d", offset());
+        s = buf;
         break;
       }
       break;
     case contextLoc1: {
-        s = NEW_RESOURCE_ARRAY(char, 24);
-        sprintf(s, "C%d,%d(%d)", contextNo(), tempNo(), scopeID());
+        char* buf = NEW_RESOURCE_ARRAY(char, 24);
+        sprintf(buf, "C%d,%d(%d)", contextNo(), tempNo(), scopeID());
+        s = buf;
       }
       break;
     case contextLoc2: {
-        s = NEW_RESOURCE_ARRAY(char, 24);
-        sprintf(s, "C%d,%d[%d]", contextNo(), tempNo(), scopeOffs());
+        char* buf = NEW_RESOURCE_ARRAY(char, 24);
+        sprintf(buf, "C%d,%d[%d]", contextNo(), tempNo(), scopeOffs());
+        s = buf;
       }
       break;
     case floatLoc: {
-        s = NEW_RESOURCE_ARRAY(char, 16);
-	sprintf(s, "F%d(%d)", floatNo(), scopeNo());
+        char* buf = NEW_RESOURCE_ARRAY(char, 16);
+	sprintf(buf, "F%d(%d)", floatNo(), scopeNo());
+	s = buf;
       }
       break;
     default: ShouldNotReachHere(); break;
@@ -154,7 +181,7 @@ int IntFreeList::length() {
 
 
 void IntFreeList::print() {
-  std->print("FreeList 0x%x:", this);  _list->print();
+  stdOut->print("FreeList 0x%x:", this);  _list->print();
 }
 
 

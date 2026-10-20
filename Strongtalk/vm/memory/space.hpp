@@ -20,8 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_SPACE_HPP_HPP
+#define VM_MEMORY_SPACE_HPP_HPP
 
 
+#include "allocation.hpp"
+#include "util.hpp"
 // A Water mark points into a space and is used during scavenge to 
 // keep track of progress.
 class NewWaterMark : ValueObj {
@@ -55,7 +59,7 @@ inline bool operator!=(const OldWaterMark& x, const OldWaterMark& y) {
 class space: public CHeapObj {
  private:
   // instance variable
-  char* _name;
+  const char* _name;
 
  public:
   // invariant: bottom() and end() are on page_size boundaries
@@ -64,8 +68,8 @@ class space: public CHeapObj {
   virtual oop* top()    = 0;
   virtual oop* end()    = 0;
 
-  char* name() const        { return _name; }
-  void set_name(char* name) { _name = name; }
+  const char* name() const        { return _name; }
+  void set_name(const char* name) { _name = name; }
 
  protected:
   virtual void set_bottom(oop* value) = 0;
@@ -73,7 +77,7 @@ class space: public CHeapObj {
   virtual void set_end(oop* value)    = 0;
 
  public:
-  void initialize(char* name, oop* bottom, oop* end);
+  void initialize(const char* name, oop* bottom, oop* end);
   void clear();
 
  public:
@@ -194,6 +198,7 @@ class survivorSpace : public newSpace {
 };
 
 class oldSpace: public space {
+  friend class oldGeneration;	// shrink_top
  friend class space;
  private:
   oop* _bottom;
@@ -242,6 +247,10 @@ class oldSpace: public space {
     }
   }
 
+  // Gives back [from, top) of the most recent allocation, including the offset array
+  // entries recorded for the card boundaries beyond the new top.
+  void shrink_top(oop* from);
+
   // constructors
   // allocates object space too; sets size to amount allocated, 0 if none
   oldSpace(char* nm, int &size);
@@ -268,3 +277,6 @@ class oldSpace: public space {
   }
 };
 
+
+
+#endif // VM_MEMORY_SPACE_HPP_HPP

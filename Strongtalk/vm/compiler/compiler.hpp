@@ -20,7 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_COMPILER_HPP_HPP
+#define VM_COMPILER_COMPILER_HPP_HPP
 
+#include "compUtils.hpp"
+#include "jumpTable.hpp"
 # ifdef DELTA_COMPILER
 
 extern int nofCompilations;
@@ -145,11 +149,14 @@ public:
 #ifdef DEBUG
 // cout: output stream for compiler messages
 // Intended usage pattern: if (CompilerDebug) cout(PrintXXX)->print("....").
-// This will print the message to std if the PrintXXX flag is set or to the compiler's string buffer otherwise.
+// This will print the message to stdOut if the PrintXXX flag is set or to the compiler's string buffer otherwise.
 outputStream* cout(bool flag);	// for compiler debugging; returns stdout or compiler-internal string stream depending on flag
 void print_cout();		// prints hidden messages of current compilation
 #else
-#define cout(flag)  if (flag) std
+#define cout(flag)  if (flag) stdOut
 #endif
 
 #endif
+
+
+#endif // VM_COMPILER_COMPILER_HPP_HPP

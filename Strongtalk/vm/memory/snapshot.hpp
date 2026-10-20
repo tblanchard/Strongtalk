@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_SNAPSHOT_HPP_HPP
+#define VM_MEMORY_SNAPSHOT_HPP_HPP
 
 
 // SnapshotDesc is the class handling readin and writing of snapshots
@@ -52,8 +54,8 @@ class SnapshotDesc : StackObj {
   void write_zone();
 
  public:
-  void read_from(char* name);
-  void write_on(char* name);
+  void read_from(const char* name);
+  void write_on(const char* name);
 
   bool has_error() { return _has_error; }
   symbolOop error_symbol();
@@ -63,3 +65,6 @@ class SnapshotDesc : StackObj {
   friend class WriteClosure;
   friend class ReadClosure;
 };
+
+
+#endif // VM_MEMORY_SNAPSHOT_HPP_HPP

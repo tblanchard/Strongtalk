@@ -20,9 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_MEMOOPKLASS_HPP
+#define VM_OOPS_MEMOOPKLASS_HPP
 
 // super class for all heap objects
 
+void set_memOopKlass_vtbl(Klass* k);
 class memOopKlass: public Klass {
  public:
   // allocation properties
@@ -48,7 +51,7 @@ class memOopKlass: public Klass {
   oop oop_shallow_copy(oop obj, bool tenured);
 
   // printing support
-  char* name() const { return "memOop"; }
+  const char* name() const { return "memOop"; }
 
   // class creation
   friend void set_memOopKlass_vtbl(Klass* k);
@@ -74,3 +77,5 @@ class memOopKlass: public Klass {
   // sizing
   int oop_header_size() const { return memOopDesc::header_size(); }
 };
+
+#endif // VM_OOPS_MEMOOPKLASS_HPP

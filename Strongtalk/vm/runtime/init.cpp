@@ -21,14 +21,38 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_init.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "init.hpp"
+#include "debug.hpp"
 // Add new initialization/finalization methods to the macro below; your
 // functions must be parameterless and must be named after the .c file
 // they belong to (e.g. "void foo_init(); void foo_exit()" for foo.c).
 // The INIT_DO macro defines the initialization sequence; you need not
 // add a corresponding entry to EXIT_DO if you don't need finalization.
+
+// Steps that generate x86-32 machine code (stub routines, the interpreter).
+// They only run when the x86 backend is available (see platform.hpp).
+#ifdef STRONGTALK_X86_BACKEND
+# define CODE_GENERATION_INIT_DO(template) \
+  template(stubRoutines_init)		\
+  template(interpreter_init)
+#else
+# define CODE_GENERATION_INIT_DO(template)
+#endif
 
 # define INIT_DO(template)		\
   template(ostream_init)		\
@@ -37,8 +61,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   template(eventlog_init)		\
   template(integerOps_init)		\
   template(bytecodes_init)		\
-  template(stubRoutines_init)		\
-  template(interpreter_init)		\
+  CODE_GENERATION_INIT_DO(template)	\
   template(dispatchTable_init)		\
   template(disclaimer_init)		\
   template(universe_init)		\
@@ -63,6 +86,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 # define CALL_TEMPLATE(name)	  name();
 
 INIT_DO(DEFINE_TEMPLATE)
+void stubRoutines_init();
+void interpreter_init();
 #ifdef DELTA_COMPILER
   COMPILER_INIT_DO(DEFINE_TEMPLATE)
 #endif

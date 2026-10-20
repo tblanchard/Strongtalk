@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_VIRTUALSPACE_HPP_HPP
+#define VM_RUNTIME_VIRTUALSPACE_HPP_HPP
 
 // ReservedSpace is a data strucure for reserving a contiguous chunk of memory.
 
@@ -116,3 +118,6 @@ class VirtualSpaces : AllStatic {
   static void print();
   static void test();
 };
+
+
+#endif // VM_RUNTIME_VIRTUALSPACE_HPP_HPP

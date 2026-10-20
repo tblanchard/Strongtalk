@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_REFLECTION_HPP_HPP
+#define VM_MEMORY_REFLECTION_HPP_HPP
 
 
 class memConverter;
@@ -80,3 +82,6 @@ class Reflection : AllStatic {
   // place forward pointer and 
   static void forward(memOop old_obj, memOop new_obj);
 };
+
+
+#endif // VM_MEMORY_REFLECTION_HPP_HPP

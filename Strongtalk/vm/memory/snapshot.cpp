@@ -22,9 +22,35 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_snapshot.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "snapshot.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
 void SnapshotDesc::read_header() {
   read_revision();
   read_sizes();
@@ -104,14 +130,14 @@ void SnapshotDesc::write_zone() {
   // Not implemented yet
 }
 
-void SnapshotDesc::read_from(char* name) {
+void SnapshotDesc::read_from(const char* name) {
   read_header();
   read_spaces();
   read_roots();
   read_zone();
 }
 
-void SnapshotDesc::write_on(char* name) {
+void SnapshotDesc::write_on(const char* name) {
   write_header();
   write_spaces();
   write_roots();

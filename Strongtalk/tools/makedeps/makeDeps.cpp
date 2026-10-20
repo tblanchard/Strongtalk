@@ -108,7 +108,7 @@ public:
 
   Bool suffix_matches(char* s);
 
-  char* nameOfList() { return stem; }
+  const char* nameOfList() { return stem; }
 
   char* getInvDir() { return inverseDir; }
 
@@ -213,14 +213,14 @@ class AbstractPlatform {
 
   Bool fileNameStringEquality(char* a, char* b) { return strcmp(a, b) == 0; }
 
-  void fileNamePortabilityCheck(char* name );
-  void fileNamePortabilityCheck(char* name, char* matchingName);
+  void fileNamePortabilityCheck(const char* name );
+  void fileNamePortabilityCheck(const char* name, char* matchingName);
 
   int fileNameLengthLimit() { return 31; } // max is 31 on mac, so warn
 
   int  defaultGrandIncludeThreshold() { return 30; }
 
-  virtual void fatal(char* msg = "See console window") { fprintf(stderr, "%s\n", msg); exit(1); }
+  virtual void fatal(const char* msg = "See console window") { fprintf(stderr, "%s\n", msg); exit(1); }
 };
 
 
@@ -276,7 +276,7 @@ class MetroWerksMacPlatform:  public AbstractPlatform {
 
   void abort() { Debugger(); }
   
-  void fatal(char* msg = "See console window") {
+  void fatal(const char* msg = "See console window") {
     fprintf(stderr, "%s\n", msg);
     SIOUXSettings.autocloseonquit  = False;
     SIOUXSettings.asktosaveonclose = True;
@@ -385,7 +385,7 @@ class WinGammaPlatform: public AbstractPlatform {
   // I think windows file names are case-insensitive -- dmu
   virtual Bool fileNameStringEquality(char* a, char* b) { return stricmp(a, b) == 0; }
 
-  void fatal(char* msg = "See console window") {
+  void fatal(const char* msg = "See console window") {
     MessageBox(NULL, msg, "makeDeps error:", MB_OK);
     exit(1);
   }
@@ -440,9 +440,9 @@ void FileName::check_length() {
 
 
 Bool suffix_matches(char* s, char** suffixes) {
-  register int len = strlen(s);
+  int len = strlen(s);
   for ( char** suffp = suffixes;  *suffp;  ++suffp ) {
-    register int suffLen = strlen(*suffp);
+    int suffLen = strlen(*suffp);
     if ( len >= suffLen  
     &&  Plat.fileNameStringEquality(&s[len - suffLen], *suffp))
          return True;
@@ -520,13 +520,13 @@ class item {
 
 class macro_definitions {
   struct macro {
-    char* name;
+    const char* name;
     char* contents;
   };
   macro macros[1000];
   int nmacros;
 
-  char** lookupAll(char* name, int nameLen,
+  char** lookupAll(const char* name, int nameLen,
                char* pltf, char* dbf, char* line, int lineNo // for error msgs
                ) {
     char** r = new char*[maxMatches + 1];
@@ -559,7 +559,7 @@ class macro_definitions {
     nmacros = 0;
   }
 
-  void add_macro(char* name, char* contents) {
+  void add_macro(const char* name, char* contents) {
     if ((unsigned)nmacros >= sizeof(macros) / sizeof(macros[0])) {
       Plat.fatal( "too many macros!");
     }
@@ -751,7 +751,7 @@ class database {
 
 
 
-void AbstractPlatform::fileNamePortabilityCheck(char* name, char* matchingName) {
+void AbstractPlatform::fileNamePortabilityCheck(const char* name, char* matchingName) {
   if (strcmp(name, matchingName) != 0) {
     char err[BUFSIZ];
     sprintf(err, 
@@ -763,7 +763,7 @@ void AbstractPlatform::fileNamePortabilityCheck(char* name, char* matchingName) 
 }
 
 
-void AbstractPlatform::fileNamePortabilityCheck(char* name) {
+void AbstractPlatform::fileNamePortabilityCheck(const char* name) {
   if ('A' <= name[0]  &&  name[0] <= 'Z') {
     char err[BUFSIZ];
     sprintf(err, 
@@ -777,28 +777,28 @@ void AbstractPlatform::fileNamePortabilityCheck(char* name) {
 
 
      
-list* list::listForFile(char* namea) {
-  for ( register item* p = first;  p;  p = p->next)
+list* list::listForFile(const char* namea) {
+  for ( item* p = first;  p;  p = p->next)
     if ( Plat.fileNameStringEquality(p->contents->name, namea) ) {
       Plat.fileNamePortabilityCheck( namea, p->contents->name );
       return p->contents;
     }
 
   Plat.fileNamePortabilityCheck( namea ); 
-  register list *s = new list(namea);
+  list *s = new list(namea);
   add(s);
   return s;
 }
 
 
-Bool list::compareLists(register list* s, database* cur, database* prev) {
+Bool list::compareLists(list* s, database* cur, database* prev) {
   if (    platformDependentInclude != NULL
   &&   s->platformDependentInclude != NULL
   &&   strcmp(    platformDependentInclude, 
                s->platformDependentInclude ) != 0 )
     return False; // difference in platformDependentIncludes
     
-  register item *mine, *his;
+  item *mine, *his;
   for ( mine = first,  his = s->first;
         ;
         mine = mine->next,  his = his->next) {
@@ -819,10 +819,10 @@ Bool list::compareLists(register list* s, database* cur, database* prev) {
 
 
 void list::add(list* s) {
-  register item* i = new item(s);
+  item* i = new item(s);
   // next two statements are for debugging
-  if (  i->next     )    { printf("next %x\n", (unsigned)i->next);      Plat.abort();}
-  if ( !i->contents )    { printf("c = %x\n",  (unsigned)i->contents);  Plat.abort();}
+  if (  i->next     )    { printf("next %lx\n", (unsigned long)i->next);      Plat.abort();}
+  if ( !i->contents )    { printf("c = %lx\n",  (unsigned long)i->contents);  Plat.abort();}
   
   if (last)   last->next = i;
   else             first = i;
@@ -832,7 +832,7 @@ void list::add(list* s) {
 
 
 void list::addFirst(list* s) {
-  register item* i = new item(s);
+  item* i = new item(s);
   if (first) {
       i->next = first;
       first = i->next;
@@ -844,7 +844,7 @@ void list::addFirst(list* s) {
 
 
 void list::addIfAbsent(list* s) {
-  for ( register item* p = first;  p;  p = p->next)
+  for ( item* p = first;  p;  p = p->next)
     if (p->contents == s)
       return;
   add(s);
@@ -852,7 +852,7 @@ void list::addIfAbsent(list* s) {
 
 
 void list::doFiles(list* s) {
-  for ( register item* p = first;  p;  p = p->next) {
+  for ( item* p = first;  p;  p = p->next) {
     list* h = p->contents;
     if (h->platformDependentInclude != NULL) {
       fprintf(stderr, "Error: The source for %s is %s.\n\tIt shouldn't be included directly by %s.\n",
@@ -873,8 +873,8 @@ void list::traceCycle(list* s) {
   isCycle = True;
   fprintf(stderr, "\ttracing cycle for %s\n", name);
   exitCode = 1;
-  for (register item* p = first; p; p = p->next) {
-    register list* q = p->contents;
+  for (item* p = first; p; p = p->next) {
+    list* q = p->contents;
     if (q->mayBeCycle)
       if (s == q) {
         char err[BUFSIZ];
@@ -905,7 +905,7 @@ list* list::doCFile() {
   list* s = new list(name);
   s->useGrandInclude = useGrandInclude; // propagate this
   doFiles(s);
-  for ( register item *si = s->first;  si;  si = si->next)
+  for ( item *si = s->first;  si;  si = si->next)
     si->contents->beenHere = False;
   return s;
 }
@@ -945,7 +945,7 @@ void list::put_incl_file( database* db ) {
     Plat.writeGIInclude(inclFile);
   }
   
-  for (register item *si = first;  si;  si = si->next) {
+  for (item *si = first;  si;  si = si->next) {
     if ( !db->hfile_is_in_grand_include( si->contents, this ) )
       fprintf( inclFile, 
                "# include \"%s%s\"\n", 
@@ -1102,7 +1102,7 @@ void database::get_quad(char* plat_dep_inc,
 
 void database::compute() {
   printf("\tcomputing closures\n");
-  register item* si;
+  item* si;
   for ( si = outerFiles->first;  si;  si = si->next) {
     // build both indiv and grand results
     indiv_includes->add(si->contents->doCFile());
@@ -1113,7 +1113,7 @@ void database::compute() {
           
   // count how many times each include is included in grand-includable context
   // & add em to grand
-  for ( register item* cf = indiv_includes->first;  cf;  cf = cf->next) {
+  for ( item* cf = indiv_includes->first;  cf;  cf = cf->next) {
     list *indiv_include = cf->contents;
 
     if ( !indiv_include->useGrandInclude )
@@ -1122,7 +1122,7 @@ void database::compute() {
     indiv_include->doFiles(grand_include); // put em on grand_include list
 
 
-    for ( register item* incListItem = indiv_include->first;
+    for ( item* incListItem = indiv_include->first;
           incListItem;
           incListItem = incListItem->next ) {
       ++incListItem->contents->count;
@@ -1132,7 +1132,7 @@ void database::compute() {
 
 
 void database::verify() {
-  for (register item *si = indiv_includes->first;  si;  si = si->next) {
+  for (item *si = indiv_includes->first;  si;  si = si->next) {
     if ( !si->contents) Plat.abort();
   }
 }
@@ -1140,7 +1140,7 @@ void database::verify() {
 void database::write_individual_includes() {
   printf("\twriting individual include files\n");
   
-  register item* si;
+  item* si;
   for ( si = indiv_includes->first;  si;  si = si->next) {
     printf("\tcreating %s\n", si->contents->name);
     si->contents->put_incl_file( this );
@@ -1148,13 +1148,13 @@ void database::write_individual_includes() {
 }
 
 void database::write_individual_includes(database* previous) {
-  register item *ci, *pi;
+  item *ci, *pi;
   for ( ci = indiv_includes->first,  pi = previous->indiv_includes->first;
         ci;
         ci = ci->next,  pi = pi->next) {
 
-    register list  *newCFileList = ci->contents;
-    register list *prevCFileList = pi->contents;
+    list  *newCFileList = ci->contents;
+    list *prevCFileList = pi->contents;
     if (!newCFileList->compareLists(prevCFileList, this, previous)) {
         printf("\tupdating %s\n", newCFileList->name);
         newCFileList->put_incl_file( this );
@@ -1193,7 +1193,7 @@ void database::write_grand_include() {
   fclose( inc );
 }
 
-static void print_dependent_on(FILE* gd, char* name) {
+static void print_dependent_on(FILE* gd, const char* name) {
   fprintf( gd, " ");
   fprintf( gd, Plat.dependent_format(), name);
 }

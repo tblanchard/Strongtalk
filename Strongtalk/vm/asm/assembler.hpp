@@ -20,7 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_ASM_ASSEMBLER_HPP_HPP
+#define VM_ASM_ASSEMBLER_HPP_HPP
 
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
 const int nofRegisters = 8;	// total number of registers
 
 class Register: public ValueObj {
@@ -44,7 +48,7 @@ class Register: public ValueObj {
   friend bool operator != (Register x, Register y) { return x._number != y._number; }
 
   // debugging
-  char* name() const;
+  const char* name() const;
 };
 
 
@@ -462,7 +466,10 @@ class MacroAssembler: public Assembler {
   void fpop();
 
   // debugging
-  static void print_reg(char* name, oop obj);
+  static void print_reg(const char* name, oop obj);
   static void inspector(oop edi, oop esi, oop ebp, oop esp, oop ebx, oop edx, oop ecx, oop eax, char* eip);
   void inspect(char* title = NULL);
 };
+
+
+#endif // VM_ASM_ASSEMBLER_HPP_HPP

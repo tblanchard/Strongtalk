@@ -21,10 +21,102 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "loopOpt.hpp"
+#include "regAlloc.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "methodKlass.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_scope.cpp.incl"
 # include <string.h>
 
 smi Scope::_currentScopeID;
@@ -536,7 +628,8 @@ InlinedScope* InlinedScope::find_scope(int c, int& nofIndirections, OutlinedScop
   Scope* 	s = this;
   out = NULL;
   // first, go up as far as possible
-  for (int d = distance; d > 0 && s->parent()->isInlinedScope(); d--, s = s->parent()) ; 
+  int d;
+  for (d = distance; d > 0 && s->parent()->isInlinedScope(); d--, s = s->parent()) ; 
   if (d == 0) {
     // found scope in our nmethod
     return (InlinedScope*)s;
@@ -586,7 +679,8 @@ void InlinedScope::generateDebugInfoForNonInlinedBlocks() {
 
 
 void InlinedScope::copy_noninlined_block_info(nmethod* nm) {
-  for (int i = bbIterator->exposedBlks->length() - 1; i >= 0; i--) {
+  int i;
+  for (i = bbIterator->exposedBlks->length() - 1; i >= 0; i--) {
     BlockPReg* blk = bbIterator->exposedBlks->at(i);
     if (blk->isUsed()) {
       int offset = theCompiler->scopeDescRecorder()->
@@ -611,7 +705,8 @@ CompiledLoop* InlinedScope::addLoop() {
 }
 
 void InlinedScope::optimizeLoops() {
-  for (int i = _loops->length() - 1; i >= 0; i--) {
+  int i;
+  for (i = _loops->length() - 1; i >= 0; i--) {
     CompiledLoop* loop = _loops->at(i);
     char* msg = loop->recognize();
     if (msg) {
@@ -804,9 +899,9 @@ void InlinedScope::generateDebugInfo() {
 
   if (PrintDebugInfoGeneration) {
     if (isMethodScope()) {
-      std->print_cr("self: %s", _self->preg()->name());
+      stdOut->print_cr("self: %s", _self->preg()->name());
     } else {
-      std->print_cr("no receiver (block method)");
+      stdOut->print_cr("no receiver (block method)");
     }
   }
 
@@ -820,7 +915,7 @@ void InlinedScope::generateDebugInfo() {
       for (i = 0; i < len; i++) {
         PReg* preg = _temporaries->at(i)->preg();
         rec->addTemporary(_scopeInfo, i, preg->createLogicalAddress());
-	if (PrintDebugInfoGeneration) std->print_cr("temp[%2d]: %s", i, preg->name());
+	if (PrintDebugInfoGeneration) stdOut->print_cr("temp[%2d]: %s", i, preg->name());
       }
     }
     // float temporaries
@@ -829,7 +924,7 @@ void InlinedScope::generateDebugInfo() {
       for (i = 0; i < len; i++) {
         PReg* preg = _floatTemporaries->at(i)->preg();
         rec->addTemporary(_scopeInfo, i, preg->createLogicalAddress());
-	if (PrintDebugInfoGeneration) std->print_cr("float[%2d]: %s", i, preg->name());
+	if (PrintDebugInfoGeneration) stdOut->print_cr("float[%2d]: %s", i, preg->name());
       }
     }
     // context temporaries
@@ -838,7 +933,7 @@ void InlinedScope::generateDebugInfo() {
       for (i = 0; i < len; i++) {
         PReg* preg = _contextTemporaries->at(i)->preg();
         rec->addContextTemporary(_scopeInfo, i, preg->createLogicalAddress());
-	if (PrintDebugInfoGeneration) std->print_cr("c_temp[%2d]: %s", i, preg->name());
+	if (PrintDebugInfoGeneration) stdOut->print_cr("c_temp[%2d]: %s", i, preg->name());
       }
     }
     // expr stack
@@ -853,7 +948,7 @@ void InlinedScope::generateDebugInfo() {
 	  //       debug info than actually needed for the new backend. Discuss
 	  //       this with Lars.
           rec->addExprStack(_scopeInfo, i, r->createLogicalAddress());
-          if (PrintDebugInfoGeneration) std->print_cr("expr[%2d]: %s", i, r->name());
+          if (PrintDebugInfoGeneration) stdOut->print_cr("expr[%2d]: %s", i, r->name());
         } else {
   	  // r's scope is too low (i.e. it's not actually live anymore)
 	  // this can only happen if the expression is discarded; thus it's safe not to describe this entry
@@ -868,7 +963,7 @@ void InlinedScope::generateDebugInfo() {
   len = _subScopes->length();
   for (i = 0; i < len; i++) {
     InlinedScope* s = _subScopes->at(i);
-    if (PrintDebugInfoGeneration) std->print_cr("Subscope %d (id = %d):", i, s->scopeID());
+    if (PrintDebugInfoGeneration) stdOut->print_cr("Subscope %d (id = %d):", i, s->scopeID());
     s->generateDebugInfo();
   }
 }
@@ -1014,14 +1109,14 @@ void BlockScope::print_short() {
 }
 
 
-void OutlinedScope::print_short(char* name) {
+void OutlinedScope::print_short(const char* name) {
   lprintf("(%s*)%#lx (", name, this); 
   _scope->selector()->print_symbol_on();
   lprintf(")");
 }
 
 
-void OutlinedScope::print(char* name) {
+void OutlinedScope::print(const char* name) {
   print_short(name);
   lprintf("  _nm = %#lx, _scope = %#lx", _nm, _scope);
 }

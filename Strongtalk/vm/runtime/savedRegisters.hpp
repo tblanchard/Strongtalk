@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_SAVEDREGISTERS_HPP_HPP
+#define VM_RUNTIME_SAVEDREGISTERS_HPP_HPP
 
 
 // SavedRegisters is used for storing the values of data registers
@@ -31,7 +33,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 class SavedRegisters : AllStatic {
  public:
-  static oop  fetch(int register_number, int* frame_pointer);
+  static oop  fetch(int register_number, intptr_t* frame_pointer);
   static void clear();
   static void save_registers();
 };
+
+
+#endif // VM_RUNTIME_SAVEDREGISTERS_HPP_HPP

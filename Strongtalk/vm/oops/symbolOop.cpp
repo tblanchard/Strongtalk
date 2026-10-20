@@ -22,9 +22,50 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_symbolOop.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "symbolOop.hpp"
+#include "runtime.hpp"
+#include "shell.hpp"
+#include "universe.inline.hpp"
+#include "symbolTable.hpp"
+#include "byteArrayKlass.hpp"
+#include "symbolKlass.hpp"
+#include "abort.hpp"
 symbolOop symbolOopDesc::scavenge() {
   ShouldNotCallThis(); // shouldn't be scavenging canonical symbols
                        // (should be tenured);
@@ -48,7 +89,7 @@ bool symbolOopDesc::verify() {
 }
 
 void symbolOopDesc::print_symbol_on(outputStream* st) {
-  st = st ? st : std;
+  st = st ? st : stdOut;
   for (int index = 1; index <= length(); index++)
     st->put(byte_at(index));
 }

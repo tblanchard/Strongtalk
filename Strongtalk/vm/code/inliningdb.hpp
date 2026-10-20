@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_INLININGDB_HPP_HPP
+#define VM_CODE_INLININGDB_HPP_HPP
 
+#include "types.hpp"
 // Interface to the inlining database
 
 class InliningDatabaseKey;
@@ -104,3 +107,5 @@ class InliningDatabase : AllStatic {
   static inline unsigned int index_for(LookupKey* outer, LookupKey* inner);
   static inline unsigned int next_index(unsigned int index);
 };
+
+#endif // VM_CODE_INLININGDB_HPP_HPP

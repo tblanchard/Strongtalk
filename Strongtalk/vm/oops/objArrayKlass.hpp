@@ -20,7 +20,26 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_OBJARRAYKLASS_HPP_HPP
+#define VM_OOPS_OBJARRAYKLASS_HPP_HPP
 
+// This header is self-contained. The inline methods below access
+// objArrayOopDesc (objArrayOop(obj)->length() at oop_size(),
+// objArrayOopDesc::header_size() at oop_header_size()), so the
+// objArrayOopDesc class must be complete here rather than relying on
+// every including translation unit to order its includes correctly.
+#include "oopsHierarchy.hpp"
+#include "types.hpp"
+#include "oop.hpp"
+#include "asserts.hpp"
+#include "smiOop.hpp"
+#include "memOop.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "objArrayOop.hpp"
+#include "memOopKlass.hpp"
+
+void set_objArrayKlass_vtbl(Klass* k);
 class objArrayKlass: public memOopKlass {
  public:
   // allocation properties
@@ -49,7 +68,7 @@ class objArrayKlass: public memOopKlass {
 
   friend void set_objArrayKlass_vtbl(Klass* k);
 
-  char* name() const { return "objArray"; }
+  const char* name() const { return "objArray"; }
 
   // ALL FUNCTIONS BELOW THIS POINT ARE DISPATCHED FROM AN OOP 
   
@@ -74,3 +93,6 @@ class objArrayKlass: public memOopKlass {
   // Sizing
   int oop_header_size() const { return objArrayOopDesc::header_size(); }
 };
+
+
+#endif // VM_OOPS_OBJARRAYKLASS_HPP_HPP

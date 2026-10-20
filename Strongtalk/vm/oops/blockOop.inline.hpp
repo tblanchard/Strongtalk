@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_BLOCKOOP_INLINE_HPP_HPP
+#define VM_OOPS_BLOCKOOP_INLINE_HPP_HPP
 
 #ifdef DELTA_COMPILER
 inline jumpTableEntry* blockClosureOopDesc::jump_table_entry() const {
@@ -27,3 +29,6 @@ inline jumpTableEntry* blockClosureOopDesc::jump_table_entry() const {
   return (jumpTableEntry*)addr()->_methodOrJumpAddr;
 }
 #endif
+
+
+#endif // VM_OOPS_BLOCKOOP_INLINE_HPP_HPP

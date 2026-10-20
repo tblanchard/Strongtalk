@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_MIXINKLASS_HPP_HPP
+#define VM_OOPS_MIXINKLASS_HPP_HPP
 
+void set_mixinKlass_vtbl(Klass* k);
 class mixinKlass: public memOopKlass {
  public:
   // testers
@@ -54,8 +57,11 @@ class mixinKlass: public memOopKlass {
   int oop_header_size() const { return mixinOopDesc::header_size(); }
 
   // printing support
-  char* name() const { return "mixin"; }
+  const char* name() const { return "mixin"; }
 
   // class creation
   friend void set_mixinKlass_vtbl(Klass* k);
 };
+
+
+#endif // VM_OOPS_MIXINKLASS_HPP_HPP

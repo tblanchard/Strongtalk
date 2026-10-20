@@ -22,16 +22,65 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_stackChunk.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "stackChunk.hpp"
+#include "runtime.hpp"
+#include "frame.hpp"
+#include "symbolOop.hpp"
+#include "methodOop.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "location.hpp"
+#include "vframe.hpp"
+#include "oopFactory.hpp"
+#include "universe.inline.hpp"
+#include "objArrayOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
 GrowableArray<const compiledVFrame*>*  frames;
 GrowableArray<contextOop>*       contexts;
 
 bool StackChunkBuilder::_is_deoptimizing = false;
-int* StackChunkBuilder::frame_pointer    = NULL;
+intptr_t* StackChunkBuilder::frame_pointer    = NULL;
 
-StackChunkBuilder::StackChunkBuilder(int* fp, int size) {
+StackChunkBuilder::StackChunkBuilder(intptr_t* fp, int size) {
   number_of_vframes = 0;
   number_of_locals  = 0;
   array             = new GrowableArray<oop>(size);
@@ -77,7 +126,8 @@ void StackChunkBuilder::append(deltaVFrame* f) {
       }
     }
   }
-  for (int index = con ? 1 : 0; index < number_of_temps; index++) 
+  int index;
+  for (index = con ? 1 : 0; index < number_of_temps; index++) 
     array->push(f->temp_at(index));
  
   // push expression stack

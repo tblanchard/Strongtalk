@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_ABORT_HPP_HPP
+#define VM_RUNTIME_ABORT_HPP_HPP
 
 // The ErrorHandler takes care of error recovery
 
@@ -41,3 +43,6 @@ class ErrorHandler : AllStatic {
   static int aborting_nlr_home_id() { return 0xcafebabe; }
 
 };
+
+
+#endif // VM_RUNTIME_ABORT_HPP_HPP

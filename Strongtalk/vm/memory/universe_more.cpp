@@ -21,9 +21,49 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "symbolTable.hpp"
+#include "handle.hpp"
+#include "sweeper.hpp"
+#include "ageTable.hpp"
+#include "timer.hpp"
+#include "vmOperations.hpp"
+#include "weakArrayKlass.hpp"
 
-# include "incls/_precompiled.incl"
-# include "incls/_universe.more.cpp.incl"
+
 
 bool GCInProgress = false;
 
@@ -84,7 +124,7 @@ void Universe::scavenge(oop* p) {
     TraceTime   t("Scavenge", PrintScavenge);
 
     if (PrintScavenge && WizardMode) {
-      std->print(" %d",tenuring_threshold);
+      stdOut->print(" %d",tenuring_threshold);
     }
     
     if (VerifyBeforeScavenge) verify();

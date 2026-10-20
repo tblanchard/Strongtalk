@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_ITERATOR_HPP_HPP
+#define VM_MEMORY_ITERATOR_HPP_HPP
 
 // The following classes are C++ `closures` for iterating over
 // Objects, Roots, and Frames.
@@ -109,7 +111,7 @@ class FrameLayoutClosure : StackObj {
   // Called for the receiver 
   virtual void do_receiver(oop* o) {}
   // Called for the link 
-  virtual void do_link(int** fp) {}
+  virtual void do_link(intptr_t** fp) {}
   // Called for the return address 
   virtual void do_return_addr(char** pc) {}
 };
@@ -137,3 +139,6 @@ class klassOopClosure : StackObj {
   virtual void do_klass(klassOop klass) {}
 };
 
+
+
+#endif // VM_MEMORY_ITERATOR_HPP_HPP

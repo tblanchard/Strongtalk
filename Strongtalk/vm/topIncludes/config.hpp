@@ -20,14 +20,37 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_TOPINCLUDES_CONFIG_HPP_HPP
+#define VM_TOPINCLUDES_CONFIG_HPP_HPP
 
+#include "platform.hpp"
+
+#include <stdint.h>
+#include <sys/types.h>
+
+// A VM word is the size of a pointer (oops, smis and mark words are all one word).
+// Originally 4 (x86-32); 8 on 64-bit targets such as arm64.
 const int BitsPerByte = 8;
-const int BytesPerWord = 4;
+const int BytesPerWord = sizeof(void*);
 const int BitsPerWord = BitsPerByte * BytesPerWord;
 
+static_assert(sizeof(void*) == sizeof(intptr_t), "pointer and intptr_t must be the same size");
+
 const int LogBitsPerByte = 3;
-const int LogBytesPerWord = 2;
+const int LogBytesPerWord = sizeof(void*) == 8 ? 3 : 2;
 const int LogBitsPerWord = LogBitsPerByte + LogBytesPerWord;
 
+// A smi holds the untagged value of a SmallInteger; it is pointer sized so
+// that a tagged smiOop (value << Tag_Size) fits in a word.
+typedef intptr_t smi;
+
+typedef unsigned short doubleByte;
+typedef uint16_t       uint16;
+typedef int16_t        int16;
+typedef uint32_t       uint32;
 
 
+
+
+
+#endif // VM_TOPINCLUDES_CONFIG_HPP_HPP

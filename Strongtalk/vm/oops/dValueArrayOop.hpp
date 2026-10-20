@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_DVALUEARRAYOOP_HPP_HPP
+#define VM_OOPS_DVALUEARRAYOOP_HPP_HPP
 
 // doubleValueArrays are arrays containing double value [8 bytes each]
 
@@ -29,6 +31,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 //    [instVars    ]*
 //    [length      ]      offset
 
+doubleValueArrayOop as_doubleValueArrayOop(void* p);
 class doubleValueArrayOopDesc: public memOopDesc {
   public:
   // constructor
@@ -41,7 +44,7 @@ class doubleValueArrayOopDesc: public memOopDesc {
   doubleValueArrayOopDesc* addr() const {
     return (doubleValueArrayOopDesc*) memOopDesc::addr(); }
 
-  bool is_within_bounds(int index) const { return 1 <= index && index <= length(); }
+  bool is_within_bounds(smi index) const { return 1 <= index && index <= length(); }
 
   oop* addr_as_oops() const { return (oop*)addr(); }
 
@@ -80,3 +83,6 @@ class doubleValueArrayOopDesc: public memOopDesc {
   friend doubleValueArrayKlass;
 };
 
+
+
+#endif // VM_OOPS_DVALUEARRAYOOP_HPP_HPP

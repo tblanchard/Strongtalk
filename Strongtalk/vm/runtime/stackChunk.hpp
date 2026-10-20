@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_STACKCHUNK_HPP_HPP
+#define VM_RUNTIME_STACKCHUNK_HPP_HPP
 
 
 // The StackChunkBuilder helps generate the canonical form
@@ -34,7 +36,7 @@ class StackChunkBuilder: public ResourceObj {
   // size of the corresponding deoptimized interpreter stack.
   int number_of_vframes;    // Number of vframes collected
   int number_of_locals;     // Sum of all temporaries and expressions in colleced vframes
-  static int* frame_pointer;// Frame pointer of the resulting frame
+  static intptr_t* frame_pointer;// Frame pointer of the resulting frame
 
   static int header_size() { return 2; }
   static bool _is_deoptimizing;
@@ -42,7 +44,7 @@ class StackChunkBuilder: public ResourceObj {
   GrowableArray<oop>* array;
  public:
   // Constructor
-  StackChunkBuilder(int* fp, int size = 100);
+  StackChunkBuilder(intptr_t* fp, int size = 100);
   ~StackChunkBuilder();
 
   // Adds a frame
@@ -67,3 +69,6 @@ class StackChunkBuilder: public ResourceObj {
   static void       context_at_put(const compiledVFrame* frame, contextOop con);
   static contextOop context_at(const compiledVFrame* frame);
 };
+
+
+#endif // VM_RUNTIME_STACKCHUNK_HPP_HPP

@@ -22,10 +22,92 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "recompiler.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "abort.hpp"
+#include "frame.hpp"
+#include "uncommonBranch.hpp"
+#include "slist.hpp"
+#include "compUtils.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "stackChunk.hpp"
+#include "stubRoutines.hpp"
 #ifdef DELTA_COMPILER
-# include "incls/_uncommonBranch.cpp.incl"
 
 // Tells whether the call has been executed before
 // %note:
@@ -36,20 +118,21 @@ bool patch_uncommon_call(frame* f) {
   //  from: call _unused_uncommon_trap
   //  to:   call _used_uncommon_trap
 
-  int* next_inst = (int*) f->pc();
-  int* dest_addr = next_inst-1;
-  int  dest      = *dest_addr + (int) next_inst;
+  // INTEL-SPECIFIC: the call is a rel32 call; its displacement precedes the return address
+  char*    next_inst = (char*) f->pc();
+  int32_t* dest_addr = ((int32_t*) next_inst) - 1;
+  char*    dest      = next_inst + *dest_addr;
 
   // return true if the call has been executed before
-  if (dest == (int)StubRoutines::used_uncommon_trap_entry())
+  if (dest == (char*)StubRoutines::used_uncommon_trap_entry())
     return true;
 
-  assert(dest == (int)StubRoutines::unused_uncommon_trap_entry(), "Make sure we are patching the right call");
+  assert(dest == (char*)StubRoutines::unused_uncommon_trap_entry(), "Make sure we are patching the right call");
 
   // patch with used_uncommon_trap
-  *dest_addr = ((int)StubRoutines::used_uncommon_trap_entry()) - ((int) next_inst);
+  *dest_addr = (int32_t) ((char*)StubRoutines::used_uncommon_trap_entry() - next_inst);
 
-  assert(*dest_addr + (int) next_inst == (int)StubRoutines::used_uncommon_trap_entry(), "Check the patch");
+  assert(next_inst + *dest_addr == (char*)StubRoutines::used_uncommon_trap_entry(), "Check the patch");
 
   // return false since the call is patched
   return false;
@@ -68,7 +151,7 @@ static bool has_invalid_context(frame* f) {
   while (true) {
     contextOop con = vf->compiled_context();
 
-    // std->print_cr("checking context fp = 0x%lx, pc = 0x%lx", f->fp(), f->pc());
+    // stdOut->print_cr("checking context fp = 0x%lx, pc = 0x%lx", f->fp(), f->pc());
     if (con) con->print();
 
     if (con && con->unoptimized_context()) return true;
@@ -162,11 +245,11 @@ void uncommon_trap() {
   */
 
   if (PrintUncommonBranches)  {
-    std->print("%s trap in ", used ? "Uncommon" : "New uncommon");
-    nm->print_value_on(std);
-    std->print(" #%d", nm->uncommon_trap_counter());
-    if (WizardMode) std->print(" @%d called from %#x", vf->scope()->offset(), f.pc() - Assembler::sizeOfCall);
-    std->cr();
+    stdOut->print("%s trap in ", used ? "Uncommon" : "New uncommon");
+    nm->print_value_on(stdOut);
+    stdOut->print(" #%d", nm->uncommon_trap_counter());
+    if (WizardMode) stdOut->print(" @%d called from %#x", vf->scope()->offset(), f.pc() - Assembler::sizeOfCall);
+    stdOut->cr();
     if (TraceDeoptimization) vf->print_activation(0);
     process->trace_top(0, 3);
   }

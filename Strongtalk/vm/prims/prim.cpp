@@ -21,14 +21,89 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_prim.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "prim_def.hpp"
+#include "dValueArray_prims.hpp"
+#include "dByteArray_prims.hpp"
+#include "processOop.hpp"
+#include "objArray_prims.hpp"
+#include "runtime.hpp"
+#include "double_prims.hpp"
+#include "smi_prims.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "prim.hpp"
+#include "block_prims.hpp"
+#include "vframe_prims.hpp"
+#include "oop_prims.hpp"
+#include "system_prims.hpp"
+#include "proxy_prims.hpp"
+#include "process_prims.hpp"
+#include "mixin_prims.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "frame.hpp"
+#include "byteArrayKlass.hpp"
+#include "symbolTable.hpp"
+#include "symbolKlass.hpp"
+#include "abort.hpp"
+#include "location.hpp"
+#include "debug_prims.hpp"
+#include "behavior_prims.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "callBack_prims.hpp"
+#include "oopFactory.hpp"
+#include "doubleOop.hpp"
+#include "expr.hpp"
+#include "method_prims.hpp"
+#include "byteArray_prims.hpp"
 // The primitive_table is generated from prims.src.
 // The output has the following format:
 //   static int size_of_primitive_table
 //   static primitive_desc* primitive_table;
 #include "prims.inc"
+#include "codeIterator.hpp"
 
 // the typedefs below are necessary to ensure that args are passed correctly when calling a primitive
 // through a function pointer
@@ -82,18 +157,18 @@ oop primitive_desc::eval(oop* a) {
 
 
 void primitives::print_table() {
-  std->print_cr("Primitive table:");
+  stdOut->print_cr("Primitive table:");
   for (int index = 0; index < size_of_primitive_table; index++) {
     primitive_desc* e = primitive_table[index];
-    std->print("%3d ",index);
+    stdOut->print("%3d ",index);
     e->print();
   }
-  std->print_cr(" - format: <index> <name> <number_of_parameters> <flags> [category]");
-  std->print_cr("    flags:  R = has receiver,           F = has failure block,");
-  std->print_cr("            S = can scavenge,           N = can perform NLR,");
-  std->print_cr("            C = can be constant folded, D = can invoke Delta code");
-  std->print_cr("            I = internal,               P = needs Delta fp code");
-  std->print_cr("            W = can walk stack (computed)");
+  stdOut->print_cr(" - format: <index> <name> <number_of_parameters> <flags> [category]");
+  stdOut->print_cr("    flags:  R = has receiver,           F = has failure block,");
+  stdOut->print_cr("            S = can scavenge,           N = can perform NLR,");
+  stdOut->print_cr("            C = can be constant folded, D = can invoke Delta code");
+  stdOut->print_cr("            I = internal,               P = needs Delta fp code");
+  stdOut->print_cr("            W = can walk stack (computed)");
 }
 
 
@@ -108,7 +183,7 @@ symbolOop primitive_desc::selector() const {
 
 
 void primitive_desc::print() {
-  std->print("%48s %d %s%s%s%s%s%s%s%s%s",
+  stdOut->print("%48s %d %s%s%s%s%s%s%s%s%s",
              name(), 
              number_of_parameters(),
 	     has_receiver()           ? "R" : "_",
@@ -121,18 +196,18 @@ void primitive_desc::print() {
 	     is_internal()            ? "I" : "_",
 	     needs_delta_fp_code()    ? "P" : "_");
   switch(group()) {
-    case IntComparisonPrimitive:   std->print(", smi compare");           break;
-    case IntArithmeticPrimitive:   std->print(", smi arith");             break;
-    case FloatComparisonPrimitive: std->print(", double compare");        break;
-    case FloatArithmeticPrimitive: std->print(", double arith");          break;
-    case ByteArrayPrimitive:       std->print(", byte array op.");        break;
-    case DoubleByteArrayPrimitive: std->print(", double-byte array op."); break;
-    case ObjArrayPrimitive:        std->print(", array op.");             break;
-    case BlockPrimitive: 	   std->print(", block/context");         break;
+    case IntComparisonPrimitive:   stdOut->print(", smi compare");           break;
+    case IntArithmeticPrimitive:   stdOut->print(", smi arith");             break;
+    case FloatComparisonPrimitive: stdOut->print(", double compare");        break;
+    case FloatArithmeticPrimitive: stdOut->print(", double arith");          break;
+    case ByteArrayPrimitive:       stdOut->print(", byte array op.");        break;
+    case DoubleByteArrayPrimitive: stdOut->print(", double-byte array op."); break;
+    case ObjArrayPrimitive:        stdOut->print(", array op.");             break;
+    case BlockPrimitive: 	   stdOut->print(", block/context");         break;
     case NormalPrimitive:                                                 break;
     default: fatal("Unknown primitive group");
   }
-  std->cr();
+  stdOut->cr();
 }
 
 
@@ -258,8 +333,8 @@ void primitives::lookup_and_patch() {
 
     { ResourceMark rm;
       // primitive not found => process error
-      std->print("primitive lookup error\n");
-      sel->print_value(); std->print(" not found\n");
+      stdOut->print("primitive lookup error\n");
+      sel->print_value(); stdOut->print(" not found\n");
     }
     if (DeltaProcess::active()->is_scheduler()) {
       ResourceMark rm;
@@ -305,7 +380,7 @@ void primitives::clear_counters() {
 }
 
 
-static void print_calls(char* name, int inc, int* total) {
+static void print_calls(const char* name, int inc, int* total) {
   if (inc > 0) {
     lprintf(" %s:\t%6d\n", name, inc);
     *total = *total + inc;

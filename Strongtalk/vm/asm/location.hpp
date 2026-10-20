@@ -20,8 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_ASM_LOCATION_HPP_HPP
+#define VM_ASM_LOCATION_HPP_HPP
 
 # ifdef DELTA_COMPILER
+
+#include "growableArray.hpp"
 
 // Locations serve as abstractions for physical addresses. For each
 // physical location (register, stack position or context temporary),
@@ -118,7 +122,7 @@ class Location: public ResourceObj /* but usually used as ValueObj */ {
   }
 
   // helper functions
-  char* name() const;
+  const char* name() const;
 
   // predicates
   bool isSpecialLocation() const	{ return mode() == specialLoc; }
@@ -177,3 +181,6 @@ class IntFreeList : public PrintableResourceObj {
 
 
 # endif
+
+
+#endif // VM_ASM_LOCATION_HPP_HPP

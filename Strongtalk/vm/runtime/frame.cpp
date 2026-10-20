@@ -21,9 +21,85 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_frame.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "interpreter.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "interpretedIC.hpp"
+#include "markSweep.hpp"
+#include "floats.hpp"
+#include "compiledPIC.hpp"
 u_char* frame::hp() const { 
   // Lars, please check -- assertion fails
   //assert(is_interpreted_frame(), "must be interpreted");
@@ -57,8 +133,8 @@ oop** frame::real_sender_sp_addr() const {
   return (oop**) addr_at(frame_real_sender_sp_offset);
 }
 
-void frame::patch_fp(int* fp) {
-  frame previous(NULL, ((int*) sp()) - frame_sender_sp_offset, NULL);
+void frame::patch_fp(intptr_t* fp) {
+  frame previous(NULL, ((intptr_t*) sp()) - frame_sender_sp_offset, NULL);
   previous.set_link(fp);
 }
 
@@ -155,8 +231,8 @@ bool frame::has_next_Delta_fp() const {
   return at(frame_next_Delta_fp_offset) != NULL;
 }
 
-int* frame::next_Delta_fp() const	{
-  return (int*) at(frame_next_Delta_fp_offset);
+intptr_t* frame::next_Delta_fp() const	{
+  return (intptr_t*) at(frame_next_Delta_fp_offset);
 }
 
 oop* frame::next_Delta_sp() const	{
@@ -183,17 +259,17 @@ char* frame::print_name() const {
 }
 
 void frame::print() const {
-  std->print("[%s frame: fp = %#lx, sp = %#lx, pc = %#lx", print_name(), fp(), sp(), pc());
+  stdOut->print("[%s frame: fp = %#lx, sp = %#lx, pc = %#lx", print_name(), fp(), sp(), pc());
   if (is_compiled_frame()) {
-    std->print(", nm = %#x", findNMethod(pc()));
+    stdOut->print(", nm = %#x", findNMethod(pc()));
   } else if (is_interpreted_frame()) {
-    std->print(", hp = %#x, method = %#x", hp(), method());
+    stdOut->print(", hp = %#x, method = %#x", hp(), method());
   }
-  std->print_cr("]");
+  stdOut->print_cr("]");
 
   if (PrintLongFrames) {
     for (oop* p = sp(); p < (oop*)fp(); p++)
-      std->print_cr("  - 0x%lx: 0x%lx", p, *p);
+      stdOut->print_cr("  - 0x%lx: 0x%lx", p, *p);
   }
 }
 
@@ -222,7 +298,7 @@ void frame::print_for_deoptimization(outputStream* st) {
    if (ActivationShowBCI) {
      st->print(" bci=%d ", vf->bci());
    }
-   std->print_cr(" @ 0x%lx", fp());
+   stdOut->print_cr(" @ 0x%lx", fp());
    print_context_chain(vf->interpreter_context(), st);
    if (ActivationShowExpressionStack) {
      GrowableArray<oop>* stack = vf->expression_stack();
@@ -240,12 +316,12 @@ void frame::print_for_deoptimization(outputStream* st) {
    compiledVFrame* vf = (compiledVFrame*) vframe::new_vframe(this);
    assert(vf->is_compiled_frame(), "should be compiled vframe");
    vf->code()->print_value_on(st);
-   std->print_cr(" @ 0x%lx", fp());
+   stdOut->print_cr(" @ 0x%lx", fp());
 
    while (true) {
      st->print("    ");
      vf->method()->print_value_on(st);
-     std->print_cr(" @ %d", vf->scope()->offset());
+     stdOut->print_cr(" @ %d", vf->scope()->offset());
      print_context_chain(vf->compiled_context(), st);
      if (vf->is_top()) break;
      vf = (compiledVFrame*) vf->sender();
@@ -257,14 +333,14 @@ void frame::print_for_deoptimization(outputStream* st) {
  if (is_deoptimized_frame()) {
    st->print("D "); 
    frame_array()->print_value();
-   std->print_cr(" @ 0x%lx", fp());
+   stdOut->print_cr(" @ 0x%lx", fp());
 
    deoptimizedVFrame* vf = (deoptimizedVFrame*) vframe::new_vframe(this);
    assert(vf->is_deoptimized_frame(), "should be deoptimized vframe");
    while (true) {
      st->print("    ");
      vf->method()->print_value_on(st);
-     std->cr();
+     stdOut->cr();
      print_context_chain(vf->deoptimized_context(), st);
      if (vf->is_top()) break;
      vf = (deoptimizedVFrame*) vf->sender();
@@ -494,7 +570,8 @@ frame frame::sender() const {
 }
 
 frame frame::delta_sender() const {
-  for (frame s = sender(); !s.is_delta_frame(); s = s.sender()) ;
+  frame s;
+  for (s = sender(); !s.is_delta_frame(); s = s.sender()) ;
   return s;
 }
 
@@ -502,9 +579,9 @@ bool frame::should_be_deoptimized() const {
   if (!is_compiled_frame()) return false;
   nmethod* nm = code();
   if (TraceApplyChange) {
-    std->print("checking (%s) ", nm->is_marked_for_deoptimization() ? "true" : "false"); 
-    nm->print_value_on(std);
-    std->cr();
+    stdOut->print("checking (%s) ", nm->is_marked_for_deoptimization() ? "true" : "false"); 
+    nm->print_value_on(stdOut);
+    stdOut->cr();
   }
   return nm->is_marked_for_deoptimization();
 }

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_NODE_HPP_HPP
+#define VM_COMPILER_NODE_HPP_HPP
 
 
 # ifdef DELTA_COMPILER
@@ -458,7 +460,7 @@ class StoreNode: public NonTrivialNode {
   bool canCopyPropagateOop() const 	{ return true; }
   bool hasSrc() const			{ return true; }
   virtual bool needsStoreCheck() const	{ return false; }
-  virtual char* action() const		= NULL;		// for debugging messages
+  virtual const char* action() const		= 0;		// for debugging messages
   virtual void setStoreCheck(bool ncs)	{}
   void assert_preg_type(PReg* r, GrowableArray<klassOop>* klasses, LoopHeaderNode* n);
   void makeUses(BB* bb);
@@ -490,7 +492,7 @@ class StoreOffsetNode: public StoreNode {
   bool	needsStoreCheck() const		{ return _needsStoreCheck; }
   bool	hasSrc() const			{ return true; }
   void  setStoreCheck(bool ncs)		{ _needsStoreCheck = ncs; }
-  char* action() const			{ return "stored into an object"; }
+  const char* action() const			{ return "stored into an object"; }
   Node*	clone(PReg* from, PReg* to) const;
   void	makeUses(BB* bb);
   void	removeUses(BB* bb);
@@ -527,7 +529,7 @@ class StoreUplevelNode: public StoreNode {
   int	offset() const			{ return _offset; }
   bool	needsStoreCheck() const		{ return _needsStoreCheck; }
   void  setStoreCheck(bool ncs) 	{ _needsStoreCheck = ncs; }
-  char* action() const			{ return "stored into a context temporary"; }
+  const char* action() const			{ return "stored into a context temporary"; }
   Node*	clone(PReg* from, PReg* to) const;
   void	makeUses(BB* bb);
   void	removeUses(BB* bb);
@@ -559,7 +561,7 @@ class AssignNode : public StoreNode {
   bool  shouldCopyWhenSplitting() const { return true; }
   bool	canBeEliminated() const;
   oop	constantSrc() const;
-  char* action() const			{ return _dest->isSAPReg() ? 
+  const char* action() const			{ return _dest->isSAPReg() ? 
 						  "passed as an argument" : "assigned to a local"; }
   Node*	clone(PReg* from, PReg* to) const;
   void	makeUses(BB* bb);
@@ -891,7 +893,7 @@ class ArithRCNode : public ArithNode {  // reg op const => reg
 class AbstractBranchNode : public NonTrivialNode {
   // next() is the fall-through case, next1() the taken branch
  public:
-  virtual bool	canFail() const = NULL;		// does node have a failure branch?
+  virtual bool	canFail() const = 0;		// does node have a failure branch?
   virtual Node*	failureBranch() const		{ return next1(); }
   bool		endsBB() const 			{ return true; }
  protected:
@@ -996,7 +998,7 @@ class CallNode : public AbstractBranchNode {
   bool isCallNode() const  	    	{ return true; }
   bool canChangeDest() const		{ return false; }
   bool canBeEliminated() const 		{ return false; }
-  virtual bool canInvokeDelta() const = NULL;	// can call invoke Delta code?
+  virtual bool canInvokeDelta() const = 0;	// can call invoke Delta code?
   MergeNode* nlrTestPoint() const;
   Node* likelySuccessor() const;
   Node* uncommonSuccessor() const;
@@ -1398,7 +1400,7 @@ class BranchNode : public AbstractBranchNode {
   BranchOpCode	op() const			{ return _op; }
   bool		isBranchNode() const		{ return true; }
   bool		canFail() const			{ return false; }
-  void		eliminateBranch(int op1, int op2, int res);
+  void		eliminateBranch(intptr_t op1, intptr_t op2, intptr_t res);
   void		eliminate(BB* bb, PReg* r, bool removing = false, bool cp = false);
   void		markAllocated(int* use_count, int* def_count) { Unused(use_count); Unused(def_count); }
   Node*		clone(PReg* from, PReg* to) const;
@@ -1485,7 +1487,7 @@ class AbstractArrayAtNode : public AbstractBranchNode {
  public:
   bool	hasSrc() const 			{ return true; }
   bool	hasDest() const 		{ return _dest != NULL; }
-  bool  canFail() const = NULL;
+  bool  canFail() const = 0;
   int	cost() const	     		{ return 20 + (_intArg ? 0 : 12); } // fix this
   bool	canCopyPropagate() const	{ return true; }
   int   sizeOffset() const		{ return _sizeOffset; }
@@ -1843,3 +1845,6 @@ void printNodes(Node* n);   // print n and its successors
 #endif
 
 # endif
+
+
+#endif // VM_COMPILER_NODE_HPP_HPP

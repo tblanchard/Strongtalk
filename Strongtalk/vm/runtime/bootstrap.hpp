@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_BOOTSTRAP_HPP_HPP
+#define VM_RUNTIME_BOOTSTRAP_HPP_HPP
 
 // bootstrap parses and allocates memOops from a text file
 
@@ -34,13 +36,27 @@ class bootstrap: CHeapObj {
 
   bool _new_format;
 
+  // Objects whose size differs between the image's 32-bit layout and the native layout
+  // are allocated with an upper bound and shrunk afterwards (see get_object).
+  int   _current_capacity;			// capacity (words) of the object being read
+  struct Filler { oop* start; int words; };
+  Filler* _fillers;
+  int     _number_of_fillers;
+  int     _max_number_of_fillers;
+  void    shrink(memOop m, int capacity, int size);
+  void    add_filler(oop* start, int words);
+  void    create_fillers();
+ public:
+  void    print_fillers_near(oop* p);	// debugging
+ private:
+
   void initialize_tables(int initial_table_size);
 
   void add(oop obj);
   oop  at(int index);
 
   // File
-  char* file_name;
+  const char* file_name;
   FILE* stream;
   int   file_size;
   char get_char();
@@ -56,7 +72,7 @@ class bootstrap: CHeapObj {
   void close_file();
   void insert_symbol(memOop obj);
  public:
-  bootstrap(char *name);
+  bootstrap(const char *name);
   ~bootstrap();
 
   bool has_error() { return _has_error; }
@@ -71,5 +87,12 @@ class bootstrap: CHeapObj {
 
   bool new_format() const { return _new_format; }
 
+  // Capacity in words of the object whose bootstrap_object() is running; read it before
+  // reading any field (nested objects change it).
+  int  current_capacity() const { return _current_capacity; }
+
   bool is_byte() { return getc(stream) == '4'; }
 };
+
+
+#endif // VM_RUNTIME_BOOTSTRAP_HPP_HPP

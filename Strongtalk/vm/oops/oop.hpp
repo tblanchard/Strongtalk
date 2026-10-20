@@ -21,6 +21,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
+#ifndef oop_hpp
+#define oop_hpp
+
+#include "tag.hpp"
+
 // oopDesc is the top of the oop hierarchy.  The xxxDesc classes describe
 // the format of ST objects so the fields can be accessed from C++.
 // Caution: "oop" pointers to xxxDesc structures (e.g., oop, proxyOop) are
@@ -48,7 +53,7 @@ class oopDesc {
   oopDesc();
   
   // tag checks
-  int tag() const 		{ return maskBits(int(this), Tag_Mask); }
+  int tag() const 		{ return (int) maskBits((intptr_t)this, Tag_Mask); }
   bool is_smi() const   { return tag() == Int_Tag; }
   bool is_mem() const   { return tag() == Mem_Tag; }
   bool is_mark() const  { return tag() == Mark_Tag; }
@@ -116,3 +121,5 @@ class oopDesc {
 
   friend memOopKlass;
 };
+
+#endif // oop_hpp

@@ -21,9 +21,95 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_fprofiler.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "task.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "slist.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "frame.hpp"
+#include "compUtils.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "timer.hpp"
+#include "fprofiler.hpp"
+#include "stubRoutines.hpp"
+#include "compiledPIC.hpp"
 pnode** FlatProfiler::table = NULL;
 int     FlatProfiler::table_size = 1024;
 
@@ -161,8 +247,8 @@ class pnode : public CHeapObj {
     if (ProfilerShowMethodHolder) {
       klassOop method_holder = receiver_klass()->klass_part()->lookup_method_holder_for(m);
       if (method_holder && (method_holder != receiver_klass())) {
-        std->print(", in ");
-        method_holder->klass_part()->print_name_on(std);
+        stdOut->print(", in ");
+        method_holder->klass_part()->print_name_on(stdOut);
       }
     }
   }
@@ -378,7 +464,8 @@ void FlatProfiler::record_tick() {
 
 void FlatProfiler::allocate_table() {
   table = NEW_C_HEAP_ARRAY(pnode*, table_size);
-  for(int index = 0; index < table_size; index++) 
+  int index;
+  for (index = 0; index < table_size; index++) 
     table[index] = NULL;
 }
 
@@ -386,7 +473,8 @@ void FlatProfiler::reset() {
   proc = NULL;
   task = NULL;
 
-  for(int index = 0; index < table_size; index++) {
+  int index;
+  for (index = 0; index < table_size; index++) {
     pnode* n = table[index];
     if (n) { 
       delete n;
@@ -434,7 +522,7 @@ static int compare_nodes(const void* p1,  const void* p2) {
 
 void print_ticks(char* title, int ticks, int total) {
  if (ticks>0)
-    std->print_cr("%5.1f%%  %3d %s", ticks * 100.0 / total, ticks, title);
+    stdOut->print_cr("%5.1f%%  %3d %s", ticks * 100.0 / total, ticks, title);
 }
 
 void FlatProfiler::print(int cutoff) {
@@ -447,7 +535,8 @@ void FlatProfiler::print(int cutoff) {
 
   GrowableArray <pnode*>* array = new GrowableArray<pnode*>(200);
 
-  for(int index = 0; index < table_size; index++) {
+  int index;
+  for (index = 0; index < table_size; index++) {
     for(pnode* node = table[index]; node; node = node->next())
       array->append(node);
   }
@@ -460,9 +549,9 @@ void FlatProfiler::print(int cutoff) {
     total += array->at(index)->ticks.total();
   }
 
-  std->cr();
-  std->print_cr("Flatprofile %3.2f secs (%d ticks):", secs, total);
-  std->cr();
+  stdOut->cr();
+  stdOut->print_cr("Flatprofile %3.2f secs (%d ticks):", secs, total);
+  stdOut->cr();
 
   // print interpreted methods
   tick_counter interpreted_ticks;
@@ -473,11 +562,11 @@ void FlatProfiler::print(int cutoff) {
     if (n->is_interpreted()) {
       interpreted_ticks.add(&n->ticks);
       if (!has_interpreted_ticks) {
-        interpretedNode::print_title(std);
+        interpretedNode::print_title(stdOut);
         has_interpreted_ticks = true;
       }
       if (print_count++ < ProfilerNumberOfInterpreterMethods) {
-        n->print(std, total);
+        n->print(stdOut, total);
       }
     }
   }
@@ -485,12 +574,12 @@ void FlatProfiler::print(int cutoff) {
     tick_counter others;
     for ( ; index < array->length(); index++) others.add(&array->at(index)->ticks);
     if (others.total() > 0) {
-      interpretedNode::print_total(std, &interpreted_ticks, total, "(all above)");
-      interpretedNode::print_total(std, &others, total, "(all others)");
+      interpretedNode::print_total(stdOut, &interpreted_ticks, total, "(all above)");
+      interpretedNode::print_total(stdOut, &others, total, "(all others)");
     }
     interpreted_ticks.add(&others);
-    interpretedNode::print_total(std, &interpreted_ticks, total, "Total interpreted");
-    std->cr();
+    interpretedNode::print_total(stdOut, &interpreted_ticks, total, "Total interpreted");
+    stdOut->cr();
   }
 
   // print compiled methods
@@ -502,11 +591,11 @@ void FlatProfiler::print(int cutoff) {
     if (n->is_compiled()) {
       compiled_ticks.add(&n->ticks);
       if (!has_compiled_ticks) {
-        compiledNode::print_title(std);
+        compiledNode::print_title(stdOut);
         has_compiled_ticks = true;
       }
       if (print_count++ < ProfilerNumberOfCompiledMethods) {
-        n->print(std, total);
+        n->print(stdOut, total);
       }
     }
   }
@@ -515,18 +604,18 @@ void FlatProfiler::print(int cutoff) {
     tick_counter others;
     for ( ; index < array->length(); index++) others.add(&array->at(index)->ticks);
     if (others.total() > 0) {
-      compiledNode::print_total(std, &compiled_ticks, total, "(all above)");
-      compiledNode::print_total(std, &others, total, "(all others)");
+      compiledNode::print_total(stdOut, &compiled_ticks, total, "(all above)");
+      compiledNode::print_total(stdOut, &others, total, "(all others)");
     }
     compiled_ticks.add(&others);
-    compiledNode::print_total(std, &compiled_ticks, total, "Total compiled");
-    std->cr();
+    compiledNode::print_total(stdOut, &compiled_ticks, total, "Total compiled");
+    stdOut->cr();
   }
 
-  std->cr();
+  stdOut->cr();
 
   if (total_ticks() > 0) {
-    std->print_cr(" Additional ticks:");
+    stdOut->print_cr(" Additional ticks:");
     print_ticks("Garbage collector", gc_ticks,        total);
     print_ticks("Process semaphore", semaphore_ticks, total);
     print_ticks("Unknown code",      unknown_ticks,   total);

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_DVALUEARRAY_PRIMS_HPP_HPP
+#define VM_PRIMS_DVALUEARRAY_PRIMS_HPP_HPP
 
 // Primitives for double value arrays
 
@@ -70,3 +72,6 @@ class doubleValueArrayPrimitives : AllStatic {
 
 };
 
+
+
+#endif // VM_PRIMS_DVALUEARRAY_PRIMS_HPP_HPP

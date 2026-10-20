@@ -21,10 +21,101 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "regAlloc.hpp"
+#include "split.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_preg.cpp.incl"
 
 int PReg::currentNo = 0;
 int BlockPReg::_numBlocks = 0;
@@ -392,13 +483,15 @@ bool SAPReg::extendLiveRange(InlinedScope* s, int bci) {
     if (bciGT(bci, _endBCI)) _endBCI = bci;
   } else if (s->isSenderOf(_scope)) {
     // propagating upwards - promote receiver to higher scope
-    for (InlinedScope* ss = _scope; ss->sender() != s; ss = ss->sender());
+    InlinedScope* ss;
+    for (ss = _scope; ss->sender() != s; ss = ss->sender());
     _scope = s;
     _begBCI = ss->senderBCI();
     _endBCI = bci;
   } else if (_scope->isSenderOf(s)) {
     // scope is callee; check if already covered
-    for (InlinedScope* ss = s; ss->sender() != _scope; ss = ss->sender()) ;
+    InlinedScope* ss;
+    for (ss = s; ss->sender() != _scope; ss = ss->sender()) ;
     int bci = ss->senderBCI();
     if (bciLT(bci, _begBCI)) {
       // seems like we're propagating backwards!  happens because of the non-source
@@ -455,7 +548,8 @@ bool PReg::checkEquivalentDefs() const {
   // check if all defs are equivalent, i.e. assign the same preg
   if (ndefs() == 1) return true;
   PReg* rhs = NULL;
-  for (int i = 0; i < dus.length(); i++) {
+  int i;
+  for (i = 0; i < dus.length(); i++) {
     PRegBBIndex* index = dus.at(i);
     BB* bb = index->bb;
     DUInfo* info = bb->duInfo.info->at(index->index);
@@ -570,7 +664,8 @@ bool BlockPReg::canBeEliminated(bool withUses) const {
 // eliminate all nodes defining me (if possible)
 void PReg::eliminate(bool withUses) {
   if (!canBeEliminated(withUses)) return;
-  for (int i = 0; i < dus.length(); i++) {
+  int i;
+  for (i = 0; i < dus.length(); i++) {
     PRegBBIndex* index = dus.at(i);
     BB* bb = index->bb;
     DUInfo* info = bb->duInfo.info->at(index->index);
@@ -629,10 +724,12 @@ void BlockPReg::eliminate(bool withUses) {
     // the block has been eliminated; remove the uplevel accesses
     // (needed to enable eliminating the accessed contexts)
     if (_uplevelRead) {
-      for (int i = _uplevelRead->length() - 1; i >= 0; i--) _uplevelRead->at(i)->removeUplevelAccessor(this);
+      int i;
+      for (i = _uplevelRead->length() - 1; i >= 0; i--) _uplevelRead->at(i)->removeUplevelAccessor(this);
     }
     if (_uplevelWritten) {
-      for (int i = _uplevelWritten->length() - 1; i >= 0; i--) _uplevelWritten->at(i)->removeUplevelAccessor(this);
+      int i;
+      for (i = _uplevelWritten->length() - 1; i >= 0; i--) _uplevelWritten->at(i)->removeUplevelAccessor(this);
     }
   }
 }
@@ -764,7 +861,8 @@ bool PReg::isCPEquivalent(PReg* r) const {
   // is receiver in same register as argument?
   if (this == r) return true;
   // try receiver's CP info
-  for (CPInfo* i = cpInfo; i && i->r; i = i->r->cpInfo) {
+  CPInfo* i;
+  for (i = cpInfo; i && i->r; i = i->r->cpInfo) {
     if (i->r == r) return true;
   }
   // now try the other way
@@ -948,12 +1046,13 @@ void BlockPReg::computeUplevelAccesses() {
   assert(! _uplevelWritten, "shouldn't be there");
   _uplevelRead    = c.read;
   _uplevelWritten = c.written;
-  for (int i = _uplevelRead->length() - 1; i >= 0; i--) _uplevelRead   ->at(i)->addUplevelAccessor(this, true, false);
+  int i;
+  for (i = _uplevelRead->length() - 1; i >= 0; i--) _uplevelRead   ->at(i)->addUplevelAccessor(this, true, false);
   for (i = _uplevelWritten->length() - 1;  i >= 0; i--) _uplevelWritten->at(i)->addUplevelAccessor(this, false, true);
 }
 
 
-char* PReg::safeName() const {
+const char* PReg::safeName() const {
   if (this == NULL) {
     return "(null)";     // for safer debugging
   } else {
@@ -961,7 +1060,7 @@ char* PReg::safeName() const {
   }
 }
 
-char* PReg::name() const {
+const char* PReg::name() const {
   char* n = NEW_RESOURCE_ARRAY(char, 25);
   if (loc.equals(unAllocated)) {
     sprintf(n, "%s%d%s%s%s", prefix(), id(),
@@ -988,20 +1087,21 @@ void BlockPReg::print() {
   if (_uplevelWritten) { lprintf("; uplevel-written: "); _uplevelWritten->print(); }
   if (_escapeNodes) { 
     lprintf("; escapes at: "); 
-    for (int i = 0; i < _escapeNodes->length(); i++) lprintf("N%d ", _escapeNodes->at(i)->id()); 
+    int i;
+    for (i = 0; i < _escapeNodes->length(); i++) lprintf("N%d ", _escapeNodes->at(i)->id()); 
   }
   lprintf("\n");
 }
 
 
-char* BlockPReg::name() const {
+const char* BlockPReg::name() const {
   char* n = NEW_RESOURCE_ARRAY(char, 25);
   sprintf(n, "%s <%#lx>%s", PReg::name(), PrintHexAddresses ? this : 0, _memoized ? "#" : "");
   return n;
 }
 
 
-char* ConstPReg::name() const {
+const char* ConstPReg::name() const {
   char* n = NEW_RESOURCE_ARRAY(char, 25);
   sprintf(n, "%s <%#lx>", PReg::name(), constant);
   return n;
@@ -1009,7 +1109,7 @@ char* ConstPReg::name() const {
 
 
 #ifdef not_yet_used
-  char* SplitPReg::name() const {
+  const char* SplitPReg::name() const {
     char* n = NEW_RESOURCE_ARRAY(char, 25);
 //c    char buf[MaxSplitDepth+1];
 //c    sprintf(n, "%s <%s>", PReg::name(), sig->prefix(buf));
@@ -1026,7 +1126,8 @@ bool PReg::verify() const {
     error("PReg %#lx %s: invalid ID %ld", this, name(), _id);
   }
   int uses = 0, defs = 0;
-  for (int i = 0; i < dus.length(); i++) {
+  int i;
+  for (i = 0; i < dus.length(); i++) {
     PRegBBIndex* index = dus.at(i);
     DUInfo* info = index->bb->duInfo.info->at(index->index);
     defs += info->defs.length();
@@ -1090,7 +1191,8 @@ bool BlockPReg::verify() const {
   bool ok = SAPReg::verify() && _closure->verify();
   // check uplevel-accessed vars: if they are blocks, they must be exposed
   if (_uplevelRead) {
-    for (int i = 0; i < _uplevelRead->length(); i++) {
+    int i;
+    for (i = 0; i < _uplevelRead->length(); i++) {
       if (_uplevelRead->at(i)->isBlockPReg()) {
 	BlockPReg* blk = (BlockPReg*)_uplevelRead->at(i);
 	if (!blk->escapes()) {

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_BLOCK_PRIMS_HPP_HPP
+#define VM_PRIMS_BLOCK_PRIMS_HPP_HPP
 
 // Primitives for blocks
 
@@ -280,3 +282,6 @@ PRIM_DECL_1(block_is_optimized, oop receiver);
 //     doc   = 'Tells whether the block has optimized code'
 //     name  = 'block_is_optimized' }
 //%
+
+
+#endif // VM_PRIMS_BLOCK_PRIMS_HPP_HPP

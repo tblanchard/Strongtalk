@@ -21,9 +21,58 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_method_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "prim_def.hpp"
+#include "bytecodes.hpp"
+#include "symbolOop.hpp"
+#include "oopFactory.hpp"
+#include "universe.inline.hpp"
+#include "doubleOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "prettyprinter.hpp"
+#include "methodOop.hpp"
+#include "methodKlass.hpp"
+#include "prim_impl.hpp"
+#include "method_prims.hpp"
+#include "objArrayOop.hpp"
+#include "blockKlass.hpp"
+#include "bytecodeTranscoder.hpp"
 TRACE_FUNC(TraceMethodPrims, "method")
 
 int methodOopPrimitives::number_of_calls;
@@ -39,13 +88,15 @@ PRIM_DECL_1(methodOopPrimitives::selector, oop receiver) {
 PRIM_DECL_1(methodOopPrimitives::debug_info, oop receiver) {
   PROLOGUE_1("debug_info", receiver);
   ASSERT_RECEIVER;
-  return methodOop(receiver)->debugInfo();
+  // used for file out only (Method>>fileOutDebugInfo:): bcis of the external code layout
+  return methodOop(receiver)->fileout_debug_info();
 }
 
 PRIM_DECL_1(methodOopPrimitives::size_and_flags, oop receiver) {
   PROLOGUE_1("size_and_flags", receiver);
   ASSERT_RECEIVER;
-  return methodOop(receiver)->size_and_flags();
+  // used for file out only (Method>>fileOutSizeAndFlags): the size of the external code layout
+  return methodOop(receiver)->fileout_size_and_flags();
 }
 
 PRIM_DECL_1(methodOopPrimitives::fileout_body, oop receiver) {
@@ -163,7 +214,8 @@ PRIM_DECL_6(methodOopPrimitives::constructMethod, oop selector_or_method, oop fl
   if (!oops->is_objArray())
     return markSymbol(vmSymbols::sixth_argument_has_wrong_type());
 
-  if (objArrayOop(oops)->length() * oopSize != byteArrayOop(bytes)->length()) {
+  // the byte codes come in the external layout (4-byte operand slots), see bytecodeTranscoder.hpp
+  if (objArrayOop(oops)->length() * external_bytecode_word_size != byteArrayOop(bytes)->length()) {
 	return markSymbol(vmSymbols::method_construction_failed());
   }
 

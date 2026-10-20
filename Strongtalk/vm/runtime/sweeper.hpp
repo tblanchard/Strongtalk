@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_SWEEPER_HPP_HPP
+#define VM_RUNTIME_SWEEPER_HPP_HPP
 
 // This is where the dirty work takes places.
 
@@ -61,7 +63,7 @@ class Sweeper : public CHeapObj {
   virtual void  activate();
   virtual void  deactivate();
   virtual int   interval() const = 0;
-  virtual char* name()     const = 0;
+  virtual const char* name()     const = 0;
  public:
   Sweeper();
   virtual void task() = 0;
@@ -76,7 +78,7 @@ class HeapSweeper : public Sweeper {
   void  task();
   void  activate();
   int   interval() const { return HeapSweeperInterval; }
-  char* name()     const { return "HeapSweeper"; }
+  const char* name()     const { return "HeapSweeper"; }
 };
 
 class CodeSweeper : public Sweeper {
@@ -106,7 +108,7 @@ class MethodSweeper : public CodeSweeper {
   int   method_dict_task(objArrayOop methods);
   int   klass_task(klassOop klass);
   void  activate();
-  char* name()     const { return "MethodSweeper"; }
+  const char* name()     const { return "MethodSweeper"; }
   friend class Recompilation;
 };
 
@@ -123,5 +125,8 @@ class ZoneSweeper : public CodeSweeper {
   void  nmethod_task(nmethod* nm);
   void  task();
   void  activate();
-  char* name()     const { return "ZoneSweeper"; }
+  const char* name()     const { return "ZoneSweeper"; }
 };
+
+
+#endif // VM_RUNTIME_SWEEPER_HPP_HPP

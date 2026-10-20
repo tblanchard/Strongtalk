@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_UTILITIES_OBJECTIDTABLE_HPP_HPP
+#define VM_UTILITIES_OBJECTIDTABLE_HPP_HPP
 
 class objectIDTable : AllStatic {
  private:
@@ -33,3 +35,6 @@ class objectIDTable : AllStatic {
   static void cleanup_after_bootstrap();
 };
 
+
+
+#endif // VM_UTILITIES_OBJECTIDTABLE_HPP_HPP

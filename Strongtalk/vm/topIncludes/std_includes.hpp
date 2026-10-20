@@ -20,9 +20,14 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_TOPINCLUDES_STD_INCLUDES_HPP_HPP
+#define VM_TOPINCLUDES_STD_INCLUDES_HPP_HPP
 
 
 #include <stddef.h> 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+
+
+#endif // VM_TOPINCLUDES_STD_INCLUDES_HPP_HPP

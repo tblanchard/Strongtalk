@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_VMOPERATIONS_HPP_HPP
+#define VM_RUNTIME_VMOPERATIONS_HPP_HPP
 
 // The following classes are used for operations
 // initiated by a delta process but must
@@ -39,9 +41,9 @@ class VM_Operation : public PrintableStackObj {
    void evaluate();
    // Evaluate is called in the vmProcess
    virtual void doit() = 0;
-   void print() { std->print("%s", name()); }
+   void print() { stdOut->print("%s", name()); }
 
-   virtual char* name() { return "vanilla"; }
+   virtual const char* name() { return "vanilla"; }
 };
 
 class VM_Scavenge : public VM_Operation {
@@ -52,7 +54,7 @@ class VM_Scavenge : public VM_Operation {
   VM_Scavenge(oop* addr) 	{ this->addr = addr; }
   void doit();
 
-  char* name() { return "scavenge"; }
+  const char* name() { return "scavenge"; }
 };
 
 class VM_Genesis : public VM_Operation {
@@ -60,7 +62,7 @@ class VM_Genesis : public VM_Operation {
   VM_Genesis();
   void doit();
 
-  char* name() { return "genesis"; }
+  const char* name() { return "genesis"; }
 };
 
 class VM_GarbageCollect : public VM_Operation {
@@ -71,7 +73,7 @@ class VM_GarbageCollect : public VM_Operation {
   VM_GarbageCollect(oop* addr) 		{ this->addr = addr; }
   void doit();
 
-  char* name() { return "terminate process"; }
+  const char* name() { return "terminate process"; }
 };
 
 class VM_TerminateProcess : public VM_Operation {
@@ -81,7 +83,7 @@ class VM_TerminateProcess : public VM_Operation {
   VM_TerminateProcess(DeltaProcess* target) { this->target = target; }
   void doit();
 
-  char* name() { return "terminate process"; }
+  const char* name() { return "terminate process"; }
 };
 
 
@@ -89,10 +91,12 @@ class VM_DeoptimizeStacks : public VM_Operation {
  public:
   void doit();
 
-  char* name() { return "deoptimize stacks"; }
+  const char* name() { return "deoptimize stacks"; }
 };
 
 # ifdef DELTA_COMPILER
+
+#include "../lookup/key.hpp"
 
 class VM_OptimizeMethod : public VM_Operation {
  private:
@@ -106,7 +110,7 @@ class VM_OptimizeMethod : public VM_Operation {
   nmethod* result() const 	{ return _nm; }
   void doit();
 
-  char* name() { return "optimize method"; }
+  const char* name() { return "optimize method"; }
 };
 
 class VM_OptimizeRScope : public VM_Operation {
@@ -120,7 +124,7 @@ class VM_OptimizeRScope : public VM_Operation {
   nmethod* result() const 	{ return _nm; }
   void doit();
 
-  char* name() { return "optimize rscope"; }
+  const char* name() { return "optimize rscope"; }
 };
 
 class VM_OptimizeBlockMethod : public VM_Operation {
@@ -136,7 +140,10 @@ class VM_OptimizeBlockMethod : public VM_Operation {
   void doit();
   nmethod* method() const 	{ return nm; }
 
-  char* name() { return "optimize block method"; }
+  const char* name() { return "optimize block method"; }
 };
 
 # endif
+
+
+#endif // VM_RUNTIME_VMOPERATIONS_HPP_HPP

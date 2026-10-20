@@ -20,7 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_FLOATS_HPP_HPP
+#define VM_INTERPRETER_FLOATS_HPP_HPP
 
+#include "assembler.hpp"
+#include "smiOop.hpp"
 // Floats describes the floating point operations of the interpreter
 // and implements stub routines used to execute this operations.
 // Note: The Floats stub routines are *inside* the interpreter code.
@@ -109,3 +113,5 @@ class Floats: AllStatic {
   static void  init(MacroAssembler* masm);
   static void  print();
 };
+
+#endif // VM_INTERPRETER_FLOATS_HPP_HPP

@@ -21,8 +21,42 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_ostream.cpp.incl"
+
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "oopFactory.hpp"
+#include <stdio.h>
 
 outputStream::outputStream(int width) {
   _width       = width;
@@ -30,14 +64,14 @@ outputStream::outputStream(int width) {
   _indentation = 0;
 }
 
-void outputStream::basic_print(char* str) {
-  int len = strlen(str);
+void outputStream::basic_print(const char* str) {
+  auto len = strlen(str);
   for (int i = 0; i < len; i++) put(str[i]);
 }
 
 #define BUFLEN 2000   /* max size of output of individual print() methods */
 
-void outputStream::print(char* format, ...) {
+void outputStream::print(const char* format, ...) {
   char buffer[BUFLEN];
   va_list ap;
   va_start(ap, format);
@@ -49,7 +83,7 @@ void outputStream::print(char* format, ...) {
   basic_print(buffer);
 }
 
-void outputStream::print_cr(char* format, ...) {
+void outputStream::print_cr(const char* format, ...) {
   char buffer[BUFLEN];
   va_list ap;
   va_start(ap, format);
@@ -66,7 +100,7 @@ void outputStream::vprint(const char *format, va_list argptr) {
   char buffer[BUFLEN];
   if (_vsnprintf(buffer, BUFLEN, format, argptr) < 0) {
     warning("increase BUFLEN in ostream.cpp -- output truncated");
-    buffer[BUFLEN] = 0;
+    buffer[BUFLEN-1] = 0;
   }
   basic_print(buffer);
 }
@@ -135,7 +169,7 @@ byteArrayOop stringStream::as_byteArray() {
   return a;
 }
 
-fileStream::fileStream(char* file_name) {
+fileStream::fileStream(const char* file_name) {
   _file = fopen(file_name, "w");
 }
 
@@ -149,12 +183,12 @@ fileStream::~fileStream() {
   _file = NULL;
 }
 
-outputStream* std;
+outputStream* stdOut;
 outputStream* err;
 
 void ostream_init() {
-  std = new(true) outputStream();   // NB: this stream is allocated on the C heap
-  err = std;
+  stdOut = new(true) outputStream();   // NB: this stream is allocated on the C heap
+  err = stdOut;
 }
 
 

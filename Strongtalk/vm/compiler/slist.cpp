@@ -21,11 +21,21 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "slist.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_slist.cpp.incl"
   
 GenericSListElem* GenericSList::findL(void* p) const {
   for (GenericSListElem* e = headL(); e; e = e->nextL()) {
@@ -73,7 +83,8 @@ void GenericSList::removeAfterL(GenericSListElem* e) {
 
 void GenericSList::removeL(void* p) {
   GenericSListElem* prev = NULL;
-  for (GenericSListElem* e = headL(); e && e->dataL() != p;
+  GenericSListElem* e;
+  for (e = headL(); e && e->dataL() != p;
        prev = e, e = e->nextL()) ;
   if (e == NULL) fatal("not in list");
   removeAfterL(prev);

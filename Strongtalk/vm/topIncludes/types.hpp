@@ -13,7 +13,7 @@ following conditions are met:
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT 
 NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
-THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES 
 (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
 INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
 OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
@@ -21,29 +21,28 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-
+#ifndef types_hpp
+#define types_hpp
 
 // This file contains some global types, plus many partial definitions
 // to reduce include file dependencies.  (If foo.h contains a bar* and
 // struct bar is defined here, foo.h need not depend on bar.h.)
 
 #define SYSTEM_NAME "strongtalk"
+#ifndef DELTA_COMPILER
+#define DELTA_COMPILER
+#endif
+
+// Forward declarations first, so headers included below can use pointer types.
+#include "oopsHierarchy.hpp"
 
 class bootstrap;
 
-// most portable way of dealing with bools is to treat them as ints;
-// the new basic bool type isn't goodness.
-typedef int _bool_type_;
-#define bool _bool_type_
+#include "tag.hpp"
 
-typedef int smi;
+#include <stdint.h>
+#include <sys/types.h>
 
-typedef unsigned char  u_char;
-typedef unsigned short doubleByte;
-typedef unsigned short uint16;
-typedef unsigned short u_short;
-typedef          short int16;
-typedef unsigned long  uint32;
 
 class  universe;
 class  space;
@@ -245,4 +244,9 @@ class outputStream;
 
 class StackChunkBuilder;
 
-#endif
+#endif // DELTA_COMPILER
+
+#include "oop.hpp"
+#include "memOop.hpp"
+
+#endif // types_hpp

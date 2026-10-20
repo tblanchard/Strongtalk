@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_OBJARRAY_PRIMS_HPP_HPP
+#define VM_PRIMS_OBJARRAY_PRIMS_HPP_HPP
 
 // Primitives for obj arrays
 
@@ -103,3 +105,6 @@ class objArrayPrimitives : AllStatic {
 
 };
 
+
+
+#endif // VM_PRIMS_OBJARRAY_PRIMS_HPP_HPP

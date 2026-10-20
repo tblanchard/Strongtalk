@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_DVALUEARRAYKLASS_HPP_HPP
+#define VM_OOPS_DVALUEARRAYKLASS_HPP_HPP
 
+void set_doubleValueArrayKlass_vtbl(Klass* k);
 class doubleValueArrayKlass: public memOopKlass {
  public:
   // allocation properties
@@ -46,7 +49,7 @@ class doubleValueArrayKlass: public memOopKlass {
 
   friend void set_doubleValueArrayKlass_vtbl(Klass* k);
 
-  char* name() const { return "doubleValueArray"; }
+  const char* name() const { return "doubleValueArray"; }
 
  // ALL FUNCTIONS BELOW THIS POINT ARE DISPATCHED FROM AN OOP 
  public:
@@ -69,3 +72,6 @@ class doubleValueArrayKlass: public memOopKlass {
   bool oop_is_doubleValueArray() const { return true; }
   bool oop_is_indexable() const        { return true; }
 };
+
+
+#endif // VM_OOPS_DVALUEARRAYKLASS_HPP_HPP

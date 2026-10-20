@@ -21,12 +21,26 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_bytecodes.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "disclaimer.hpp"
+#include "bytecodes.hpp"
+#include "debug.hpp"
+#include "floats.hpp"
 char*			Bytecodes::_entry_point[number_of_codes];
-char*			Bytecodes::_name[number_of_codes];
+const char*		Bytecodes::_name[number_of_codes];
 Bytecodes::Format	Bytecodes::_format[number_of_codes];
 Bytecodes::CodeType     Bytecodes::_code_type[number_of_codes];
 Bytecodes::ArgumentSpec	Bytecodes::_argument_spec[number_of_codes];
@@ -40,18 +54,18 @@ void Bytecodes::def(Code code) {
 }
 
   
-void Bytecodes::def(Code code, char* name, Format format, CodeType code_type, bool single_step, bool pop_tos) {
+void Bytecodes::def(Code code, const char* name, Format format, CodeType code_type, bool single_step, bool pop_tos) {
   def(code, name, format, code_type, single_step, no_args, no_send, pop_tos);
 }
 
 
-void Bytecodes::def(Code code, char* name, Format format, ArgumentSpec argument_spec, SendType send_type, bool pop_tos) {
+void Bytecodes::def(Code code, const char* name, Format format, ArgumentSpec argument_spec, SendType send_type, bool pop_tos) {
   assert(send_type != no_send, "must be a send");
   def(code, name, format, message_send, true, argument_spec, send_type, pop_tos);
 }
 
 
-void Bytecodes::def(Code code, char* name, Format format, CodeType code_type, bool single_step, ArgumentSpec argument_spec, SendType send_type, bool pop_tos) {
+void Bytecodes::def(Code code, const char* name, Format format, CodeType code_type, bool single_step, ArgumentSpec argument_spec, SendType send_type, bool pop_tos) {
   assert(0 <= code && code < number_of_codes, "out of bounds");
   assert(_name[code] == NULL, "bytecode defined twice");
 
@@ -840,10 +854,10 @@ void Bytecodes::print() {
   for (int i = 0; i < number_of_codes; i++) {
     Code code = Code(i);
     if (is_defined(code)) {
-      std->print("%s\n", name(code));
-      std->print("  %s\n", code_type_as_string(code_type(code)));
-      std->print("  %s\n", send_type_as_string(send_type(code)));
-      std->cr();
+      stdOut->print("%s\n", name(code));
+      stdOut->print("  %s\n", code_type_as_string(code_type(code)));
+      stdOut->print("  %s\n", send_type_as_string(send_type(code)));
+      stdOut->cr();
     }
   }
 }
@@ -854,10 +868,10 @@ void Bytecodes::print() {
 #ifndef PRODUCT
 
 static void generate_comment() {
-  std->print("\t\"\n");
-  std->print("\tGenerated method - do not modify manually\n");
-  std->print("\t(use delta +GenerateSmalltalk to generate).\n");
-  std->print("\t\"\n");
+  stdOut->print("\t\"\n");
+  stdOut->print("\tGenerated method - do not modify manually\n");
+  stdOut->print("\t(use delta +GenerateSmalltalk to generate).\n");
+  stdOut->print("\t\"\n");
 }
 
 
@@ -872,34 +886,34 @@ static bool actually_generated(Bytecodes::Code code) {
 
 
 static void generate_instr_method() {
-  std->print("instr: i\n");
+  stdOut->print("instr: i\n");
   generate_comment();
-  std->print("\t| h l |\n");
-  std->print("\th := i // 16r10.\n");
-  std->print("\tl := i \\\\ 16r10.\n\n");
+  stdOut->print("\t| h l |\n");
+  stdOut->print("\th := i // 16r10.\n");
+  stdOut->print("\tl := i \\\\ 16r10.\n\n");
   for (int h = 0; h < 0x10; h++) {
-    std->print("\th = 16r%X ifTrue: [\n", h);
+    stdOut->print("\th = 16r%X ifTrue: [\n", h);
     for (int l = 0; l < 0x10; l++) {
       Bytecodes::Code code = Bytecodes::Code(h*0x10 + l);
       if (actually_generated(code)) {
-        std->print("\t\tl = 16r%X\tifTrue:\t[ ^ '%s' ].\n", l, Bytecodes::name(code));
+        stdOut->print("\t\tl = 16r%X\tifTrue:\t[ ^ '%s' ].\n", l, Bytecodes::name(code));
       }
     }
-    std->print("\t\t^ ''\n");
-    std->print("\t].\n\n");
+    stdOut->print("\t\t^ ''\n");
+    stdOut->print("\t].\n\n");
   }
-  std->print("\tself halt\n");
-  std->print("!\n\n");
+  stdOut->print("\tself halt\n");
+  stdOut->print("!\n\n");
 }
 
 
 static void print_table_entry_for(char* selector, int code) {
-  std->print("\tselector = #%s\t\tifTrue: [ ^ 16r%02X ].\n", selector, code);
+  stdOut->print("\tselector = #%s\t\tifTrue: [ ^ 16r%02X ].\n", selector, code);
 }
 
 
 static void generate_codeForPrimitive_method() {
-  std->print("codeForPrimitive: selector\n");
+  stdOut->print("codeForPrimitive: selector\n");
   generate_comment();
   print_table_entry_for("primitiveAdd:ifFail:",			Bytecodes::smi_add		);
   print_table_entry_for("primitiveSubtract:ifFail:",		Bytecodes::smi_sub		);
@@ -916,8 +930,8 @@ static void generate_codeForPrimitive_method() {
   print_table_entry_for("primitiveBitOr:ifFail:",		Bytecodes::smi_or		);
   print_table_entry_for("primitiveBitXor:ifFail:",		Bytecodes::smi_xor		);
   print_table_entry_for("primitiveRawBitShift:ifFail:",		Bytecodes::smi_shift		);
-  std->print("\t^ nil\n");
-  std->print("!\n\n");
+  stdOut->print("\t^ nil\n");
+  stdOut->print("!\n\n");
 }
 
 
@@ -928,12 +942,12 @@ static void generate_signature(char* sig, char separator) {
   int o_cnt = 1;
   int s_cnt = 1;
   while (sig[i] != '\0') {
-    std->put(separator);
+    stdOut->put(separator);
     switch (sig[i]) {
-      case 'B': std->print("byte: b%d", b_cnt++); break;
-      case 'L': std->print("word: w%d", w_cnt++); break;
-      case 'O': std->print("oop: o%d", o_cnt++); break;
-      case 'S': std->print("bytes: s%d", s_cnt++); break;
+      case 'B': stdOut->print("byte: b%d", b_cnt++); break;
+      case 'L': stdOut->print("word: w%d", w_cnt++); break;
+      case 'O': stdOut->print("oop: o%d", o_cnt++); break;
+      case 'S': stdOut->print("bytes: s%d", s_cnt++); break;
       default : ShouldNotReachHere();
     }
     separator = ' ';
@@ -959,30 +973,30 @@ static bool has_inline_cache(Bytecodes::Code code) {
 
 static void generate_gen_method(Bytecodes::Code code) {
   char* sig = Bytecodes::format_as_string(Bytecodes::format(code));
-  std->print(Bytecodes::name(code));
+  stdOut->print(Bytecodes::name(code));
   generate_signature(sig, '_');
-  std->cr();
+  stdOut->cr();
   generate_comment();
-  std->print("\tself byte: 16r%02X", code);
+  stdOut->print("\tself byte: 16r%02X", code);
   generate_signature(sig, ' ');
-  std->print(".\n");
-  if (has_instVar_access (code)) std->print("\tself has_instVar_access.\n");
-  if (has_classVar_access(code)) std->print("\tself has_classVar_access.\n");
-  if (has_inline_cache   (code)) std->print("\tself has_inline_cache.\n");
-  std->print("!\n\n");
+  stdOut->print(".\n");
+  if (has_instVar_access (code)) stdOut->print("\tself has_instVar_access.\n");
+  if (has_classVar_access(code)) stdOut->print("\tself has_classVar_access.\n");
+  if (has_inline_cache   (code)) stdOut->print("\tself has_inline_cache.\n");
+  stdOut->print("!\n\n");
 }
 
 
 static void generate_float_function_constant_method(Floats::Function f) {
-  std->print("float_%s\n", Floats::function_name_for(f));
+  stdOut->print("float_%s\n", Floats::function_name_for(f));
   generate_comment();
-  std->print("\t^ %d\n", f);
-  std->print("!\n\n");
+  stdOut->print("\t^ %d\n", f);
+  stdOut->print("!\n\n");
 }
 
 
 static void generate_HCode_methods() {
-  std->print("!DeltaHCode methods !\n\n");
+  stdOut->print("!DeltaHCode methods !\n\n");
 
   generate_instr_method();
   generate_codeForPrimitive_method();
@@ -999,7 +1013,7 @@ static void generate_HCode_methods() {
     generate_float_function_constant_method(f);
   }
 
-  std->print("!\n\n");
+  stdOut->print("!\n\n");
 }
 
 
@@ -1009,13 +1023,13 @@ class Markup: StackObj {
  private:
   char* _tag;
  public:
-  Markup(char* tag)	{ _tag = tag; std->print("<%s>\n", _tag); }
-  ~Markup()		{ std->print("</%s>\n", _tag); }
+  Markup(char* tag)	{ _tag = tag; stdOut->print("<%s>\n", _tag); }
+  ~Markup()		{ stdOut->print("</%s>\n", _tag); }
 };
 
 
 static void markup(char* tag, char* text) {
-  std->print("<%s>%s</%s>\n", tag, text, tag);
+  stdOut->print("<%s>%s</%s>\n", tag, text, tag);
 }
 
 
@@ -1023,10 +1037,10 @@ static void print_format(Bytecodes::Format format) {
   char* f = Bytecodes::format_as_string(format);
   while (*f) {
     switch (*f) {
-      case 'B': std->print(" byte");	break;
-      case 'L': std->print(" long");	break;
-      case 'O': std->print(" oop");	break;
-      case 'S': std->print(" {byte}");	break;
+      case 'B': stdOut->print(" byte");	break;
+      case 'L': stdOut->print(" long");	break;
+      case 'O': stdOut->print(" oop");	break;
+      case 'S': stdOut->print(" {byte}");	break;
       default : ShouldNotReachHere();	break;
     }
     f++;
@@ -1048,43 +1062,43 @@ static char* arguments_as_string(Bytecodes::ArgumentSpec spec) {
 
 
 static void generate_HTML_for(Bytecodes::Code code) {
-  std->print("<TD>%02X<SUB>H</SUB><TD><B>%s</B><TD>", int(code), Bytecodes::name(code));
+  stdOut->print("<TD>%02X<SUB>H</SUB><TD><B>%s</B><TD>", int(code), Bytecodes::name(code));
   print_format(Bytecodes::format(code));
-  std->print("<TD>%s", Bytecodes::single_step(code) ? "intercepted" : "");
+  stdOut->print("<TD>%s", Bytecodes::single_step(code) ? "intercepted" : "");
   if (Bytecodes::code_type(code) == Bytecodes::message_send) {
-    std->print("<TD>%s", Bytecodes::send_type_as_string(Bytecodes::send_type(code)));
-    std->print("<TD>%s", arguments_as_string(Bytecodes::argument_spec(code)));
+    stdOut->print("<TD>%s", Bytecodes::send_type_as_string(Bytecodes::send_type(code)));
+    stdOut->print("<TD>%s", arguments_as_string(Bytecodes::argument_spec(code)));
   }
-  std->print("<TR>\n");
+  stdOut->print("<TR>\n");
 }
 
 
 static void generate_HTML_for(Bytecodes::CodeType type) {
   { Markup tag("H3");
-    std->print("%s bytecodes\n", Bytecodes::code_type_as_string(type));
+    stdOut->print("%s bytecodes\n", Bytecodes::code_type_as_string(type));
   }
   { Markup tag("TABLE");
-    std->print("<TH>Code<TH>Name<TH>Format<TH>Single step");
-    if (type == Bytecodes::message_send) std->print("<TH>Send type<TH>Arguments");
-    std->print("<TR>\n");
+    stdOut->print("<TH>Code<TH>Name<TH>Format<TH>Single step");
+    if (type == Bytecodes::message_send) stdOut->print("<TH>Send type<TH>Arguments");
+    stdOut->print("<TR>\n");
     for (int i = 0; i < Bytecodes::number_of_codes; i++) {
       Bytecodes::Code code = Bytecodes::Code(i);
       if (Bytecodes::is_defined(code) && Bytecodes::code_type(code) == type) generate_HTML_for(code);
     }
   }
-  std->print("<HR>\n");
+  stdOut->print("<HR>\n");
 }
 
 
 static void generate_HTML_docu() {
   Markup tag("HTML");
-  std->print("<!-- do not modify - use delta +GenerateHTML to generate -->\n");
+  stdOut->print("<!-- do not modify - use delta +GenerateHTML to generate -->\n");
   { Markup tag("HEAD");
     markup("TITLE", "Delta Bytecodes");
   }
   { Markup tag("BODY");
     { Markup tag("H2");
-      std->print("Delta Bytecodes (Version %d)\n", Bytecodes::version());
+      stdOut->print("Delta Bytecodes (Version %d)\n", Bytecodes::version());
     }
     for (int i = 0; i < Bytecodes::number_of_code_types; i++) generate_HTML_for(Bytecodes::CodeType(i));
   }

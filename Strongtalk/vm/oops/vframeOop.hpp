@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_VFRAMEOOP_HPP_HPP
+#define VM_OOPS_VFRAMEOOP_HPP_HPP
 
 
 // vframe objects are handles to process activations.
@@ -31,6 +33,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 //    [index       ]
 //    [timestamp   ]
 
+vframeOop as_vframeOop(void* p);
 class vframeOopDesc: public memOopDesc {
  private:
   processOop _process;
@@ -65,3 +68,6 @@ class vframeOopDesc: public memOopDesc {
 
 
 ;
+
+
+#endif // VM_OOPS_VFRAMEOOP_HPP_HPP

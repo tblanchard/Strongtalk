@@ -20,10 +20,14 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_SYMBOLOOP_HPP_HPP
+#define VM_OOPS_SYMBOLOOP_HPP_HPP
 
 
+#include "byteArrayOop.hpp"
 // symbols are immutable, canonicalized byteArrays.
 
+symbolOop as_symbolOop(void* p);
 class symbolOopDesc: public byteArrayOopDesc {
  public:
   // constructor
@@ -35,3 +39,6 @@ class symbolOopDesc: public byteArrayOopDesc {
   bool verify();
   void print_symbol_on(outputStream* st = NULL);
 };
+
+
+#endif // VM_OOPS_SYMBOLOOP_HPP_HPP

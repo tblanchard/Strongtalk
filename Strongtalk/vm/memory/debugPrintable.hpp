@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_DEBUGPRINTABLE_HPP_HPP
+#define VM_MEMORY_DEBUGPRINTABLE_HPP_HPP
 
 // these printing functions are conveniently called from the debugger
 
@@ -34,3 +36,6 @@ extern "C" {
 #endif
 }
 
+
+
+#endif // VM_MEMORY_DEBUGPRINTABLE_HPP_HPP

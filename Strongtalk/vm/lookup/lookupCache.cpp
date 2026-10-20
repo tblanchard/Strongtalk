@@ -21,9 +21,75 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_lookupCache.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "inliningdb.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "timer.hpp"
+#include "sweeper.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "frame.hpp"
+#include "vmOperations.hpp"
+#include "compiler.hpp"
 int lookupCache::number_of_primary_hits;
 int lookupCache::number_of_secondary_hits;
 int lookupCache::number_of_misses;
@@ -49,6 +115,11 @@ jumpTableEntry* LookupResult::entry() const {
 nmethod* LookupResult::get_nmethod() const {
   jumpTableEntry* e = entry();
   return e ? e->method() : NULL;
+}
+
+void LookupResult::set(nmethod* nm) {
+  assert(oop(nm)->is_smi(), "nmethod must be aligned");
+  _result = oop(nm->jump_table_entry()->entry_point());
 }
 
 bool LookupResult::matches(methodOop m) const {
@@ -89,17 +160,17 @@ class cacheElement : ValueObj {
   void verify() {
     if (key.klass() || key.selector_or_method()) {
       if (result.is_empty()) {
-         std->print("Verify failed in lookupCache: ");
-	 std->cr();
-	 std->print("  element = (");
-	 key.klass()->print_value_on(std);
-         std->print("::");
-         key.selector_or_method()->print_value_on(std);
-         std->print(")");
-         std->cr();
-	 std->print("  result = ("); 
-         result.print_on(std);
-         std->print_cr(")");
+         stdOut->print("Verify failed in lookupCache: ");
+	 stdOut->cr();
+	 stdOut->print("  element = (");
+	 key.klass()->print_value_on(stdOut);
+         stdOut->print("::");
+         key.selector_or_method()->print_value_on(stdOut);
+         stdOut->print(")");
+         stdOut->cr();
+	 stdOut->print("  result = ("); 
+         result.print_on(stdOut);
+         stdOut->print_cr(")");
 	 fatal("lookupCache verify failed");
       }
       nmethod* nm = Universe::code->lookup(&key);
@@ -129,8 +200,8 @@ class cacheElement : ValueObj {
 static cacheElement primary[primary_cache_size];
 static cacheElement secondary[secondary_cache_size];
 
-int lookupCache::primary_cache_address()	{ return int(&primary[0]); }
-int lookupCache::secondary_cache_address()	{ return int(&secondary[0]); }
+intptr_t lookupCache::primary_cache_address()	{ return intptr_t(&primary[0]); }
+intptr_t lookupCache::secondary_cache_address()	{ return intptr_t(&secondary[0]); }
 
 void lookupCache::flush() {
   int index;
@@ -177,8 +248,8 @@ void lookupCache::verify() {
 
 inline unsigned int lookupCache::hash_value(LookupKey* key) {
   return 
-    ((unsigned int) key->klass() ^ (unsigned int) key->selector_or_method()) 
-    / sizeof(cacheElement);
+    (unsigned int) (((uintptr_t) key->klass() ^ (uintptr_t) key->selector_or_method()) 
+    / sizeof(cacheElement));
 }
 
 inline LookupResult lookupCache::lookup_probe(LookupKey* key) {
@@ -277,9 +348,9 @@ LookupResult lookupCache::cache_miss_lookup(LookupKey* key, bool compile) {
     RScope* rs = InliningDatabase::lookup_and_remove(key);
     if (rs) {
       if (TraceInliningDatabase) {
-        std->print("ID compile: ");
+        stdOut->print("ID compile: ");
 	key->print();
-	std->cr();
+	stdOut->cr();
       }
 
       // Remove old nmethod if present

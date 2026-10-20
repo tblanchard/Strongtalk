@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_LOOKUP_LOOKUPCACHE_HPP_HPP
+#define VM_LOOKUP_LOOKUPCACHE_HPP_HPP
 
 // The lookup cache is a 2-way associative cache mapping LookupKeys into LookupResult.
 // Called when the inline cache fails or when a compile takes place.
@@ -65,10 +67,7 @@ class LookupResult: ValueObj {
     _result = oop(method);
   }
 
-  void set(nmethod* nm) {
-    assert(oop(nm)->is_smi(), "nmethod must be aligned");
-    _result = oop(nm->jump_table_entry()->entry_point());
-  }
+  void set(nmethod* nm); // nmethod is incomplete here; defined in lookupCache.cpp
 
   void print_on(outputStream* st) const;
   void print_short_on(outputStream* st) const;
@@ -78,10 +77,13 @@ class LookupResult: ValueObj {
 const unsigned int primary_cache_size   = 16 * K;
 const unsigned int secondary_cache_size =  2 * K;
 
+LookupResult interpreter_normal_lookup(klassOop receiver_klass, symbolOop selector);
+LookupResult interpreter_super_lookup(symbolOop selector);
+
 class lookupCache : AllStatic {
  private:
-  static int primary_cache_address();
-  static int secondary_cache_address();
+  static intptr_t primary_cache_address();
+  static intptr_t secondary_cache_address();
 
   static unsigned int hash_value(LookupKey* key);
   static int number_of_primary_hits;
@@ -131,3 +133,6 @@ class lookupCache : AllStatic {
   friend class StubRoutines;
   friend class debugPrimitives;
 };
+
+
+#endif // VM_LOOKUP_LOOKUPCACHE_HPP_HPP

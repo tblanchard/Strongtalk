@@ -21,8 +21,53 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_byteArrayOop.cpp.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "dByteArrayOop.hpp"
+#include "bootstrap.hpp"
+#include "symbolOop.hpp"
+#include "ageTable.hpp"
+#include "shell.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "symbolTable.hpp"
+#include "byteArrayKlass.hpp"
+#include "symbolKlass.hpp"
+#include "abort.hpp"
 # include <string.h>
 # include <errno.h>
 
@@ -137,12 +182,15 @@ inline int compare_as_bytes(const unsigned char* a, const unsigned char* b) {
 
 int byteArrayOopDesc::compare(byteArrayOop arg) {
   // Get the addresses of the length fields
-  const unsigned int* a = (unsigned int*) length_addr();
-  const unsigned int* b = (unsigned int*) arg->length_addr();
+  // (the length field is a smiOop word; the bodies are compared in 32-bit chunks)
+  const oop* a_length = (const oop*) length_addr();
+  const oop* b_length = (const oop*) arg->length_addr();
+  const unsigned int* a = (const unsigned int*) (a_length + 1);
+  const unsigned int* b = (const unsigned int*) (b_length + 1);
 
-  // Get the word sizes of the arays
-  int a_size = roundTo(smiOop(*a++)->value() * sizeof(char), sizeof(int)) / sizeof(int);
-  int b_size = roundTo(smiOop(*b++)->value() * sizeof(char), sizeof(int)) / sizeof(int);
+  // Get the 32-bit chunk sizes of the arrays
+  int a_size = (int) (roundTo(smiOop(*a_length)->value() * sizeof(char), sizeof(int)) / sizeof(int));
+  int b_size = (int) (roundTo(smiOop(*b_length)->value() * sizeof(char), sizeof(int)) / sizeof(int));
 
   const unsigned int* a_end = a + min(a_size, b_size);
   while(a < a_end) {
@@ -189,7 +237,8 @@ int byteArrayOopDesc::hash_value() {
 char* byteArrayOopDesc::as_string() {
   int len = length();
   char* str = NEW_RESOURCE_ARRAY(char, len+1);
-  for (int index = 0; index <len; index++) {
+  int index;
+  for (index = 0; index <len; index++) {
     str[index] = byte_at(index+1);
   }
   str[index] = '\0';

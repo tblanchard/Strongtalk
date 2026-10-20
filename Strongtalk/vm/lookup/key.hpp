@@ -20,6 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_LOOKUP_KEY_HPP_HPP
+#define VM_LOOKUP_KEY_HPP_HPP
+
+#include "methodOop.hpp"
 
 // LookupKeys are the keys into the code table.  
 // There should be at most one compiled method for a given LookupKey.
@@ -103,3 +107,6 @@ class LookupKey : ValueObj {
   static LookupKey* allocate(klassOop klass, oop selector_or_method);
 };
 
+
+
+#endif // VM_LOOKUP_KEY_HPP_HPP

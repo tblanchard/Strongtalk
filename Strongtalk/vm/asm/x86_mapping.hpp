@@ -20,6 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_ASM_X86_MAPPING_HPP_HPP
+#define VM_ASM_X86_MAPPING_HPP_HPP
+
+#include "assembler.hpp"
+#include "location.hpp"
+#include "frame.hpp"
 
 # ifdef DELTA_COMPILER
 
@@ -28,9 +34,7 @@ const int nofArgRegisters	= 0;			// max. number of arguments (excl. receiver) pa
 const int nofLocalRegisters	= 3;			// max. number of temporaries allocated in registers
 
 
-// Temporaries on the stack
-const int first_temp_offset	= -1;			// offset of first temporary relative to ebp if there are no floats
-const int first_float_offset	= -4;			// offset of first float relative to 8byte aligned ebp value (= base)
+// Temporaries on the stack: first_temp_offset and first_float_offset are defined in frame.hpp
 
 
 // Mapping specifies the x86 architecture specific constants and
@@ -121,3 +125,6 @@ const Register temp3		= edx;
 
 
 # endif
+
+
+#endif // VM_ASM_X86_MAPPING_HPP_HPP

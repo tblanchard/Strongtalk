@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_PROXYOOP_HPP_HPP
+#define VM_OOPS_PROXYOOP_HPP_HPP
 
 
 // proxy objects are handles to external data.
@@ -32,6 +34,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 const int pointer_no     = sizeof(memOopDesc)/oopSize;
 const int pointer_offset = sizeof(memOopDesc) - Mem_Tag;
 
+proxyOop as_proxyOop(void* p);
 class proxyOopDesc: public memOopDesc {
  private:
   void* _pointer;
@@ -52,7 +55,7 @@ class proxyOopDesc: public memOopDesc {
   bool is_null() const    { return get_pointer() ==       NULL; }
   bool is_allOnes() const { return get_pointer() == (void*) -1; }
 
-  smi foreign_hash() const { return smi(get_pointer()) >> Tag_Size; }
+  smi foreign_hash() const { return smi((long)get_pointer()) >> Tag_Size; }
 
   bool same_pointer_as(proxyOop x) const {
     return get_pointer() == x->get_pointer();
@@ -100,3 +103,6 @@ class proxyOopDesc: public memOopDesc {
 
   friend proxyKlass;
 };
+
+
+#endif // VM_OOPS_PROXYOOP_HPP_HPP

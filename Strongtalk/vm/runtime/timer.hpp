@@ -20,8 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_TIMER_HPP_HPP
+#define VM_RUNTIME_TIMER_HPP_HPP
 
 
+#include "longInt.hpp"
 // Timers for simple measurements
 
 class timer {
@@ -75,7 +78,10 @@ class TraceTime {
   bool   active;
   elapsedTimer t;
  public:
-  TraceTime(char* title, bool doit = true);
+  TraceTime(const char* title, bool doit = true);
   ~TraceTime();
 };
 
+
+
+#endif // VM_RUNTIME_TIMER_HPP_HPP

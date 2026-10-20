@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_METHODPRINTER_HPP_HPP
+#define VM_INTERPRETER_METHODPRINTER_HPP_HPP
 
 // MethodPrinter dumps, on the console, all byte-codes of a method.
 // In addition blocks contained in the method are dumped at the
@@ -31,7 +33,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 class MethodPrinterClosure: public MethodClosure {
  private:
    outputStream*  st;
-   void MethodPrinterClosure::print_sendtype(Bytecodes::SendType type);
+   void print_sendtype(Bytecodes::SendType type);
    void show(char* str);
    void indent();
  public:
@@ -88,3 +90,6 @@ class MethodPrinterClosure: public MethodClosure {
   void float_unaryToOop(Floats::Function f, int tof);
   void float_binaryToOop(Floats::Function f, int tof);
 };
+
+
+#endif // VM_INTERPRETER_METHODPRINTER_HPP_HPP

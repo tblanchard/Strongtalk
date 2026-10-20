@@ -20,6 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_UTILITIES_OSTREAM_HPP
+#define VM_UTILITIES_OSTREAM_HPP
+
+#include <stdio.h>
+#include <stdarg.h>
 
 // Output streams for printing
 
@@ -29,7 +34,7 @@ class outputStream : public ResourceObj {
    int  _width;		    // width of the page
    int  _position;	    // position on the current line
 
-   void basic_print(char* str);
+   void basic_print(const char* str);
 
  public:
    // creation
@@ -48,13 +53,13 @@ class outputStream : public ResourceObj {
    int position() const { return _position; }
 
    // printing
-   void print(char* format, ...);
-   void print_cr(char* format, ...);
+   void print(const char* format, ...);
+   void print_cr(const char* format, ...);
 
    void vprint(const char *format, va_list argptr);
    void vprint_cr(const char* format, va_list argptr);
 
-   void print_raw(char* str) { basic_print(str); }
+   void print_raw(const char* str) { basic_print(str); }
    void out_hex(int addr);
 
    virtual void put(char c);
@@ -66,7 +71,7 @@ class outputStream : public ResourceObj {
 };
 
 // Standard output
-extern outputStream* std;
+extern outputStream* stdOut;
 
 // Standard error
 extern outputStream* err;
@@ -89,7 +94,7 @@ class fileStream : public outputStream {
  protected:
   FILE* _file;
  public:
-  fileStream(char* file_name);
+  fileStream(const char* file_name);
   ~fileStream();
   int is_open() const { return _file != NULL; }
   void put(char c);
@@ -98,3 +103,5 @@ class fileStream : public outputStream {
 
 
 
+
+#endif // VM_UTILITIES_OSTREAM_HPP

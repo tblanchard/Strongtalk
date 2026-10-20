@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_MAPCONFORMANCE_HPP_HPP
+#define VM_CODE_MAPCONFORMANCE_HPP_HPP
 
+#include "growableArray.hpp"
 // Compiler/New Backend/Value Conformance
 //
 // Used by the new backed to make mappings conform before merging code pieces. 
@@ -128,3 +131,6 @@ class MapConformance : public ResourceObj {
 };
 
 #endif
+
+
+#endif // VM_CODE_MAPCONFORMANCE_HPP_HPP

@@ -21,11 +21,36 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "process.hpp"
+#include "bitVector.hpp"
 # ifdef DELTA_COMPILER
 
-# include "incls/_bitVector.cpp.incl"
 
   bool BitVector::unionWith(BitVector* other) {
     while (length < other->length) bits[length++] = 0;
@@ -118,7 +143,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
     print_short();
     lprintf(": {");
     int last = -1;
-    for (int i = 0; i < length; i ++) {
+    int i;
+    for (i = 0; i < length; i ++) {
       if (includes(i)) {
 	if (last < 0) {
 	  lprintf(" %ld", i);	// first bit after string of 0s

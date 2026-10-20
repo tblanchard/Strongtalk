@@ -21,10 +21,73 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_dll.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "objArrayOop.hpp"
+#include "delta.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "proxyOop.hpp"
+#include "vmOperations.hpp"
+#include "codeIterator.hpp"
 // InterpretedDLL_Cache implementation
 
 void InterpretedDLL_Cache::verify() {
@@ -36,11 +99,11 @@ void InterpretedDLL_Cache::verify() {
 
 
 void InterpretedDLL_Cache::print() {
-  std->print("DLL call ");
+  stdOut->print("DLL call ");
   dll_name()->print_value();
-  std->print("::");
+  stdOut->print("::");
   funct_name()->print_value();
-  std->print(" (0x%x, %s, interpreted)\n", entry_point(), async() ? "asynchronous" : "synchronous");
+  stdOut->print(" (0x%x, %s, interpreted)\n", entry_point(), async() ? "asynchronous" : "synchronous");
 }
 
 
@@ -75,11 +138,11 @@ void CompiledDLL_Cache::verify() {
 
 
 void CompiledDLL_Cache::print() {
-  std->print("DLL call ");
+  stdOut->print("DLL call ");
   dll_name()->print_value();
-  std->print("::");
+  stdOut->print("::");
   function_name()->print_value();
-  std->print(" (0x%x, %s, compiled)\n", entry_point(), async() ? "asynchronous" : "synchronous");
+  stdOut->print(" (0x%x, %s, compiled)\n", entry_point(), async() ? "asynchronous" : "synchronous");
 }
 
 
@@ -125,21 +188,21 @@ dll_func DLLs::lookup(symbolOop dll_name, symbolOop function_name) {
   dll_func result = lookup_fail(dll_name, function_name);
   if (result) {
     if (TraceDLLLookup) {
-      std->print("DLL looking for ");
-      dll_name->print_symbol_on(std);
-      std->print("::");
-      function_name->print_symbol_on(std);
-      std->print_cr(" -> 0x%lx", result);
+      stdOut->print("DLL looking for ");
+      dll_name->print_symbol_on(stdOut);
+      stdOut->print("::");
+      function_name->print_symbol_on(stdOut);
+      stdOut->print_cr(" -> 0x%lx", result);
     }
     return result;
   }
 
-  std->print("DLL lookup ");
-  function_name->print_symbol_on(std);
-  std->print(" in ");
-  dll_name->print_symbol_on(std);
-  std->print(" failed.");
-  std->cr();
+  stdOut->print("DLL lookup ");
+  function_name->print_symbol_on(stdOut);
+  stdOut->print(" in ");
+  dll_name->print_symbol_on(stdOut);
+  stdOut->print(" failed.");
+  stdOut->cr();
 
   DeltaProcess::active()->suspend(DLL_lookup_error);
   return NULL;

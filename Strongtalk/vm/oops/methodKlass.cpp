@@ -21,9 +21,57 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_methodKlass.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "symbolOop.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "universe.inline.hpp"
+#include "ageTable.hpp"
+#include "objArrayOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "methodOop.hpp"
+#include "methodKlass.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "bytecodeTranscoder.hpp"
 void set_methodKlass_vtbl(Klass *k) {
   methodKlass o;
   k->set_vtbl_value(o.vtbl_value());
@@ -229,10 +277,38 @@ static oop tenured(oop obj) {
 
 methodOop methodKlass::constructMethod(oop selector_or_method, int flags, int nofArgs, 
                                        objArrayOop debugInfo, byteArrayOop bytes, objArrayOop oops) {
-  klassOop k        = as_klassOop();
-  int      obj_size = methodOopDesc::header_size() + oops->length();
+  klassOop k = as_klassOop();
 
-  assert(oops->length() * oopSize == bytes->length(), "Invalid array sizes");
+  // The byte codes come in the external layout (4-byte operand slots, see bytecodeTranscoder.hpp):
+  // oops[i] belongs to the slot at byte offset (i-1)*4; it is an oop operand if the slot's bytes are zero.
+  assert(oops->length() * external_bytecode_word_size == bytes->length(), "Invalid array sizes");
+  ExternalCode code(bytes->length());
+  for (int index = 1; index <= bytes->length(); index++) {
+    code.set_byte(index - 1, bytes->byte_at(index));
+  }
+  for (int index = 1; index <= oops->length(); index++) {
+    int  pos     = (index - 1) * external_bytecode_word_size;
+    bool copyOop = true;
+    for (int i = 0; i < external_bytecode_word_size; i++) {
+      // copy oop if bytearray holds 4 consecutive aligned zeroes
+      if (bytes->byte_at(pos + 1 + i) != 0) copyOop = false;
+    }
+    if (copyOop) {
+      oop value = tenured(oops->obj_at(index));
+      assert(value->is_smi() || value->is_old(), "literal must be tenured");
+      code.set_oop(pos, value);
+    }
+  }
+
+  // convert to the native layout
+  BytecodeTranscoder t(&code);
+  if (!t.ok()) {
+    warning("method construction failed: %s", t.error());
+    return NULL;
+  }
+  t.layout(oopSize);
+  int code_words = t.padded_length() / oopSize;
+  int obj_size   = methodOopDesc::header_size() + code_words;
 
   // allocate
   methodOop method = as_methodOop(Universe::allocate_tenured(obj_size));
@@ -244,30 +320,13 @@ methodOop methodKlass::constructMethod(oop selector_or_method, int flags, int no
 
   method->set_invocation_count(0);
   method->set_sharing_count(0);
-  method->set_size_and_flags(oops->length(), nofArgs, flags);
+  method->set_size_and_flags(code_words, nofArgs, flags);
 
-  // merge the bytes and the oops
-
-  // first copy the byte array into the method
-  for (int index = 1; index <= bytes->length(); index++) {
-    method->byte_at_put(index, bytes->byte_at(index));
-  }
-
-  // then merge in the oops
-  for (index = 1; index <= oops->length(); index++) {
-    bool copyOop = true;
-    int bc_index = index*oopSize-(oopSize-1);
-    for (int i = 0; i < oopSize; i++) {
-      // copy oop if bytearray holds 4 consecutive aligned zeroes
-      if (bytes->byte_at(bc_index+i) != 0) {
-	copyOop = false;
-      }
-    }
-    if (copyOop) {
-      oop value = tenured(oops->obj_at(index));
-      assert(value->is_smi() || value->is_old(), "literal must be tenured");
-      method->oop_at_put(bc_index, value);
-    }
+  // install the converted byte codes (also remaps the bcis in the debug info)
+  method->install_codes(&t);
+  if (!t.ok()) {
+    warning("method construction failed: %s", t.error());
+    return NULL;
   }
 
   assert(method->is_method(), "must be method");

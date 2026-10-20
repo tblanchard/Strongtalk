@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_OBJARRAYOOP_HPP_HPP
+#define VM_OOPS_OBJARRAYOOP_HPP_HPP
 
 // objArrays are arrays containing oops
 
@@ -30,6 +32,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 //    [length      ]
 //    [elements    ]* = objs(1) .. objs(length)
 
+objArrayOop as_objArrayOop(void* p);
 class objArrayOopDesc: public memOopDesc {
  public:
   // constructor
@@ -42,7 +45,7 @@ class objArrayOopDesc: public memOopDesc {
   objArrayOopDesc* addr() const {
     return (objArrayOopDesc*) memOopDesc::addr(); }
 
-  bool is_within_bounds(int index) const { return 1 <= index && index <= length(); }
+  bool is_within_bounds(smi index) const { return 1 <= index && index <= length(); }
 
   oop* addr_as_oops() const { return (oop*) addr(); }
  
@@ -103,6 +106,7 @@ class objArrayOopDesc: public memOopDesc {
 };
 
 
+weakArrayOop as_weakArrayOop(void* p);
 class weakArrayOopDesc: public objArrayOopDesc {
  public:
   friend weakArrayOop as_weakArrayOop(void* p) {
@@ -115,3 +119,6 @@ class weakArrayOopDesc: public objArrayOopDesc {
   void scavenge_contents_after_registration();
   void follow_contents_after_registration();
 };
+
+
+#endif // VM_OOPS_OBJARRAYOOP_HPP_HPP

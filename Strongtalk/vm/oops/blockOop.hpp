@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_BLOCKOOP_HPP_HPP
+#define VM_OOPS_BLOCKOOP_HPP_HPP
 
 // A blockClosureOop is the oop of a block closure, i.e., the object created
 // when a block literal like [3 + 4] is evaluated.  Blocks can be "clean"
@@ -28,6 +30,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 // in which case their _lexical_scope is used to resolve accesses
 // to free variables.
 
+blockClosureOop as_blockClosureOop(void* p);
 class blockClosureOopDesc: public memOopDesc {
  private:
   oop _methodOrJumpAddr;		// block method (if interpreted), jumpTable stub address (if compiled)
@@ -69,7 +72,7 @@ class blockClosureOopDesc: public memOopDesc {
   // deoptimization
   void deoptimize();
 
-  char* name() const 			{ return "blockClosure"; }
+  const char* name() const 			{ return "blockClosure"; }
   void verify();
 
   friend blockClosureKlass;
@@ -80,6 +83,7 @@ class blockClosureOopDesc: public memOopDesc {
 // shown below is just the common prefix which is followed by the words containing the
 // actual data.
 
+contextOop as_contextOop(void* p);
 class contextOopDesc: public memOopDesc {
  private:
   smiOop _parent;
@@ -106,8 +110,8 @@ class contextOopDesc: public memOopDesc {
   bool has_parent_fp() const;
   bool has_outer_context() const;
 
-  int* parent_fp() const		{ return has_parent_fp() ? (int*) parent() : NULL; }
-  void set_home_fp(int* fp) {
+  intptr_t* parent_fp() const		{ return has_parent_fp() ? (intptr_t*) parent() : NULL; }
+  void set_home_fp(intptr_t* fp) {
     assert(oop(fp)->is_smi(), "checking alignment");
     set_parent(oop(fp));
   } 
@@ -146,3 +150,6 @@ class contextOopDesc: public memOopDesc {
   friend contextKlass;
 };
 
+
+
+#endif // VM_OOPS_BLOCKOOP_HPP_HPP

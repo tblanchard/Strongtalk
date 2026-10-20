@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_DISPATCHTABLE_HPP_HPP
+#define VM_INTERPRETER_DISPATCHTABLE_HPP_HPP
 
 // The dispatchTable controls the dispatch of byte codes
 
@@ -44,8 +46,8 @@ class dispatchTable: AllStatic {
 
   // intercepts all relevant entries to enable single step.
   static void intercept_for_step();
-  static void intercept_for_next(int* fr);
-  static void intercept_for_return(int* fr);
+  static void intercept_for_next(intptr_t* fr);
+  static void intercept_for_return(intptr_t* fr);
 
   // answers whether the dispatch table is in single step mode.
   static bool in_normal_mode()  { return mode == normal_mode; }
@@ -53,3 +55,6 @@ class dispatchTable: AllStatic {
   static bool in_next_mode()    { return mode == next_mode; }
   static bool in_return_mode()  { return mode == return_mode; }
 };
+
+
+#endif // VM_INTERPRETER_DISPATCHTABLE_HPP_HPP

@@ -22,10 +22,89 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_interpretedIC.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "frame.hpp"
+#include "delta.hpp"
+#include "oopFactory.hpp"
+#include "objArrayKlass.hpp"
+#include "inliner.hpp"
 // Implementation of Interpreter_PICs
 //
 // A simple free list manager for interpreted PICs.
@@ -373,23 +452,23 @@ void InterpretedIC::replace(nmethod* nm) {
 
 
 void InterpretedIC::print() {
-  std->print("Inline cache (");
+  stdOut->print("Inline cache (");
   if (is_empty()) {
-    std->print("empty");
+    stdOut->print("empty");
   } else {
-    std->print(Bytecodes::send_type_as_string(send_type()));
+    stdOut->print(Bytecodes::send_type_as_string(send_type()));
   }
-  std->print(") ");
+  stdOut->print(") ");
   selector()->print_value();
-  std->cr();
+  stdOut->cr();
   InterpretedIC_Iterator it(this);
   while (!it.at_end()) {
-    std->print("\t- klass: ");
+    stdOut->print("\t- klass: ");
     it.klass()->print_value();
     if (it.is_interpreted()) {
-      std->print(";\tmethod  %#x\n", it.interpreted_method());
+      stdOut->print(";\tmethod  %#x\n", it.interpreted_method());
     } else {
-      std->print(";\tnmethod %#x\n", it.compiled_method());
+      stdOut->print(";\tnmethod %#x\n", it.compiled_method());
     }
     it.advance();
   }
@@ -542,8 +621,8 @@ void InterpretedIC::does_not_understand(oop receiver, InterpretedIC* ic, frame* 
   if (interpreter_normal_lookup(receiver->klass(), sel).is_empty()) {
     // doesNotUnderstand: not found ==> process error
     { ResourceMark rm;
-      std->print("LOOKUP ERROR\n");
-      sel->print_value(); std->print(" not found\n");
+      stdOut->print("LOOKUP ERROR\n");
+      sel->print_value(); stdOut->print(" not found\n");
     }
     if (DeltaProcess::active()->is_scheduler()) {
       DeltaProcess::active()->trace_stack();
@@ -566,13 +645,13 @@ void InterpretedIC::does_not_understand(oop receiver, InterpretedIC* ic, frame* 
 
 
 void InterpretedIC::trace_inline_cache_miss(InterpretedIC* ic, klassOop klass, LookupResult result) {
-  std->print("InterpretedIC lookup (");
+  stdOut->print("InterpretedIC lookup (");
   klass->print_value();
-  std->print(", ");
+  stdOut->print(", ");
   ic->selector()->print_value();
-  std->print(") --> ");
-  result.print_short_on(std);
-  std->cr();
+  stdOut->print(") --> ");
+  result.print_short_on(stdOut);
+  stdOut->cr();
 }
 
 
@@ -582,7 +661,11 @@ void InterpretedIC::trace_inline_cache_miss(InterpretedIC* ic, klassOop klass, L
 // that it corresponds to the inline cache contents.
 
 void InterpretedIC::inline_cache_miss() {
-  NoGCVerifier noGC;  
+  // A doesNotUnderstand: handler that simply returns makes us redo the lookup;
+  // iterate (bounded) instead of recursing so the native stack cannot overflow.
+  const int max_dnu_retries = 100;
+  for (int retries = 0; ; retries++) {
+  NoGCVerifier noGC;
 
   // get ic info
   frame           f         = DeltaProcess::active()->last_frame();
@@ -600,16 +683,28 @@ void InterpretedIC::inline_cache_miss() {
                       : interpreter_normal_lookup(klass, ic->selector());
 
   // tracing
-  if (TraceMessageSend) std->print_cr("inline cache miss");
+  if (TraceMessageSend) stdOut->print_cr("inline cache miss");
   if (TraceLookup)      trace_inline_cache_miss(ic, klass, result);
 
   // handle the lookup result
-  if (!result.is_empty()) 
+  if (!result.is_empty()) {
     update_inline_cache(ic, &f, send_code, klass, result);
-  else {
-    does_not_understand(receiver, ic, &f);
-    // If the program continues we'll redo the inline_cache_miss
-    if (!have_nlr_through_C) inline_cache_miss();
+    return;
+  }
+  if (retries == max_dnu_retries) {
+    { ResourceMark rm;
+      stdOut->print("doesNotUnderstand: keeps returning for ");
+      klass->print_value();
+      stdOut->print(" >> ");
+      ic->selector()->print_value();
+      stdOut->cr();
+      DeltaProcess::active()->trace_stack();
+    }
+    fatal("unhandled doesNotUnderstand:");
+  }
+  does_not_understand(receiver, ic, &f);
+  // If the program continues we'll redo the inline_cache_miss
+  if (have_nlr_through_C) return;
   }
 }
 
@@ -755,6 +850,6 @@ bool InterpretedIC_Iterator::is_super_send() const {
 
 
 void InterpretedIC_Iterator::print() {
-  std->print_cr("InterpretedIC_Iterator %#x for ic %#x (%s)", this, _ic, selector()->as_string());
+  stdOut->print_cr("InterpretedIC_Iterator %#x for ic %#x (%s)", this, _ic, selector()->as_string());
 }
 

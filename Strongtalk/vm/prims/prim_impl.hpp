@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_PRIM_IMPL_HPP_HPP
+#define VM_PRIMS_PRIM_IMPL_HPP_HPP
 
 // Macroes for the primitive implementation
 
@@ -48,7 +50,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 #ifdef ASSERT
 #define TRACE_FUNC(flag,label) \
-  static void Trace(char* name, \
+  static void Trace(const char* name, \
                     char* s1 = NULL, oop a1 = NULL, \
                     char* s2 = NULL, oop a2 = NULL, \
                     char* s3 = NULL, oop a3 = NULL, \
@@ -119,3 +121,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #define PROLOGUE_5(name, a1, a2, a3, a4, a5)         TRACE_5(name, a1, a2, a3, a4, a5)
 #define PROLOGUE_6(name, a1, a2, a3, a4, a5, a6)     TRACE_6(name, a1, a2, a3, a4, a5, a6)
 #define PROLOGUE_7(name, a1, a2, a3, a4, a5, a6, a7) TRACE_7(name, a1, a2, a3, a4, a5, a6, a7)
+
+
+#endif // VM_PRIMS_PRIM_IMPL_HPP_HPP

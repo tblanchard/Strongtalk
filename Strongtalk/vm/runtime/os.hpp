@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_OS_HPP_HPP
+#define VM_RUNTIME_OS_HPP_HPP
 
 // os defines the interface to operating system
 
@@ -35,7 +37,7 @@ class os {
   static void initialize_system_info();
   friend void os_init();
  public:
-  static int    getenv(char* name,char* buffer,int len);
+  static int    getenv(const char* name,char* buffer,int len);
 
   // We must call updateTimes before calling userTime or currentTime.
   static int    updateTimes();
@@ -92,11 +94,11 @@ class os {
   // thread support for profiling
   static void suspend_thread(Thread* thread);
   static void resume_thread(Thread* thread);
-  static void fetch_top_frame(Thread* thread, int** sp, int** fp, char** pc);
+  static void fetch_top_frame(Thread* thread, intptr_t** sp, intptr_t** fp, char** pc);
 
   static void breakpoint();
 
-  static int message_box(char* title, char* message);
+  static int message_box(const char* title, const char* message);
 
   static void     fatalExit(int num);
 
@@ -104,8 +106,8 @@ class os {
   static bool check_directory(char* dir_name);
 
   // DLL support
-  static dll_func dll_lookup(char* name, DLL* library);
-  static DLL*     dll_load(char* name);
+  static dll_func dll_lookup(const char* name, DLL* library);
+  static DLL*     dll_load(const char* name);
   static bool     dll_unload(DLL* library);
 };
 
@@ -121,3 +123,6 @@ class ThreadCritical {
   ThreadCritical();
   ~ThreadCritical();
 };
+
+
+#endif // VM_RUNTIME_OS_HPP_HPP

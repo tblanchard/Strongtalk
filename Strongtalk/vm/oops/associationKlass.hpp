@@ -20,8 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_ASSOCIATIONKLASS_HPP_HPP
+#define VM_OOPS_ASSOCIATIONKLASS_HPP_HPP
 
 // associations are cons cells used in the Delta system dictionary.
+void set_associationKlass_vtbl(Klass* k);
 class associationKlass: public memOopKlass {
  public:
   friend void set_associationKlass_vtbl(Klass* k);
@@ -45,7 +48,7 @@ class associationKlass: public memOopKlass {
   // memory operations
   bool oop_verify(oop obj);
 
-  char* name() const { return "association"; }
+  const char* name() const { return "association"; }
 
   // Reflective properties
   bool can_have_instance_variables() const { return false; }
@@ -67,3 +70,6 @@ class associationKlass: public memOopKlass {
   // sizing
   int oop_header_size() const { return associationOopDesc::header_size(); }
 };
+
+
+#endif // VM_OOPS_ASSOCIATIONKLASS_HPP_HPP

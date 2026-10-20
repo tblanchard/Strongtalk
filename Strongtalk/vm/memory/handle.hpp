@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_HANDLE_HPP_HPP
+#define VM_MEMORY_HANDLE_HPP_HPP
 
 // Interface for preserving memOops across scavenge/gc in primitives.
 // ex.
@@ -80,3 +82,6 @@ class Handle : StackObj {
     return klassOop(Handles::oop_at(index));
   }
 };
+
+
+#endif // VM_MEMORY_HANDLE_HPP_HPP

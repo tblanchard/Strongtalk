@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_MARKSWEEP_HPP_HPP
+#define VM_MEMORY_MARKSWEEP_HPP_HPP
 
 // MarkSweep takes care of garbage collection
 class MarkSweep : AllStatic {
@@ -52,3 +54,6 @@ class MarkSweep : AllStatic {
   static void deallocate();
   static void trace(char* msg);
 };
+
+
+#endif // VM_MEMORY_MARKSWEEP_HPP_HPP

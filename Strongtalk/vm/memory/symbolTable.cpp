@@ -22,9 +22,52 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_symbolTable.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "symbolOop.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "symbolTable.hpp"
+#include "byteArrayKlass.hpp"
+#include "symbolKlass.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 # define FOR_ALL_ENTRIES(entry) \
   for (entry = firstBucket(); entry <= lastBucket(); entry ++)
 
@@ -38,7 +81,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
       }                                                                 \
     }
 
-int hash(char* name, int len) {
+int hash(const char* name, int len) {
   // hash on at most 32 characters, evenly spaced
   int increment;
  
@@ -50,24 +93,25 @@ int hash(char* name, int len) {
  
   // hashpjw from Dragon book (ASU p. 436), except increment differently
  
-  assert(BitsPerByte * BytesPerWord == 32, "assumes 32-bit words");
-  long unsigned h = 0;
-  long unsigned g;
-  char* s = name;
-  char* end = s + len;
+  // computed in 32 bits (as on the original 32-bit VM) on all hosts
+  uint32_t h = 0;
+  uint32_t g;
+  const char* s = name;
+  const char* end = s + len;
   for (; s < end; s = s + increment) {
-    h = (h << 4) + (long unsigned) *s;
-    if (g = h & 0xf0000000) h ^= g | (g >> 24);
+    h = (h << 4) + (uint32_t) (int) *s;	// chars are sign extended, as with MSVC
+    if ((g = h & 0xf0000000)) h ^= g | (g >> 24);
   }
-  return h;
+  return (int) h;
 }
 
 symbolTable::symbolTable() {
-  for (int i = 0; i < symbol_table_size; i ++) buckets[i].clear();
+  int i;
+  for (i = 0; i < symbol_table_size; i ++) buckets[i].clear();
   free_list = first_free_link = end_block = NULL;
 }
 
-symbolOop symbolTable::basic_add(char *name, int len, int hashValue) {
+symbolOop symbolTable::basic_add(const char *name, int len, int hashValue) {
   symbolKlass* sk = (symbolKlass*) Universe::symbolKlassObj()->klass_part();
   symbolOop str =   sk->allocateSymbol(name, len);
   basic_add(str, hashValue);
@@ -75,7 +119,7 @@ symbolOop symbolTable::basic_add(char *name, int len, int hashValue) {
 }
 
 bool symbolTable::is_present(symbolOop sym) {
-  char* name = (char*) sym->bytes();
+  const char* name = (char*) sym->bytes();
   int   len  = sym->length();
   int hashValue = hash(name, len);
   symbolTableEntry* bucket = bucketFor(hashValue);
@@ -87,7 +131,7 @@ bool symbolTable::is_present(symbolOop sym) {
   return false;
 }
 
-symbolOop symbolTable::lookup(char* name, int len) {
+symbolOop symbolTable::lookup(const char* name, int len) {
   int hashValue = hash(name, len);
   symbolTableEntry* bucket = bucketFor(hashValue);
   if (!bucket->is_empty()) {
@@ -210,7 +254,8 @@ bool symbolTableEntry::verify(int i) {
 }
 
 void symbolTable::verify() {
-  for (int i = 0; i < symbol_table_size; i ++)
+  int i;
+  for (i = 0; i < symbol_table_size; i ++)
     if (!buckets[i].verify(i))
       lprintf("\tof bucket %ld of symbol table\n", long(i));
 }
@@ -283,7 +328,8 @@ void symbolTable::print_histogram() {
   int results[results_length];
   
   // initialize results to zero
-  for (int j = 0; j < results_length; j++) {
+  int j;
+  for (j = 0; j < results_length; j++) {
     results[j] = 0;
   }
 
@@ -291,7 +337,8 @@ void symbolTable::print_histogram() {
   int min_symbols = 0;
   int max_symbols = 0;
   int out_of_range = 0;
-  for (int i = 0; i < symbol_table_size; i++) {
+  int i;
+  for (i = 0; i < symbol_table_size; i++) {
     symbolTableEntry curr = buckets[i];
     int counter = curr.length();
     total += counter;

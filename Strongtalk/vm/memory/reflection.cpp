@@ -22,9 +22,77 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_reflection.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "associationOop.hpp"
+#include "dByteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "objArrayOop.hpp"
+#include "delta.hpp"
+#include "processOop.hpp"
+#include "dValueArrayOop.hpp"
+#include "proxyOop.hpp"
+#include "evaluator.hpp"
+#include "mixinOop.hpp"
+#include "reflection.hpp"
+#include "timer.hpp"
+#include "oopFactory.hpp"
+#include "vmSymbols.hpp"
 // Converter hierarchy:
 // - memConverter
 //   - byteArrayConverter
@@ -53,9 +121,9 @@ class memConverter: public ResourceObj {
       int new_index = new_klass->klass_part()->lookup_inst_var(name);
       if (new_index > 0) {
 	if (TraceApplyChange) {
-          std->print("map ");
-	  name->print_symbol_on(std);
-	  std->print_cr(" %d -> %d", old_index + old_header_size, new_index);
+          stdOut->print("map ");
+	  name->print_symbol_on(stdOut);
+	  stdOut->print_cr(" %d -> %d", old_index + old_header_size, new_index);
 	}
         // We found a match between a old and new class
         mapping->push(old_index + old_header_size);
@@ -437,15 +505,16 @@ memConverter* ClassChange::create_converter_for(klassOop old_class, klassOop new
 
 void ClassChange::update_class_vars() {
   if (TraceApplyChange) {
-    std->print(" - updating class variables for: ");
+    stdOut->print(" - updating class variables for: ");
     old_klass()->print_value();
-    std->cr();
+    stdOut->cr();
   }
 
   Klass* k = old_klass()->klass_part();
 
   // Remove the dead entries
-  for (int index = k->number_of_classVars(); index > 0; index--) {
+  int index;
+  for (index = k->number_of_classVars(); index > 0; index--) {
     associationOop assoc = k->classVar_at(index);
     if (!new_mixin()->includes_classVar(assoc->key())) {
       k->remove_classVar_at(index);
@@ -468,9 +537,9 @@ void ClassChange::update_class_vars() {
 
 void ClassChange::update_methods(bool instance_side) {
   if (TraceApplyChange) {
-    std->print(" updating %s-side methods for: ", instance_side ? "instance" : "class");
+    stdOut->print(" updating %s-side methods for: ", instance_side ? "instance" : "class");
     old_klass()->print_value();
-    std->cr();
+    stdOut->cr();
   }
 
   if (instance_side) {
@@ -565,8 +634,8 @@ bool Reflection::needs_schema_change() {
     bool sub_result = class_changes->at(index)->needs_schema_change();
     if (TraceApplyChange && sub_result) {
       class_changes->at(index)->old_klass()->print_value();
-      std->cr();
-      std->print_cr("  needs schema change because: %s.", class_changes->at(index)->reason_for_schema_change());
+      stdOut->cr();
+      stdOut->print_cr("  needs schema change because: %s.", class_changes->at(index)->reason_for_schema_change());
     }
     result = result || sub_result;
   }
@@ -658,7 +727,8 @@ void Reflection::update_classes(bool class_vars_changed, bool instance_methods_c
 }
 
 void Reflection::setup_schema_change() {
-  for (int index = 0; index < class_changes->length(); index++) {
+  int index;
+  for (index = 0; index < class_changes->length(); index++) {
     class_changes->at(index)->setup_schema_change();
   }
   for (index = 0; index < class_changes->length(); index++) {
@@ -672,12 +742,12 @@ void Reflection::apply_change(mixinOop    new_mixin,
 			      objArrayOop invocations) {
   ResourceMark rm;
   if (TraceApplyChange) {
-    std->print("Reflective change");
-    std->print_cr("[new]"); 
+    stdOut->print("Reflective change");
+    stdOut->print_cr("[new]"); 
     new_mixin->print();
-    std->print_cr("[old]"); 
+    stdOut->print_cr("[old]"); 
     old_mixin->print();
-    std->print_cr("[invocations]"); 
+    stdOut->print_cr("[invocations]"); 
     invocations->print();
     Universe::verify();
   }
@@ -700,7 +770,7 @@ void Reflection::apply_change(mixinOop    new_mixin,
 
   if (format_changed) {
     if (TraceApplyChange) {
-      std->print_cr(" - schema change is needed");
+      stdOut->print_cr(" - schema change is needed");
     }
 
     converted = new GrowableArray<memOop> (100);
@@ -732,8 +802,8 @@ void Reflection::apply_change(mixinOop    new_mixin,
     for (int j = 0; j < converted->length(); j++) {
       memOop obj = converted->at(j);
       if (TraceApplyChange) {
-        std->print_cr("Old: 0x%lx, 0x%lx", obj,              obj->mark());
-        std->print_cr("New: 0x%lx, 0x%lx", obj->forwardee(), obj->forwardee()->mark());
+        stdOut->print_cr("Old: 0x%lx, 0x%lx", obj,              obj->mark());
+        stdOut->print_cr("New: 0x%lx, 0x%lx", obj->forwardee(), obj->forwardee()->mark());
       }
       obj->set_mark(obj->forwardee()->mark());
     }
@@ -743,7 +813,7 @@ void Reflection::apply_change(mixinOop    new_mixin,
 
   } else {
     if (TraceApplyChange) {
-      std->print_cr(" - no schema change (%s%s%s)",
+      stdOut->print_cr(" - no schema change (%s%s%s)",
 	class_vars_changed        ? "class variables "  : "",
 	instance_methods_changed  ? "instance methods " : "",
 	class_methods_changed     ? "class methods "    : "");

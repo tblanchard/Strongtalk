@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_METHODITERATOR_HPP_HPP
+#define VM_INTERPRETER_METHODITERATOR_HPP_HPP
 
 // The MethodIterator iterates over the byte code structures of a methodOop
 // Usage:
@@ -495,3 +497,6 @@ class MethodIterator: StackObj {
   MethodIterator(MethodInterval* interval, MethodClosure* blk, AbstractMethodIntervalFactory* f = &defaultFactory);
   MethodInterval* interval() const { return _interval; }
 };
+
+
+#endif // VM_INTERPRETER_METHODITERATOR_HPP_HPP

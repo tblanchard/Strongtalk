@@ -21,10 +21,97 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "slist.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "frame.hpp"
+#include "compUtils.hpp"
+#include "interpreter.hpp"
+#include "delta.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "evaluator.hpp"
+#include "bitVector.hpp"
+#include "stubRoutines.hpp"
+#include "pcDesc.hpp"
+#include "compiledPIC.hpp"
+#include "registerMask.hpp"
+#include "oopFactory.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_compiledIC.cpp.incl"
 
 
 extern "C" void UncommonTrap() {
@@ -97,20 +184,20 @@ char* CompiledIC::normalLookup(oop recv) {
   //
   // assert(!Interpreter::contains(begin_addr()), "should be handled in the interpreter");
   if (Interpreter::contains(begin_addr())) {
-    std->print_cr("nmethod called from interpreter reports ic miss:");
-    std->print_cr("interpreter call at: 0x%x", begin_addr());
-    std->print_cr("nmethod entry point: 0x%x", Interpreter::_last_native_called);
+    stdOut->print_cr("nmethod called from interpreter reports ic miss:");
+    stdOut->print_cr("interpreter call at: 0x%x", begin_addr());
+    stdOut->print_cr("nmethod entry point: 0x%x", Interpreter::_last_native_called);
     InterpretedIC* ic = as_InterpretedIC(next_instruction_address());
     fatal("please notify VM people");
   }
 
   if (TraceLookup) {
-    std->print("CompiledIC lookup (");
+    stdOut->print("CompiledIC lookup (");
     recv->klass()->print_value();
-    std->print(", ");
+    stdOut->print(", ");
     selector()->print_value();
-    std->print(")");
-    std->cr();
+    stdOut->print(")");
+    stdOut->cr();
   }
   klassOop klass = recv->klass();
   symbolOop sel = selector();
@@ -144,8 +231,8 @@ char* CompiledIC::normalLookup(oop recv) {
     if (interpreter_normal_lookup(recv->klass(), sel).is_empty()) {
       // doesNotUnderstand: not found ==> process error
       { ResourceMark rm;
-        std->print("LOOKUP ERROR\n");
-        sel->print_value(); std->print(" not found\n");
+        stdOut->print("LOOKUP ERROR\n");
+        sel->print_value(); stdOut->print(" not found\n");
       }
       if (DeltaProcess::active()->is_scheduler()) {
         DeltaProcess::active()->trace_stack();
@@ -168,9 +255,9 @@ char* CompiledIC::normalLookup(oop recv) {
 
     LookupKey key(klass, sel);
 
-    std->print("Compiled lookup failed for: ");
-    key.print_on(std);
-    std->cr();
+    stdOut->print("Compiled lookup failed for: ");
+    key.print_on(stdOut);
+    stdOut->cr();
 
     DeltaProcess::active()->trace_stack();
     warning("Lookup error: DoesNotUnderstand semantics not implemented for compiled code");
@@ -303,14 +390,14 @@ char* CompiledIC::superLookup(oop recv) {
   symbolOop       sel = selector();
 
   if (TraceLookup) {
-    std->print("CompiledIC super lookup (");
+    stdOut->print("CompiledIC super lookup (");
     recv_klass->print_value();
-    std->print(", ");
+    stdOut->print(", ");
     mhld_klass->print_value();
-    std->print(", ");
+    stdOut->print(", ");
     selector()->print_value();
-    std->print(")");
-    std->cr();
+    stdOut->print(")");
+    stdOut->cr();
   }
 
   // The inline cache for super sends looks like the inline cache

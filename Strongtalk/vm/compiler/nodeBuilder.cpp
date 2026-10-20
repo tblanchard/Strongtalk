@@ -21,10 +21,104 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "proxyOop.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "primInliner.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "doubleOop.hpp"
+#include "loopOpt.hpp"
+#include "oopFactory.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_nodeBuilder.cpp.incl"
 
 // Class variables
 
@@ -897,7 +991,8 @@ void NodeBuilder::splitMergeExpr(Expr* expr, TypeTestNode* test) {
   GrowableArray<Expr*>* exprsToSplit = splittablePaths(expr, test);
   if (!exprsToSplit) return;
  
-  for (int i = exprsToSplit->length() - 1; i >= 0; i--) {
+  int i;
+  for (i = exprsToSplit->length() - 1; i >= 0; i--) {
     Expr* e = exprsToSplit->at(i);
     Node* start = e->node();
     GrowableArray<NonTrivialNode*>* nodesToCopy = nodesBetween(start, test);
@@ -921,7 +1016,8 @@ void NodeBuilder::splitMergeExpr(Expr* expr, TypeTestNode* test) {
 #ifdef ASSERT
     bool found = nodesToCopy->length() == 0;	// hard to test if no nodes to copy, so assume it's ok
 #endif
-    for (int i = 0; i < nodesToCopy->length(); i++) {
+    int i;
+    for (i = 0; i < nodesToCopy->length(); i++) {
       NonTrivialNode* orig = nodesToCopy->at(i);
       Node* copy = orig->copy(NULL, NULL);
       if (CompilerDebug) cout(PrintSplitting)->print("%*s*  (copying node N%d along the path -> N%d)\n", _scope->depth*2, "", orig->id(), copy->id());
@@ -958,7 +1054,8 @@ GrowableArray<Expr*>* NodeBuilder::splittablePaths(const Expr* expr, const TypeT
   GrowableArray<Expr*>* okExprs   = new GrowableArray<Expr*>(10);  // those who are splittable
 
   // collect all paths that look splittable
-  for (int i = m->exprs->length() - 1; i >= 0; i--) {
+  int i;
+  for (i = m->exprs->length() - 1; i >= 0; i--) {
     for (Expr* x = m->exprs->at(i); x; x = x->next) {
       Node* start = x->node();
       exprNodes->append(start);

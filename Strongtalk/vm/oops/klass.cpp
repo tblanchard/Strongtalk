@@ -21,9 +21,54 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_klass.cpp.incl" 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "klassKlass.hpp"
+#include "bytecodes.hpp"
+#include "bootstrap.hpp"
+#include "symbolOop.hpp"
+#include "oopFactory.hpp"
+#include "universe.inline.hpp"
+#include "mixinOop.hpp"
+#include "objArrayOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "methodOop.hpp"
 void Klass::initialize() {
   set_untagged_contents(false);
   set_classVars(objArrayOop(oopFactory::new_objArray(0)));
@@ -59,7 +104,7 @@ Klass::Format Klass::format_from_symbol(symbolOop format) {
   return Klass::no_klass;
 }
 
-char* Klass::name_from_format(Format format) {
+const char* Klass::name_from_format(Format format) {
   switch (format) {
   case mem_klass:             return "Oops";
   case proxy_klass:           return "ExternalProxy";
@@ -97,7 +142,7 @@ klassOop Klass::create_subclass(mixinOop mixin, Format format) {
   return NULL;
 }
 
-klassOop Klass::create_generic_class(klassOop super_class, mixinOop mixin, int vtbl) {
+klassOop Klass::create_generic_class(klassOop super_class, mixinOop mixin, intptr_t vtbl) {
   BlockScavenge bs;
 
   // Compute the class variables based on the instance side mixin class variable names

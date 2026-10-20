@@ -21,9 +21,60 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_behavior_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "prim_def.hpp"
+#include "bytecodes.hpp"
+#include "symbolOop.hpp"
+#include "oopFactory.hpp"
+#include "ageTable.hpp"
+#include "universe.inline.hpp"
+#include "behavior_prims.hpp"
+#include "doubleOop.hpp"
+#include "mixinOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "methodOop.hpp"
+#include "methodKlass.hpp"
+#include "markSweep.hpp"
+#include "prim_impl.hpp"
+#include "memOop.inline.hpp"
+#include "objArrayOop.hpp"
 TRACE_FUNC(TraceBehaviorPrims, "behavior")
 
 int behaviorPrimitives::number_of_calls;
@@ -106,7 +157,7 @@ PRIM_DECL_2(behaviorPrimitives::classVariableAt, oop behavior, oop index) {
   if (!index->is_smi())
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
 
-  int i = smiOop(index)->value();
+  smi i = smiOop(index)->value();
   if (i > 0 && i <= klassOop(behavior)->klass_part()->number_of_classVars())
     return klassOop(behavior)->klass_part()->classVar_at(i);
   return markSymbol(vmSymbols::out_of_bounds());
@@ -318,7 +369,7 @@ PRIM_DECL_1(behaviorPrimitives::format, oop behavior) {
   if (!behavior->is_klass())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  char* format_name =  Klass::name_from_format(klassOop(behavior)->klass_part()->format());
+  const char* format_name = Klass::name_from_format(klassOop(behavior)->klass_part()->format());
   return oopFactory::new_symbol(format_name);
 }
 

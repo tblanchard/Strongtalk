@@ -21,10 +21,77 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_methodIterator.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "associationOop.hpp"
+#include "bytecodes.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "symbolOop.hpp"
+#include "methodOop.hpp"
+#include "ic_iterator.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "prim.hpp"
 // MethodInterval
 
 MethodInterval::MethodInterval(methodOop method, MethodInterval* parent) {
@@ -130,6 +197,7 @@ IfNode::IfNode(methodOop method, MethodInterval* parent, int begin_bci, int next
   has_else_branch             = isSet(structure, 1);
   _ignore_else_while_printing = isSet(structure, 2);
   else_jump_size              = structure >> 4;
+  if (has_else_branch && else_jump_size == 0) else_jump_size = 16;	// 16 does not fit the nibble
 
   if (has_else_branch) {
     int else_jump = next_bci + else_offset - else_jump_size;
@@ -311,12 +379,12 @@ void SpecializedMethodClosure::dll_call_node(DLLCallNode* node) {
 // MethodIterator
 
 void MethodIterator::unknown_code(u_char code) {
-  std->print_cr("Unknown code found 0x%x", code);
+  stdOut->print_cr("Unknown code found 0x%x", code);
   fatal("aborting");
 }
 
 void MethodIterator::should_never_encounter(u_char code) {
-  std->print_cr("Should never iterate through code 0x%x", code);
+  stdOut->print_cr("Should never iterate through code 0x%x", code);
   fatal("aborting");
 }
 

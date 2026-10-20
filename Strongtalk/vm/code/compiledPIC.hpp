@@ -20,9 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_COMPILEDPIC_HPP_HPP
+#define VM_CODE_COMPILEDPIC_HPP_HPP
 
 #ifdef DELTA_COMPILER
-
+#include "lookupCache.hpp"
 // A PIC implements a Polymorphic Inline Cache for compiled code.
 // It may be megamorphic, in which case it may cache only the last
 // method and do a lookup whenever there is a cache miss.
@@ -223,3 +225,6 @@ class CompiledIC_Iterator: public IC_Iterator {
 
 
 #endif
+
+
+#endif // VM_CODE_COMPILEDPIC_HPP_HPP

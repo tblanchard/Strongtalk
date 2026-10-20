@@ -20,17 +20,19 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_UTILITIES_LPRINTF_HPP_HPP
+#define VM_UTILITIES_LPRINTF_HPP_HPP
 
 // lprintf replaces printf -- never use printf in the VM!
 // output written by lprintf can easily be redirected, duplicated into a
 // log file, etc.
 
-extern "C" void lprintf(char* m, ...);
+extern "C" void lprintf(const char* m, ...);
 extern "C" void lputc(char c);
-extern "C" void lputs(char* str);
-extern "C" void error(char* m, ...);
-extern "C" void warning(char* m, ...);
-extern "C" void compiler_warning(char* m, ...);
+extern "C" void lputs(const char* str);
+extern "C" void error(const char* m, ...);
+extern "C" void warning(const char* m, ...);
+extern "C" void compiler_warning(const char* m, ...);
 
 // like sprintf, but updates the buf pointer so that subsequent
 // sprintf invocations append to the string
@@ -38,3 +40,6 @@ extern "C" void my_sprintf    (char*& buf, const char* format, ...);
 extern "C" void my_sprintf_len(char*& buf, const int len, const char* format, ...);	// make output len chars long
 
 void flush_logFile();
+
+
+#endif // VM_UTILITIES_LPRINTF_HPP_HPP

@@ -21,9 +21,32 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "iCache.hpp"
+#include "nativeInstruction.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "locations.hpp"
+#include "debug.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_locations.cpp.incl"
 
 
 // Implementation of Locations
@@ -285,23 +308,23 @@ void Locations::print() {
   int len = _freeList->length();
   int i;
   // print used locations
-  std->print("Locations:\n");
+  stdOut->print("Locations:\n");
   for (i = 0; i < len; i++) {
     if (nofUses(i) > 0) {
-      std->print("%d: %d uses\n", i, nofUses(i));
+      stdOut->print("%d: %d uses\n", i, nofUses(i));
     }
   }
-  std->cr();
+  stdOut->cr();
   // print whole free list
-  std->print("Free List:\n");
-  std->print("no. of arguments    : %d\n", _nofArguments);
-  std->print("no. of registers    : %d\n", _nofRegisters);
-  std->print("first free register : %d\n", _firstFreeRegister);
-  std->print("first free stack loc: %d\n", _firstFreeStackTmp);
+  stdOut->print("Free List:\n");
+  stdOut->print("no. of arguments    : %d\n", _nofArguments);
+  stdOut->print("no. of registers    : %d\n", _nofRegisters);
+  stdOut->print("first free register : %d\n", _firstFreeRegister);
+  stdOut->print("first free stack loc: %d\n", _firstFreeStackTmp);
   for (i = 0; i < len; i++) {
-    std->print("%d: %d\n", i, _freeList->at(i));
+    stdOut->print("%d: %d\n", i, _freeList->at(i));
   }
-  std->cr();
+  stdOut->cr();
 }
 
 

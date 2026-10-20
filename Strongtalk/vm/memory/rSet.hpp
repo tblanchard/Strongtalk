@@ -20,8 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_RSET_HPP_HPP
+#define VM_MEMORY_RSET_HPP_HPP
 
 
+#include "util.hpp"
 // remembered set for GC, implemented as a card marking byte array with one byte / card
 // Card size is 512 bytes
 // NB: Card size must be >= 512 because of the offset_array in oldspace
@@ -41,10 +44,10 @@ class rSet: public CHeapObj {
   char     byte_map[1];  	// size is a lie
   
   // friend void oldSpace::switch_pointers_by_card(oop, oop);
-  char* byte_for(void *p) const { return (char*)&byte_map[int((char*)p - low_boundary) >> card_shift]; }
+  char* byte_for(void *p) const { return (char*)&byte_map[long((char*)p - low_boundary) >> card_shift]; }
   oop*  oop_for(char* p) const 	{ return (oop*)(low_boundary  +  ((p - byte_map) <<  card_shift)); }
 
-  friend oop*  card_for(oop* p) { return (oop*)(int(p) & ~(card_size - 1)); }
+  friend oop*  card_for(oop* p) { return (oop*)((long)p & ~(card_size - 1)); }
   
   inline char* byte_map_end() const;
  
@@ -84,3 +87,6 @@ class rSet: public CHeapObj {
   rSet(rSet *old, char *start, char *end);
   bool has_page_dirty_objects(oldSpace* sp, char* page);
 };
+
+
+#endif // VM_MEMORY_RSET_HPP_HPP

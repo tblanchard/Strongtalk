@@ -21,9 +21,49 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_tempDecoder.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "symbolOop.hpp"
+#include "klassOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "methodOop.hpp"
+#include "tempDecoder.hpp"
 #define NEXT                        \
   pos++;                            \
   if (pos > len) return;            \
@@ -135,32 +175,32 @@ bool TempDecoder::is_heap_parameter(byteArrayOop name, objArrayOop tempInfo) {
 }
 
 void TempPrinter::decode(methodOop method, int bci) {
-  std->print_cr("TempDecoding:");
+  stdOut->print_cr("TempDecoding:");
   TempDecoder::decode(method, bci);
 }
 
 void TempPrinter::parameter(byteArrayOop name, int index) {
-  std->print_cr("  param:      %s@%d", name->as_string(), index);
+  stdOut->print_cr("  param:      %s@%d", name->as_string(), index);
 }
 
 void TempPrinter::stack_temp(byteArrayOop name, int no) {
-  std->print_cr("  stack temp: %s@%d", name->as_string(), no);
+  stdOut->print_cr("  stack temp: %s@%d", name->as_string(), no);
 }
 
 void TempPrinter::stack_float_temp(byteArrayOop name, int fno) {
-  std->print_cr("  stack float temp: %s@%d", name->as_string(), fno);
+  stdOut->print_cr("  stack float temp: %s@%d", name->as_string(), fno);
 }
 
 void TempPrinter::heap_temp(byteArrayOop name, int no){
-  std->print_cr("  heap temp:  %s@%d", name->as_string(), no);
+  stdOut->print_cr("  heap temp:  %s@%d", name->as_string(), no);
 }
 
 void TempPrinter::heap_parameter(byteArrayOop name, int no){
-  std->print_cr("  heap param:  %s@%d", name->as_string(), no);
+  stdOut->print_cr("  heap param:  %s@%d", name->as_string(), no);
 }
 
 void TempPrinter::no_debug_info() {
-  std->print_cr("method has no debug information");
+  stdOut->print_cr("method has no debug information");
 }
 
 

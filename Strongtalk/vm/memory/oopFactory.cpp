@@ -21,16 +21,68 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_oopFactory.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "vframeOop.hpp"
+#include "symbolOop.hpp"
+#include "associationKlass.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "ageTable.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "objArrayKlass.hpp"
+#include "vframeKlass.hpp"
+#include "processOop.hpp"
+#include "oopFactory.hpp"
+#include "doubleOop.hpp"
+#include "symbolTable.hpp"
+#include "doubleKlass.hpp"
+#include "byteArrayKlass.hpp"
 byteArrayOop oopFactory::new_byteArray(int size) {
   byteArrayKlass* bk =
     (byteArrayKlass*) Universe::byteArrayKlassObj()->klass_part();
   return byteArrayOop(bk->allocateObjectSize(size));
 }
 
-byteArrayOop oopFactory::new_byteArray(char* name) {
+byteArrayOop oopFactory::new_byteArray(const char* name) {
   int len = strlen(name);
   byteArrayOop result = new_byteArray(len);
   for (int index = 0; index < len; index++) {
@@ -75,11 +127,11 @@ doubleOop oopFactory::clone_double_to_oldspace(doubleOop value) {
   return d;
 }
 
-symbolOop oopFactory::new_symbol(char* name,int len) {
+symbolOop oopFactory::new_symbol(const char* name,int len) {
   return Universe::symbol_table->lookup(name, len);
 }
 
-symbolOop oopFactory::new_symbol(char* name) {
+symbolOop oopFactory::new_symbol(const char* name) {
   return new_symbol(name, strlen(name));
 }
 

@@ -22,11 +22,52 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_symbolKlass.cpp.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "symbolOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "symbolTable.hpp"
+#include "byteArrayKlass.hpp"
+#include "symbolKlass.hpp"
 # include <ctype.h>
 
-symbolOop symbolKlass::allocateSymbol(char* value, int len) {
+symbolOop symbolKlass::allocateSymbol(const char* value, int len) {
   symbolOop sym = as_symbolOop(Universe::allocate_tenured(object_size(len)));
   sym->init_untagged_contents_mark();
   sym->set_klass_field(Universe::symbolKlassObj());
@@ -79,9 +120,9 @@ void symbolKlass::oop_print_value_on(oop obj, outputStream* st) {
 
 void symbolKlass::print(oop obj) {
   assert_symbol(obj, "dispatch check");
-  std->print("'");
+  stdOut->print("'");
   symbolOop(obj)->print_symbol_on();
-  std->print("' ");
+  stdOut->print("' ");
 }
 
 oop symbolKlass::oop_shallow_copy(oop obj, bool tenured) {

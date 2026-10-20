@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_NATIVEINSTRUCTION_HPP_HPP
+#define VM_CODE_NATIVEINSTRUCTION_HPP_HPP
 
 
 // The base class for differnt kinds of native instruction abstractions.
@@ -42,6 +44,9 @@ class NativeInstruction: ValueObj {
 // An abstraction for accessing/manipulating native call imm32 instructions.
 // (used to manipulate inline caches, primitive & dll calls, etc.)
 
+class NativeCall;
+NativeCall* nativeCall_from_relocInfo(char* displacement_address);
+NativeCall* nativeCall_from_return_address(char* return_address);
 class NativeCall: public NativeInstruction {
  public:
   enum Intel_specific_constants {
@@ -194,3 +199,5 @@ inline IC_Info* ic_info_at(char* address)
 {
     return (IC_Info*)nativeTest_at(address);
 }
+
+#endif // VM_CODE_NATIVEINSTRUCTION_HPP_HPP

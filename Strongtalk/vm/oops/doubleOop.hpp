@@ -20,12 +20,15 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_DOUBLEOOP_HPP_HPP
+#define VM_OOPS_DOUBLEOOP_HPP_HPP
 
 // Layout format:
 //   [Header]
 //   [Klass ]
 //   [Double]   (contains untagged values)
 
+doubleOop as_doubleOop(void* p);
 class doubleOopDesc: public memOopDesc {
  private:
   // instance variables
@@ -52,3 +55,6 @@ class doubleOopDesc: public memOopDesc {
 
   friend doubleKlass;
 };
+
+
+#endif // VM_OOPS_DOUBLEOOP_HPP_HPP

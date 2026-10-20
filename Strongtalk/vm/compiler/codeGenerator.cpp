@@ -21,10 +21,113 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "proxyOop.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "prim_def.hpp"
+#include "block_prims.hpp"
+#include "recompiler.hpp"
+#include "abort.hpp"
+#include "uncommonBranch.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "vmOperations.hpp"
+#include "locations.hpp"
+#include "pregMapping.hpp"
+#include "codeGenerator.hpp"
+#include "loopOpt.hpp"
+#include "regAlloc.hpp"
+#include "stubRoutines.hpp"
+#include "disassembler.hpp"
+#include "objArrayOop.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_codeGenerator.cpp.incl"
 
 
 // Sometimes a little stub has to be generated if a merge between two execution
@@ -123,7 +226,7 @@ class DebugInfoWriter: public PRegClosure {
 	}
 	// debugging
 	if (PrintDebugInfoGeneration) {
-	  std->print_cr("%5d: %-20s @ %s", pc_offset, preg->name(), new_loc.name());
+	  stdOut->print_cr("%5d: %-20s @ %s", pc_offset, preg->name(), new_loc.name());
 	}
 	rec->changeLogicalAddress(preg->logicalAddress(), nameNode, pc_offset);
       }
@@ -134,7 +237,7 @@ class DebugInfoWriter: public PRegClosure {
 
 
   void print() {
-    std->print_cr("a DebugInfoWriter");
+    stdOut->print_cr("a DebugInfoWriter");
   }
 };
 
@@ -310,8 +413,8 @@ void CodeGenerator::generateMergeStubs() {
   char* start_pc = _masm->pc();
   while (_mergeStubs.nonEmpty()) _mergeStubs.pop()->generateMergeStub();
   if (PrintCodeGeneration && _masm->pc() > start_pc) {
-    std->print("---\n");
-    std->print("fixup merge stubs\n");
+    stdOut->print("---\n");
+    stdOut->print("fixup merge stubs\n");
     _masm->code()->decode();
   }
 }
@@ -329,7 +432,7 @@ char* CodeGenerator::nmethodAddress() const {
 void CodeGenerator::incrementInvocationCounter() {
   // Generates code to increment the nmethod execution counter
   char* addr = nmethodAddress() + nmethod::invocationCountOffset();
-  _masm->incl(Address(int(addr), relocInfo::internal_word_type));
+  _masm->incl(Address(x86_imm32(addr), relocInfo::internal_word_type));
 }
 
 
@@ -382,10 +485,10 @@ void CodeGenerator::finalize(InlinedScope* scope) {
   if (CompilerDebug) _masm->movl(eax, nofCompilations);
 
   if (PrintCodeGeneration) {
-    std->print("---\n");
-    std->print("merge stubs\n");
+    stdOut->print("---\n");
+    stdOut->print("merge stubs\n");
     _masm->code()->decode();
-    std->print("---\n");
+    stdOut->print("---\n");
   }
 }
 
@@ -485,10 +588,10 @@ void CodeGenerator::finalize(InlinedScope* scope) {
   if (CompilerDebug) _masm->movl(eax, nofCompilations);
 
   if (PrintCodeGeneration) {
-    std->print("---\n");
-    std->print("entry point\n");
+    stdOut->print("---\n");
+    stdOut->print("entry point\n");
     _masm->code()->decode();
-    std->print("---\n");
+    stdOut->print("---\n");
   }
 }
 */
@@ -507,7 +610,7 @@ void CodeGenerator::storeCheck(Register obj) {
   // base changes. Advantage: only one instead of two instructions.
   Temporary base(_currentMapping);
   Temporary indx(_currentMapping);
-  _masm->movl(base.reg(), Address(int(&byte_map_base), relocInfo::external_word_type));
+  _masm->movl(base.reg(), Address(x86_imm32(&byte_map_base), relocInfo::external_word_type));
   _masm->movl(indx.reg(), obj);						// do not destroy obj (a preg may be mapped to it)
   _masm->shrl(indx.reg(), card_shift);					// divide obj by card_size
   _masm->movb(Address(base.reg(), indx.reg(), Address::times_1), 0);	// clear entry
@@ -594,9 +697,9 @@ static int _numberOfNLRs	= 0;
 void CodeGenerator::indent() {
   const int maxIndent = 40;
   if (_callDepth <= maxIndent) {
-    std->print("%*s", _callDepth, "");
+    stdOut->print("%*s", _callDepth, "");
   } else {
-    std->print("%*d: ", maxIndent-2, _callDepth);
+    stdOut->print("%*d: ", maxIndent-2, _callDepth);
   }
 }
 
@@ -631,7 +734,7 @@ void CodeGenerator::verifyArguments(oop recv, oop* ebp, int nofArgs) {
   _callDepth++;
   if (TraceCalls) { 
     ResourceMark rm;
-    indent(); std->print("( %s %s ", recv->print_value_string(), nmethodName());
+    indent(); stdOut->print("( %s %s ", recv->print_value_string(), nmethodName());
   }
   verifyObj(recv);
   int i = nofArgs;
@@ -642,13 +745,13 @@ void CodeGenerator::verifyArguments(oop recv, oop* ebp, int nofArgs) {
     if (TraceCalls) {
       ResourceMark rm;
       if (print_args_long || (*arg)->is_smi()) {
-        std->print("%s ", (*arg)->print_value_string());
+        stdOut->print("%s ", (*arg)->print_value_string());
       } else {
-        std->print("0x%x ", *arg);
+        stdOut->print("0x%x ", *arg);
       }
     }
   }
-  if (TraceCalls) std->cr();
+  if (TraceCalls) stdOut->cr();
   if (VerifyDebugInfo) { 
     deltaVFrame* f = DeltaProcess::active()->last_delta_vframe();
     while (f != NULL) {
@@ -664,7 +767,7 @@ void CodeGenerator::verifyReturn(oop result) {
   result->verify();
   if (TraceCalls) {
     ResourceMark rm;
-    indent(); std->print(") %s -> %s\n", nmethodName(), result->print_value_string());
+    indent(); stdOut->print(") %s -> %s\n", nmethodName(), result->print_value_string());
   }
   _callDepth--;
 }
@@ -680,7 +783,7 @@ void CodeGenerator::verifyNLR(char* fp, char* nlrFrame, int nlrScopeID, oop resu
   result->verify();
   if (TraceCalls) {
     ResourceMark rm;
-    indent(); std->print(") %s  ^ %s\n", nmethodName(), result->print_value_string());
+    indent(); stdOut->print(") %s  ^ %s\n", nmethodName(), result->print_value_string());
   }
   _callDepth--;
 }
@@ -753,7 +856,7 @@ static bool bb_needs_jump;
 
 
 void CodeGenerator::beginOfBasicBlock(Node* node) {
-  if (PrintCodeGeneration && WizardMode) std->print("--- begin of basic block (N%d) ---\n", node->id());
+  if (PrintCodeGeneration && WizardMode) stdOut->print("--- begin of basic block (N%d) ---\n", node->id());
   bindLabel(node);
 }
 
@@ -763,7 +866,7 @@ void CodeGenerator::endOfBasicBlock(Node* node) {
     Node* from = node;
     Node* to   = node->next();
     if (PrintCodeGeneration) {
-      std->print("branch from N%d to N%d\n", from->id(), to->id());
+      stdOut->print("branch from N%d to N%d\n", from->id(), to->id());
       if (PrintPRegMapping) _currentMapping->print();
     }
     jmp(from, to);
@@ -771,7 +874,7 @@ void CodeGenerator::endOfBasicBlock(Node* node) {
     if (PrintCodeGeneration) _masm->code()->decode();
   }
 
-  if (PrintCodeGeneration && WizardMode) std->print("--- end of basic block (N%d) ---\n", node->id());
+  if (PrintCodeGeneration && WizardMode) stdOut->print("--- end of basic block (N%d) ---\n", node->id());
 }
 
 
@@ -793,10 +896,10 @@ void CodeGenerator::beginOfNode(Node* node) {
   if (GenerateFullDebugInfo) updateDebuggingInfo(node);
   // debugging
   if (PrintCodeGeneration) {
-    std->print("---\n");
-    std->print("N%d: ", node->id());
+    stdOut->print("---\n");
+    stdOut->print("N%d: ", node->id());
     node->print();
-    std->print(" (bci = %d)\n", node->bci());
+    stdOut->print(" (bci = %d)\n", node->bci());
     if (PrintPRegMapping) _currentMapping->print();
   }
   bb_needs_jump = true;
@@ -884,10 +987,10 @@ void CodeGenerator::aPrologueNode(PrologueNode* node) {
   Label recompile_stub_call;
   if (RecompilationPolicy::needRecompileCounter(theCompiler)) {
     char* addr = nmethodAddress() + nmethod::invocationCountOffset();
-    _masm->movl(temp1, Address(int(addr), relocInfo::internal_word_type));
+    _masm->movl(temp1, Address(x86_imm32(addr), relocInfo::internal_word_type));
     _masm->incl(temp1);
     _masm->cmpl(temp1, theCompiler->get_invocation_counter_limit());
-    _masm->movl(Address(int(addr), relocInfo::internal_word_type), temp1);
+    _masm->movl(Address(x86_imm32(addr), relocInfo::internal_word_type), temp1);
     _masm->jcc(Assembler::greaterEqual, recompile_stub_call);
     //
     // need to fix this:
@@ -1092,7 +1195,7 @@ void CodeGenerator::arithROOp(ArithOpCode op, Register x, oop y) { // x := x op 
 
 void CodeGenerator::arithRXOp(ArithOpCode op, Register x, oop y) { // x := x op y
   if (y->is_smi()) {
-    arithRCOp(op, x, int(y));				// y is smiOop -> needs no relocation info
+    arithRCOp(op, x, x86_imm32(y));				// y is smiOop -> needs no relocation info
   } else {
     arithROOp(op, x, y);
   }
@@ -1221,7 +1324,7 @@ void CodeGenerator::aContextCreateNode(ContextCreateNode* node) {
     case 1 : // fall through for now - fix this
     case 2 : // fall through for now - fix this
     default:
-      _masm->pushl(int(as_smiOop(node->nofTemps())));
+      _masm->pushl(x86_imm32(as_smiOop(node->nofTemps())));
       aPrimNode(node);
       _masm->addl(esp, oopSize);	// pop argument, this is not a Pascal call - change this as some point?
       break;
@@ -1230,7 +1333,7 @@ void CodeGenerator::aContextCreateNode(ContextCreateNode* node) {
   Register context_reg = use(node->dst());
   if (node->src() == NULL) {
     assert(node->scope()->isMethodScope() || node->scope()->method()->block_info() == methodOopDesc::expects_nil, "inconsistency");
-    _masm->movl(Address(context_reg, contextOopDesc::parent_byte_offset()), NULL);
+    _masm->movl(Address(context_reg, contextOopDesc::parent_byte_offset()), (int) 0);
     // NULL for now; the interpreter uses nil. However, some of the
     // context verification code called from compiled code checks for
     // parents that are either a frame pointer, NULL or a context.
@@ -1327,7 +1430,7 @@ void CodeGenerator::materializeBlock(BlockCreateNode* node) {
     case 1 : // fall through for now - fix this
     case 2 : // fall through for now - fix this
     default:
-      _masm->pushl(int(as_smiOop(nofArgs)));
+      _masm->pushl(x86_imm32(as_smiOop(nofArgs)));
       aPrimNode(node);			// Note: primitive calls are called via call_C - also necessary for primitiveValue calls?
       _masm->addl(esp, oopSize);	// pop argument, this is not a Pascal call - change this at some point?
       break;
@@ -1340,7 +1443,7 @@ void CodeGenerator::materializeBlock(BlockCreateNode* node) {
   // assert(theCompiler->jumpTableID == closure->parent_id(), "nmethod id must be the same");
   // fix this: RELOCATION INFORMATION IS NEEDED WHEN MOVING THE JUMPTABLE (Snapshot reading etc.)
   _masm->movl(Address(closure_reg, blockClosureOopDesc::context_byte_offset()        ),	use(closure->context()));
-  _masm->movl(Address(closure_reg, blockClosureOopDesc::method_or_entry_byte_offset()),	(int)closure->jump_table_entry());
+  _masm->movl(Address(closure_reg, blockClosureOopDesc::method_or_entry_byte_offset()),	x86_imm32(closure->jump_table_entry()));
   storeCheck(closure_reg);
 }
 
@@ -1445,7 +1548,7 @@ void CodeGenerator::aDLLNode(DLLNode* node) {
   // CompiledDLL_Cache
   // This code pattern must correspond to the CompiledDLL_Cache layout
   // (make sure assembler is not optimizing mov reg, 0 into xor reg, reg!)
-  _masm->movl(edx, int(node->function()));		// part of CompiledDLL_Cache
+  _masm->movl(edx, x86_imm32(node->function()));		// part of CompiledDLL_Cache
   _masm->inline_oop(node->dll_name());			// part of CompiledDLL_Cache
   _masm->inline_oop(node->function_name());		// part of CompiledDLL_Cache
   _masm->call(entry, relocInfo::runtime_call_type);	// call lookup/parameter conversion routine
@@ -2083,7 +2186,7 @@ void CodeGenerator::anArrayAtNode(ArrayAtNode* node) {
   // use temporary register for index - will be modified
   Temporary offset(_currentMapping, index);
   // first element is at index 1 => subtract smi(1) (doesn't change smi/oop property)
-  theMacroAssm->subl(offset.reg(), int(smiOop_one));
+  theMacroAssm->subl(offset.reg(), x86_imm32(smiOop_one));
   // do index smi check if necessary (still possible, even after subtracting smi(1))
   Label indexNotSmi;
   if (!node->index_is_smi()) {
@@ -2182,7 +2285,7 @@ void CodeGenerator::anArrayAtPutNode(ArrayAtPutNode* node) {
   // use temporary register for index - will be modified
   Temporary offset(_currentMapping, index);
   // first element is at index 1 => subtract smi(1) (doesn't change smi/oop property)
-  theMacroAssm->subl(offset.reg(), int(smiOop_one));
+  theMacroAssm->subl(offset.reg(), x86_imm32(smiOop_one));
   // do index smi check if necessary (still possible, even after subtracting smi(1))
   Label indexNotSmi;
   if (!node->index_is_smi()) {

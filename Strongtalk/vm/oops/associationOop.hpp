@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_ASSOCIATIONOOP_HPP_HPP
+#define VM_OOPS_ASSOCIATIONOOP_HPP_HPP
 
 // Associations are cons cells (key, value) used in the Delta system dictionary.
 //  - associationOops      are mutable.
@@ -32,6 +34,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 //  [value       ]
 //  [is_constant ]
 
+associationOop as_associationOop(void* p);
 class associationOopDesc: public memOopDesc {
  protected:
   symbolOop _key;
@@ -63,3 +66,6 @@ class associationOopDesc: public memOopDesc {
   static int is_constant_offset() { return 4; } // offset of the is_constant field in words
   friend associationKlass;
 };
+
+
+#endif // VM_OOPS_ASSOCIATIONOOP_HPP_HPP

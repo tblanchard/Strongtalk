@@ -21,11 +21,75 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "vmOperations.hpp"
+#include "disassembler.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_jumpTable.cpp.incl"
 
 static const char halt_instruction = '\xF4';
 static const char jump_instruction = '\xE9';
@@ -112,10 +176,10 @@ void jumpTable::freeID(int index) {
 }
 
 void jumpTable::print() {
-  std->print_cr("jumpTable %#lx: capacity %ld (%ld used)", this, length, usedIDs);
+  stdOut->print_cr("jumpTable %#lx: capacity %ld (%ld used)", this, length, usedIDs);
   for (int i = 0; i < length; i++) {
     if (!major_at(i)->is_unused()) {
-      std->print(" %3d: ", i);
+      stdOut->print(" %3d: ", i);
       major_at(i)->print();
     }
   }
@@ -178,12 +242,12 @@ void jumpTableEntry::initialize_as_link(char* link) {
 }
 
 void jumpTableEntry::initialize_nmethod_stub(char* dest) {
-  fill_entry(jump_instruction, dest - (int) state_addr(), nmethod_entry);
+  fill_entry(jump_instruction, (char*) (dest - (char*) state_addr()), nmethod_entry);	// INTEL-SPECIFIC: relative jump
 }
 
 void jumpTableEntry::initialize_block_closure_stub() {
   fill_entry(jump_instruction,
-	     StubRoutines::compile_block_entry() - (int) state_addr(),
+	     StubRoutines::compile_block_entry() - x86_imm32(state_addr()),
              block_closure_entry);
 }
 
@@ -212,16 +276,16 @@ char** jumpTableEntry::destination_addr() const {
 }
 
 char* jumpTableEntry::destination() const {
-  return *destination_addr() + (int) state_addr();
+  return *destination_addr() + x86_imm32(state_addr());
 }
 
 void jumpTableEntry::set_destination(char* dest) {
-  *destination_addr() = dest - (int) state_addr();
+  *destination_addr() = dest - x86_imm32(state_addr());
 }
 
 int jumpTableEntry::next_free() const {
   assert(is_unused(), "must be a unused entry");
-  return (int) *destination_addr();
+  return x86_imm32(*destination_addr());
 }
 
 nmethod* jumpTableEntry::method() const {
@@ -277,35 +341,35 @@ nmethod* jumpTableEntry::parent_nmethod(int& index) const {
 
 void jumpTableEntry::print() {
   if (is_unused()) { 
-    std->print_cr("Unused {next = %d}", (int) destination());
+    stdOut->print_cr("Unused {next = %d}", (intptr_t) destination());
     return;
   }
   if (is_nmethod_stub()) {
-    std->print("Nmethod stub ");
+    stdOut->print("Nmethod stub ");
     Disassembler::decode(jump_inst_addr(), state_addr());
     nmethod* nm = method();
     if (nm) {
       nm->key.print();
     } else {
-      std->print_cr("{not pointing to nmethod}");
+      stdOut->print_cr("{not pointing to nmethod}");
     }
     return;
   }
 
   if (is_block_closure_stub()) {
-    std->print("Block closure stub");
+    stdOut->print("Block closure stub");
     Disassembler::decode(jump_inst_addr(), state_addr());
     nmethod* nm = block_nmethod();
     if (nm) {
       nm->key.print();
     } else {
-      std->print_cr("{not compiled yet}");
+      stdOut->print_cr("{not compiled yet}");
     }
     return;
   }
 
   if (is_link()) {
-    std->print_cr("Link for:");
+    stdOut->print_cr("Link for:");
     jumpTable::jump_entry_for_at(link(), 0)->print();
     return;
   }

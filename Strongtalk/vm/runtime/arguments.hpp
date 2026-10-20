@@ -20,8 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_ARGUMENTS_HPP_HPP
+#define VM_RUNTIME_ARGUMENTS_HPP_HPP
 
 // parse_arguments parses the command line arguments.
-extern char* boot_filename;
+extern const char* boot_filename;
 void parse_arguments(int argc, char* argv[]);
-void process_settings_file(char* file_name, bool quiet = false);
+void process_settings_file(const char* file_name, bool quiet = false);
+
+#endif // VM_RUNTIME_ARGUMENTS_HPP_HPP

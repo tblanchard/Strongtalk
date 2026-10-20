@@ -20,6 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_VMSYMBOLS_HPP_HPP
+#define VM_MEMORY_VMSYMBOLS_HPP_HPP
+
+#include "oopsHierarchy.hpp"
+#include "symbolOop.hpp"
 
 
 #define VMSYMBOLS(template) \
@@ -60,11 +65,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   template(bitInvert,                    "bitInvert")              	\
   template(and_,  	                 "and:")       			\
   template(or_,				 "or:")  	           	\
-  template(and,  	                 "&&")        			\
-  template(or,				 "||")    	         	\
+  template(and_op,  	                 "&&")        			\
+  template(or_op,				 "||")    	         	\
   template(and1,  	                 "&")        			\
   template(or1,				 "|")  	 	          	\
-  template(not,  	                 "not")        			\
+  template(not_op,  	                 "not")        			\
   template(xor_,  	                 "xor:")       			\
   template(eqv_,  	                 "eqv:")       			\
   template(at,                           "at:")                    	\
@@ -160,7 +165,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 #define VMSYMBOL_POSTFIX  _enum
-#define VMSYMBOL_ENUM_NAME(name) name##VMSYMBOL_POSTFIX
+#define VMSYMBOL_ENUM_NAME(name) name##_enum
 
 #define VMSYMBOL_ENUM(name,string) VMSYMBOL_ENUM_NAME(name),
 
@@ -178,7 +183,139 @@ class vmSymbols : AllStatic {
   friend void vmSymbols_init();
  public:
   static void initialize();
-  VMSYMBOLS(VMSYMBOL_DECL)
+  typedef class symbolOopDesc* symbolOop;
+  static symbolOop smi_overflow() { return vm_symbols[smi_overflow_enum]; }
+  static symbolOop division_by_zero() { return vm_symbols[division_by_zero_enum]; }
+  static symbolOop receiver_has_wrong_type() { return vm_symbols[receiver_has_wrong_type_enum]; }
+  static symbolOop division_not_exact() { return vm_symbols[division_not_exact_enum]; }
+  static symbolOop first_argument_has_wrong_type() { return vm_symbols[first_argument_has_wrong_type_enum]; }
+  static symbolOop second_argument_has_wrong_type() { return vm_symbols[second_argument_has_wrong_type_enum]; }
+  static symbolOop third_argument_has_wrong_type() { return vm_symbols[third_argument_has_wrong_type_enum]; }
+  static symbolOop fourth_argument_has_wrong_type() { return vm_symbols[fourth_argument_has_wrong_type_enum]; }
+  static symbolOop fifth_argument_has_wrong_type() { return vm_symbols[fifth_argument_has_wrong_type_enum]; }
+  static symbolOop sixth_argument_has_wrong_type() { return vm_symbols[sixth_argument_has_wrong_type_enum]; }
+  static symbolOop seventh_argument_has_wrong_type() { return vm_symbols[seventh_argument_has_wrong_type_enum]; }
+  static symbolOop eighth_argument_has_wrong_type() { return vm_symbols[eighth_argument_has_wrong_type_enum]; }
+  static symbolOop ninth_argument_has_wrong_type() { return vm_symbols[ninth_argument_has_wrong_type_enum]; }
+  static symbolOop tenth_argument_has_wrong_type() { return vm_symbols[tenth_argument_has_wrong_type_enum]; }
+  static symbolOop argument_has_wrong_type() { return vm_symbols[argument_has_wrong_type_enum]; }
+  static symbolOop argument_is_invalid() { return vm_symbols[argument_is_invalid_enum]; }
+  static symbolOop conversion_failed() { return vm_symbols[conversion_failed_enum]; }
+  static symbolOop not_found() { return vm_symbols[not_found_enum]; }
+  static symbolOop plus() { return vm_symbols[plus_enum]; }
+  static symbolOop minus() { return vm_symbols[minus_enum]; }
+  static symbolOop multiply() { return vm_symbols[multiply_enum]; }
+  static symbolOop divide() { return vm_symbols[divide_enum]; }
+  static symbolOop mod() { return vm_symbols[mod_enum]; }
+  static symbolOop point_at() { return vm_symbols[point_at_enum]; }
+  static symbolOop equal() { return vm_symbols[equal_enum]; }
+  static symbolOop not_equal() { return vm_symbols[not_equal_enum]; }
+  static symbolOop less_than() { return vm_symbols[less_than_enum]; }
+  static symbolOop less_than_or_equal() { return vm_symbols[less_than_or_equal_enum]; }
+  static symbolOop greater_than() { return vm_symbols[greater_than_enum]; }
+  static symbolOop greater_than_or_equal() { return vm_symbols[greater_than_or_equal_enum]; }
+  static symbolOop bitAnd_() { return vm_symbols[bitAnd__enum]; }
+  static symbolOop bitOr_() { return vm_symbols[bitOr__enum]; }
+  static symbolOop bitXor_() { return vm_symbols[bitXor__enum]; }
+  static symbolOop bitShift_() { return vm_symbols[bitShift__enum]; }
+  static symbolOop bitInvert() { return vm_symbols[bitInvert_enum]; }
+  static symbolOop and_() { return vm_symbols[and__enum]; }
+  static symbolOop or_() { return vm_symbols[or__enum]; }
+  static symbolOop and_op() { return vm_symbols[and_op_enum]; }
+  static symbolOop or_op() { return vm_symbols[or_op_enum]; }
+  static symbolOop and1() { return vm_symbols[and1_enum]; }
+  static symbolOop or1() { return vm_symbols[or1_enum]; }
+  static symbolOop not_op() { return vm_symbols[not_op_enum]; }
+  static symbolOop xor_() { return vm_symbols[xor__enum]; }
+  static symbolOop eqv_() { return vm_symbols[eqv__enum]; }
+  static symbolOop at() { return vm_symbols[at_enum]; }
+  static symbolOop at_put() { return vm_symbols[at_put_enum]; }
+  static symbolOop size() { return vm_symbols[size_enum]; }
+  static symbolOop double_equal() { return vm_symbols[double_equal_enum]; }
+  static symbolOop double_tilde() { return vm_symbols[double_tilde_enum]; }
+  static symbolOop out_of_bounds() { return vm_symbols[out_of_bounds_enum]; }
+  static symbolOop index_not_valid() { return vm_symbols[index_not_valid_enum]; }
+  static symbolOop not_yet_implemented() { return vm_symbols[not_yet_implemented_enum]; }
+  static symbolOop indexable() { return vm_symbols[indexable_enum]; }
+  static symbolOop not_oops() { return vm_symbols[not_oops_enum]; }
+  static symbolOop not_clonable() { return vm_symbols[not_clonable_enum]; }
+  static symbolOop value_out_of_range() { return vm_symbols[value_out_of_range_enum]; }
+  static symbolOop method_construction_failed() { return vm_symbols[method_construction_failed_enum]; }
+  static symbolOop primitive_not_defined() { return vm_symbols[primitive_not_defined_enum]; }
+  static symbolOop smi_conversion_failed() { return vm_symbols[smi_conversion_failed_enum]; }
+  static symbolOop not_klass() { return vm_symbols[not_klass_enum]; }
+  static symbolOop selector_for_blockMethod() { return vm_symbols[selector_for_blockMethod_enum]; }
+  static symbolOop not_indexable() { return vm_symbols[not_indexable_enum]; }
+  static symbolOop to_by_do() { return vm_symbols[to_by_do_enum]; }
+  static symbolOop value() { return vm_symbols[value_enum]; }
+  static symbolOop value_() { return vm_symbols[value__enum]; }
+  static symbolOop if_true() { return vm_symbols[if_true_enum]; }
+  static symbolOop if_true_false() { return vm_symbols[if_true_false_enum]; }
+  static symbolOop if_false() { return vm_symbols[if_false_enum]; }
+  static symbolOop if_false_true() { return vm_symbols[if_false_true_enum]; }
+  static symbolOop while_true() { return vm_symbols[while_true_enum]; }
+  static symbolOop while_true_() { return vm_symbols[while_true__enum]; }
+  static symbolOop while_false() { return vm_symbols[while_false_enum]; }
+  static symbolOop while_false_() { return vm_symbols[while_false__enum]; }
+  static symbolOop empty_queue() { return vm_symbols[empty_queue_enum]; }
+  static symbolOop is_absent() { return vm_symbols[is_absent_enum]; }
+  static symbolOop in_scheduler() { return vm_symbols[in_scheduler_enum]; }
+  static symbolOop in_async_dll() { return vm_symbols[in_async_dll_enum]; }
+  static symbolOop not_in_scheduler() { return vm_symbols[not_in_scheduler_enum]; }
+  static symbolOop initialized() { return vm_symbols[initialized_enum]; }
+  static symbolOop yielded() { return vm_symbols[yielded_enum]; }
+  static symbolOop running() { return vm_symbols[running_enum]; }
+  static symbolOop stopped() { return vm_symbols[stopped_enum]; }
+  static symbolOop preempted() { return vm_symbols[preempted_enum]; }
+  static symbolOop completed() { return vm_symbols[completed_enum]; }
+  static symbolOop dead() { return vm_symbols[dead_enum]; }
+  static symbolOop aborted() { return vm_symbols[aborted_enum]; }
+  static symbolOop boolean_error() { return vm_symbols[boolean_error_enum]; }
+  static symbolOop lookup_error() { return vm_symbols[lookup_error_enum]; }
+  static symbolOop primitive_lookup_error() { return vm_symbols[primitive_lookup_error_enum]; }
+  static symbolOop DLL_lookup_error() { return vm_symbols[DLL_lookup_error_enum]; }
+  static symbolOop NLR_error() { return vm_symbols[NLR_error_enum]; }
+  static symbolOop float_error() { return vm_symbols[float_error_enum]; }
+  static symbolOop stack_overflow() { return vm_symbols[stack_overflow_enum]; }
+  static symbolOop is_installed() { return vm_symbols[is_installed_enum]; }
+  static symbolOop failed() { return vm_symbols[failed_enum]; }
+  static symbolOop abs() { return vm_symbols[abs_enum]; }
+  static symbolOop negated() { return vm_symbols[negated_enum]; }
+  static symbolOop squared() { return vm_symbols[squared_enum]; }
+  static symbolOop sqrt() { return vm_symbols[sqrt_enum]; }
+  static symbolOop sin() { return vm_symbols[sin_enum]; }
+  static symbolOop cos() { return vm_symbols[cos_enum]; }
+  static symbolOop tan() { return vm_symbols[tan_enum]; }
+  static symbolOop exp() { return vm_symbols[exp_enum]; }
+  static symbolOop ln() { return vm_symbols[ln_enum]; }
+  static symbolOop as_float() { return vm_symbols[as_float_enum]; }
+  static symbolOop as_float_value() { return vm_symbols[as_float_value_enum]; }
+  static symbolOop negative_size() { return vm_symbols[negative_size_enum]; }
+  static symbolOop not_active() { return vm_symbols[not_active_enum]; }
+  static symbolOop primitive_disabled_in_product() { return vm_symbols[primitive_disabled_in_product_enum]; }
+  static symbolOop activation_is_invalid() { return vm_symbols[activation_is_invalid_enum]; }
+  static symbolOop external_activation() { return vm_symbols[external_activation_enum]; }
+  static symbolOop mem_klass() { return vm_symbols[mem_klass_enum]; }
+  static symbolOop association_klass() { return vm_symbols[association_klass_enum]; }
+  static symbolOop blockClosure_klass() { return vm_symbols[blockClosure_klass_enum]; }
+  static symbolOop byteArray_klass() { return vm_symbols[byteArray_klass_enum]; }
+  static symbolOop symbol_klass() { return vm_symbols[symbol_klass_enum]; }
+  static symbolOop context_klass() { return vm_symbols[context_klass_enum]; }
+  static symbolOop doubleByteArray_klass() { return vm_symbols[doubleByteArray_klass_enum]; }
+  static symbolOop doubleValueArray_klass() { return vm_symbols[doubleValueArray_klass_enum]; }
+  static symbolOop double_klass() { return vm_symbols[double_klass_enum]; }
+  static symbolOop klass_klass() { return vm_symbols[klass_klass_enum]; }
+  static symbolOop method_klass() { return vm_symbols[method_klass_enum]; }
+  static symbolOop mixin_klass() { return vm_symbols[mixin_klass_enum]; }
+  static symbolOop objArray_klass() { return vm_symbols[objArray_klass_enum]; }
+  static symbolOop weakArray_klass() { return vm_symbols[weakArray_klass_enum]; }
+  static symbolOop process_klass() { return vm_symbols[process_klass_enum]; }
+  static symbolOop vframe_klass() { return vm_symbols[vframe_klass_enum]; }
+  static symbolOop proxy_klass() { return vm_symbols[proxy_klass_enum]; }
+  static symbolOop smi_klass() { return vm_symbols[smi_klass_enum]; }
+  static symbolOop error() { return vm_symbols[error_enum]; }
+  static symbolOop error_() { return vm_symbols[error__enum]; }
+  static symbolOop subclassResponsibility() { return vm_symbols[subclassResponsibility_enum]; }
 
   // operations for memory management.
   static void follow_contents();
@@ -202,3 +339,6 @@ inline symbolOop unmarkSymbol(oop sym) {
   assert(res->is_symbol(), "must be symbol");
   return symbolOop(res);
 }
+
+
+#endif // VM_MEMORY_VMSYMBOLS_HPP_HPP

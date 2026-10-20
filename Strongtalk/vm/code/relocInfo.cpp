@@ -21,11 +21,73 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "stubRoutines.hpp"
+#include "prim.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "abort.hpp"
+#include "compiledPIC.hpp"
+#include "uncommonBranch.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_relocInfo.cpp.incl"
 
 relocInfo::relocInfo(int t, int off) {
   assert(0 <= t && t < (1 << reloc_type_width), "wrong type");
@@ -40,27 +102,27 @@ int relocInfo::print(nmethod* m, int last_offset) {
   int* addr = (int*) (m->insts() + current_offset);
   printIndent();
   if (isOop()) {
-    std->print("embedded oop   @0x%lx = ", addr);
-    oop(*addr)->print_value();
+    stdOut->print("embedded oop   @0x%lx = ", addr);
+    (*(oop*) addr)->print_value();
   } else {
     assert(isCall(), "must be a call");
-    char* target = (char*) (*addr + (int) addr + oopSize);
+    char* target = (char*) addr + sizeof(int32_t) + *(int32_t*) addr;	// INTEL-SPECIFIC: rel32 call displacement
     if (isIC()) {
-      std->print("inline cache   @0x%lx", addr);
+      stdOut->print("inline cache   @0x%lx", addr);
     } else if (isPrimitive()) {
-      std->print("primitive call @0x%lx = ", addr);
+      stdOut->print("primitive call @0x%lx = ", addr);
       primitive_desc* pd = primitives::lookup((fntype) target);
       if (pd != NULL) {
-        std->print("(%s)", pd->name());
+        stdOut->print("(%s)", pd->name());
       } else {
-        std->print("runtime routine");
+        stdOut->print("runtime routine");
       }
     } else if (isDLL()) {
-      std->print("DLL call @0x%lx = ", addr);
+      stdOut->print("DLL call @0x%lx = ", addr);
     } else if (isUncommonTrap()) {
-      std->print("uncommon trap @0x%lx", addr);
+      stdOut->print("uncommon trap @0x%lx", addr);
     } else {
-      std->print("run-time call @0x%lx", addr);
+      stdOut->print("run-time call @0x%lx", addr);
     }
   }
   return current_offset;

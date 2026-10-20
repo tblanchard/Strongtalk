@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_INTERPRETER_INTERPRETERSTATISTICS_HPP_HPP
+#define VM_INTERPRETER_INTERPRETERSTATISTICS_HPP_HPP
 
 // Collects statistical information on the interpreter.
 
@@ -39,3 +41,6 @@ class InterpreterStatistics: AllStatic {
 
   static void initialize();
 };
+
+
+#endif // VM_INTERPRETER_INTERPRETERSTATISTICS_HPP_HPP

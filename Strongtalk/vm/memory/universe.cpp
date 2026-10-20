@@ -22,9 +22,105 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_universe.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "inliningdb.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "disclaimer.hpp"
+#include "processOop.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "ncode.hpp"
+#include "prim.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objectIDTable.hpp"
+#include "ageTable.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
+#include "klassKlass.hpp"
+#include "nmethodScopes.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "shell.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "doubleOop.hpp"
+#include "doubleKlass.hpp"
+#include "byteArrayKlass.hpp"
+#include "symbolTable.hpp"
+#include "symbolKlass.hpp"
+#include "abort.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "interpreter.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "delta.hpp"
+#include "prettyPrinter.hpp"
+#include "oopFactory.hpp"
+#include "interpretedIC.hpp"
+#include "handle.hpp"
+#include "objArrayKlass.hpp"
+#include "printlayout.hpp"
+#include "mixinOop.hpp"
+#include "smiKlass.hpp"
+#include "processKlass.hpp"
 bool NeedScavenge  = false;
 bool bootstrapping = true;
 
@@ -35,22 +131,22 @@ void Universe::genesis() {
   ResourceMark rm;
 
   /*
-  std->print_cr("Delta version %d.%d%s (%s %s).",
+  stdOut->print_cr("Delta version %d.%d%s (%s %s).",
                 Universe::major_version(), Universe::minor_version(), Universe::beta_version(), 
 		__DATE__, __TIME__);
-  std->print_cr("Copyright 1994 - 1996, LongView Technologies L.L.C. All rights reserved.");
-  std->print_cr("(use argument -? for a list of flags)");
+  stdOut->print_cr("Copyright 1994 - 1996, LongView Technologies L.L.C. All rights reserved.");
+  stdOut->print_cr("(use argument -? for a list of flags)");
   */
   
-  std->cr();
+  stdOut->cr();
   Disclaimer::print_disclaimer();
-  std->print_cr("Version %d.%d (build %s %s)", Universe::major_version(), Universe::minor_version(), __DATE__, __TIME__);
-  std->print_cr("(use argument -? for a list of flags)");
-  std->cr();
+  stdOut->print_cr("Version %d.%d (build %s %s)", Universe::major_version(), Universe::minor_version(), __DATE__, __TIME__);
+  stdOut->print_cr("(use argument -? for a list of flags)");
+  stdOut->cr();
 
-  if (UseNewBackend | TryNewBackend)	std->print_cr("- VM using new backend (%s makeConformant)", UseNewMakeConformant ? "new" : "old");
+  if (UseNewBackend | TryNewBackend)	stdOut->print_cr("- VM using new backend (%s makeConformant)", UseNewMakeConformant ? "new" : "old");
   //if (Disclaimer::is_product())	Disclaimer::print_disclaimer();
-  if (Disclaimer::is_debug())		std->print_cr("- VM is in debug mode");
+  if (Disclaimer::is_debug())		stdOut->print_cr("- VM is in debug mode");
   if (!Interpreter::is_optimized())	Interpreter::print_code_status();
   
   scavengeCount = 0;
@@ -158,11 +254,11 @@ void Universe::verify(bool postScavenge) {
 
 
 void Universe::print() {
-  std->print_cr("Memory:");
+  stdOut->print_cr("Memory:");
   new_gen.print();
   old_gen.print();
   if (WizardMode) {
-    std->print_cr("  (threshold=%d)", tenuring_threshold);
+    stdOut->print_cr("  (threshold=%d)", tenuring_threshold);
   }
 }
 
@@ -175,7 +271,7 @@ oop* Universe::object_start(oop* p) {
 
 class PrintClosure: public ObjectClosure {
   void do_object(memOop obj) { 
-    PrintObjectClosure blk(std);
+    PrintObjectClosure blk(stdOut);
     blk.do_object(obj);
     obj->layout_iterate(&blk);
   }
@@ -337,7 +433,7 @@ symbolOop Universe::find_global_key_for(oop value, bool* meta) {
 }
 
 
-oop Universe::find_global(char* name, bool must_be_constant) {
+oop Universe::find_global(const char* name, bool must_be_constant) {
   if (!must_be_constant) {
     if (strcmp(name, "true")  == 0 ) return trueObj();
     if (strcmp(name, "false") == 0 ) return falseObj();
@@ -359,7 +455,7 @@ oop Universe::find_global(char* name, bool must_be_constant) {
 }
 
 
-associationOop Universe::find_global_association(char* name) {
+associationOop Universe::find_global_association(const char* name) {
   symbolOop sym = oopFactory::new_symbol(name);
 
   int l = systemDictionaryObj()->length();
@@ -601,7 +697,7 @@ void Universe::remove_global_at(int index) {
 }
 
 bool Universe::on_page_boundary(void* addr) {
-  return ((int) addr) % page_size() == 0;
+  return ((intptr_t) addr) % page_size() == 0;
 }
 
 int Universe::page_size() {

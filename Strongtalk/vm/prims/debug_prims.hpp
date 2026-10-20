@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_DEBUG_PRIMS_HPP_HPP
+#define VM_PRIMS_DEBUG_PRIMS_HPP_HPP
 
 // Primitives for debugging
 
@@ -257,3 +259,6 @@ class debugPrimitives : AllStatic {
   //%
   static PRIM_DECL_0(verify);
 };
+
+
+#endif // VM_PRIMS_DEBUG_PRIMS_HPP_HPP

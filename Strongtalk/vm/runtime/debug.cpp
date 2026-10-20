@@ -21,10 +21,42 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-#include "incls/_precompiled.incl"
-#include "incls/_debug.cpp.incl"
 
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "abort.hpp"
 // definition of boolean flags
 
 #define MATERIALIZE_BOOLEAN_FLAG(name,value,doc) \
@@ -44,7 +76,7 @@ APPLY_TO_INTEGER_FLAGS(MATERIALIZE_INTEGER_FLAG,MATERIALIZE_INTEGER_FLAG)
 // boolean flag table
 
 struct boolFlag {
-  char* name;
+  const char* name;
   bool* value_ptr;
   bool  default_value;
   char* doc;
@@ -68,14 +100,14 @@ static boolFlag boolTable[] = {
 };
 
 
-inline bool str_equal(char* s, char* q, int len) {
+inline bool str_equal(const char* s, const char* q, int len) {
   // s is null terminated, q is not!
   if (strlen(s) != (unsigned int) len) return false;
   return strncmp(s, q, len) == 0;
 }
 
 
-bool debugFlags::boolAt(char* name, int len, bool* value) {
+bool debugFlags::boolAt(const char* name, int len, bool* value) {
   for (boolFlag* current = &boolTable[0]; current->name; current++) {
     if (str_equal(current->name, name, len)) {
       *value = *current->value_ptr;
@@ -86,7 +118,7 @@ bool debugFlags::boolAt(char* name, int len, bool* value) {
 }
 
 
-bool debugFlags::boolAtPut(char* name, int len, bool* value) {
+bool debugFlags::boolAtPut(const char* name, int len, bool* value) {
   if (str_equal("TracePrims", name, len)) {
     TraceOopPrims             = *value;
     TraceDoublePrims          = *value;
@@ -121,7 +153,7 @@ bool debugFlags::boolAtPut(char* name, int len, bool* value) {
 // integer flag table
 
 struct intFlag {
-  char* name;
+  const char* name;
   int*  value_ptr;
   int   default_value;
   char* doc;
@@ -145,7 +177,7 @@ static intFlag intTable[] = {
 };
 
 
-bool debugFlags::intAt(char* name, int len, int* value) {
+bool debugFlags::intAt(const char* name, int len, int* value) {
   for (intFlag* current = &intTable[0]; current->name; current++) {
     if (str_equal(current->name, name, len)) {
       *value = *current->value_ptr;
@@ -156,7 +188,7 @@ bool debugFlags::intAt(char* name, int len, int* value) {
 }
 
 
-bool debugFlags::intAtPut(char* name, int len, int* value) {
+bool debugFlags::intAtPut(const char* name, int len, int* value) {
   for (intFlag* current = &intTable[0]; current->name; current++) {
     if (str_equal(current->name, name, len)) {
       int old_value = *current->value_ptr;
@@ -186,7 +218,7 @@ void debugFlags::print_on(outputStream* st) {
 
   // Integer flags
   for (intFlag* i = &intTable[0]; i->name; i++)
-    st->print_cr("%s=%d",  i->name, *b->value_ptr);
+    st->print_cr("%s=%d",  i->name, *i->value_ptr);
 }
 
 
@@ -199,8 +231,8 @@ void print_diff_on(outputStream* st) {
 
   // Integer flags
   for (intFlag* i = &intTable[0]; i->name; i++) {
-    if (*b->value_ptr != b->default_value)
-      st->print_cr("%s=%d",  i->name, *b->value_ptr);
+    if (*i->value_ptr != i->default_value)
+      st->print_cr("%s=%d",  i->name, *i->value_ptr);
   }
 }
 

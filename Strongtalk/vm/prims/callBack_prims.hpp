@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_CALLBACK_PRIMS_HPP_HPP
+#define VM_PRIMS_CALLBACK_PRIMS_HPP_HPP
 
 // Primitives for call back
 
@@ -76,3 +78,6 @@ class callBackPrimitives : AllStatic {
   static PRIM_DECL_1(invokeC, oop proxy);
 
  }; 
+
+
+#endif // VM_PRIMS_CALLBACK_PRIMS_HPP_HPP

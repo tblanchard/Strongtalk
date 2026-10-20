@@ -21,9 +21,36 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_markOop.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
 void markOopDesc::print_on(outputStream* st) {
   st->print("mark(%c,%c,", has_tagged_contents() ? 'U' : '_',
                            is_near_death()       ? 'D' : '_');
@@ -31,7 +58,7 @@ void markOopDesc::print_on(outputStream* st) {
   st->print("age %d)",    age());
 }
 
-int assign_hash(markOop& m) {
+smi assign_hash(markOop& m) {
   m = m->set_hash(CurrentHash++);
   return m->hash();
 }

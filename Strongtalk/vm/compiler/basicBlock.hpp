@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_BASICBLOCK_HPP_HPP
+#define VM_COMPILER_BASICBLOCK_HPP_HPP
 
 // BBs (Basic Blocks) are used by the Compiler to perform local optimizations 
 // and code generation
@@ -269,3 +271,6 @@ class NodeVisitor: public ResourceObj {
 
 
 # endif
+
+
+#endif // VM_COMPILER_BASICBLOCK_HPP_HPP

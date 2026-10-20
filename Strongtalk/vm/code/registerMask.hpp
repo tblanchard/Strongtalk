@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_REGISTERMASK_HPP_HPP
+#define VM_CODE_REGISTERMASK_HPP_HPP
 
 // A RegisterMask tells the scavenger which registers / stack locs are
 // live.  (One bit per location.)
@@ -82,3 +84,6 @@ void printAllocated(RegisterMask r);
   Location findFirstUnusedTemp(LongRegisterMask** masks, int len);
 # endif
     
+
+
+#endif // VM_CODE_REGISTERMASK_HPP_HPP

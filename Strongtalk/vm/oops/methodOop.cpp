@@ -21,9 +21,91 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_methodOop.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "costModel.hpp"
+#include "prim.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "prettyPrinter.hpp"
+#include "oopFactory.hpp"
+#include "interpretedIC.hpp"
+#include "floats.hpp"
+#include "methodIterator.hpp"
+#include "bootstrap.hpp"
+#include "methodPrinter.hpp"
+#include "mixinOop.hpp"
+#include "methodKlass.hpp"
+#include "bytecodeTranscoder.hpp"
+#include "bootstrap.hpp"
 void methodOopDesc::decay_invocation_count(double decay_factor) {
   double new_count = (double) invocation_count() / decay_factor;
   set_invocation_count((int) new_count);
@@ -67,20 +149,82 @@ void methodOopDesc::dec_sharing_count() {
 }
 
 void methodOopDesc::bootstrap_object(bootstrap* st) {
+  int capacity = st->current_capacity();	// must be read before any field
   memOopDesc::bootstrap_header(st);
   st->read_oop((oop*)&addr()->_debugInfo);
   st->read_oop((oop*)&addr()->_selector_or_method);
   set_counters(0, 0);
   st->read_oop((oop*)&addr()->_size_and_flags);
 
-  for(int index = 1; index <= size_of_codes() * 4; )
+  // The image holds the byte codes in the external (32-bit) layout (4-byte operand slots).
+  int external_length = size_of_codes() * external_bytecode_word_size;
+  ExternalCode code(external_length);
+  for (int index = 0; index < external_length; ) {
     if (st->is_byte()) {
-      byte_at_put(index, st->read_byte());
+      code.set_byte(index, st->read_byte());
       index++;
     } else {
-      st->read_oop((oop*) codes(index));
-      index += 4;
+      oop value;
+      st->read_oop(&value);
+      code.set_oop(index, value);
+      index += external_bytecode_word_size;
     }
+  }
+
+  if (VerifyFileOut) remember_loaded_code(this, code);
+
+  BytecodeTranscoder t(&code);
+  if (!t.ok()) fatal1("bootstrap: cannot convert byte codes: %s", t.error());
+  t.layout(oopSize);
+  if (header_size() + t.padded_length() / oopSize > capacity)
+    fatal("bootstrap: method does not fit after byte code conversion");
+  install_codes(&t);
+}
+
+// Installs the code of a laid out transcoder (native layout); the method must have room for it.
+// Bci ranges in the temp info are remapped to the new code positions.
+void methodOopDesc::install_codes(BytecodeTranscoder* t) {
+  NativeCode sink(codes(), t->padded_length());
+  t->emit(&sink);
+  if (!t->ok()) fatal1("cannot convert byte codes: %s", t->error());
+  set_size_of_code(t->padded_length() / oopSize);
+  remap_temp_info(t);
+}
+
+// tempInfo format (see TempDecoder::decode):
+//   name* offset name* offset name* offset name* (begin end offset name* offset name*)*
+// The begin/end pairs are bcis.
+void methodOopDesc::remap_temp_info(BytecodeTranscoder* t) {
+  oop info = debugInfo();
+  if (info == NULL || !info->is_objArray()) return;
+  remap_temp_info_bcis(objArrayOop(info), t);
+}
+
+void methodOopDesc::remap_temp_info_bcis(objArrayOop tempInfo, BytecodeTranscoder* t) {
+  int len = tempInfo->length();
+  int pos = 1;
+  // skip parameters and the three global sections
+  while (pos <= len && tempInfo->obj_at(pos)->is_byteArray()) pos++;
+  for (int section = 0; section < 3; section++) {
+    if (pos > len) return;
+    pos++;	// offset
+    while (pos <= len && tempInfo->obj_at(pos)->is_byteArray()) pos++;
+  }
+  // inlined scopes
+  while (pos + 1 <= len) {
+    oop begin = tempInfo->obj_at(pos);
+    oop end   = tempInfo->obj_at(pos + 1);
+    if (!begin->is_smi() || !end->is_smi()) return;
+    // smis need no store check (and cannot be verified while bootstrapping)
+    *tempInfo->objs(pos)     = as_smiOop(t->map_bci((int) smiOop(begin)->value(), false));
+    *tempInfo->objs(pos + 1) = as_smiOop(t->map_bci((int) smiOop(end)->value(),   true));
+    pos += 2;
+    for (int part = 0; part < 2; part++) {	// oop temps, float temps
+      if (pos > len) return;
+      pos++;	// offset
+      while (pos <= len && tempInfo->obj_at(pos)->is_byteArray()) pos++;
+    }
+  }
 }
 
 int methodOopDesc::next_bci_from(u_char* hp) const {
@@ -129,7 +273,7 @@ int methodOopDesc::number_of_stack_temporaries() const {
 
 int methodOopDesc::float_offset(int float_no) const {
   assert(0 <= float_no && float_no < number_of_float_temporaries(), "float_no out of range");
-  return float_section_start_offset() - float_no*floatSize/oopSize - 1;
+  return float_section_start_offset() - float_no*floatSlotWords - 1;
 }
 
 symbolOop methodOopDesc::enclosing_method_selector() const {
@@ -140,7 +284,7 @@ symbolOop methodOopDesc::enclosing_method_selector() const {
 }
 
 void methodOopDesc::print_value_for(klassOop receiver_klass, outputStream* st) {
-  outputStream* s = st ? st : std;
+  outputStream* s = st ? st : stdOut;
   if (is_blockMethod()) {
     st->print("[] in ");
     enclosing_method_selector()->print_symbol_on(st);
@@ -156,10 +300,11 @@ void methodOopDesc::print_value_for(klassOop receiver_klass, outputStream* st) {
 
 void methodOopDesc::print_codes() {
   ResourceMark rm;
-  selector()->print_symbol_on(std);
-  std->cr();
-  MethodIterator mi(this, &MethodPrinterClosure(std));
-  std->cr();
+  selector()->print_symbol_on(stdOut);
+  stdOut->cr();
+  MethodPrinterClosure blk(stdOut);
+  MethodIterator mi(this, &blk);
+  stdOut->cr();
 }
 
 
@@ -197,149 +342,257 @@ objArrayOop methodOopDesc::tempInfo() {
   return debugInfo();
 }
 
-class methodStream {
+// File out: methods are written in the external (32-bit) layout, i.e. the layout read by
+// bootstrap_object. Inline caches and primitive/DLL call sites are written in their
+// unlinked form, so the code does not depend on the state of this VM.
+
+// The method's code in native layout, with all call sites unlinked (C heap copy).
+class CanonicalCode {
  public:
-  GrowableArray<oop>* result;
+  cvector<u_char> bytes;
 
-  methodStream() {
-    result = new GrowableArray<oop>(1000);
+  CanonicalCode(methodOop m) : bytes(m->codes(), m->codes_end()) {
+    _codes = m->codes();
+    CodeIterator c(m);
+    do {
+      if (Bytecodes::send_type(c.code()) != Bytecodes::no_send) {
+        // send: original send code; the inline cache holds the selector and 0
+        u_char* ic = (u_char*) c.ic();
+        put_byte(c.hp(), Bytecodes::original_send_code_for(c.code()));
+        put_word(ic,           (intptr_t) c.ic()->selector());
+        put_word(ic + oopSize, (intptr_t) smiOop_zero);
+      } else if (c.is_primitive_call()) {
+        // primitive call: lookup form, the first operand is the primitive's selector
+        Bytecodes::Format f = Bytecodes::format(c.code());
+        put_byte(c.hp(), Bytecodes::original_primitive_call_code_for(c.code()));
+        if (f == Bytecodes::BL || f == Bytecodes::BLL) {	// linked: the operand is the entry point
+          primitive_desc* pdesc = primitives::lookup((fntype) c.word_at(1));
+          put_word((u_char*) c.aligned_oop(1), (intptr_t) pdesc->selector());
+        }
+      } else if (c.is_dll_call()) {
+        // DLL call: no entry point (dll name, function name, entry point, number of arguments)
+        put_word((u_char*) c.dll_cache() + 2 * oopSize, 0);
+      }
+    } while (c.advance());
   }
 
-  void put_byte(int byte) {
-    result->append(trueObj);
-    result->append(as_smiOop(byte));
+ private:
+  u_char* _codes;	// the method's code; positions in the copy are the same
+  void put_byte(u_char* p, u_char b)       { bytes[p - _codes] = b; }
+  void put_word(u_char* p, intptr_t value) { *(intptr_t*) &bytes[p - _codes] = value; }
+};
+
+// The method's code converted to the external layout.
+class ExternalForm {
+ public:
+  CanonicalCode       canonical;
+  NativeCode          native;
+  BytecodeTranscoder  transcoder;
+
+  ExternalForm(methodOop m)
+    : canonical(m),
+      native(&canonical.bytes[0], (int) canonical.bytes.size()),
+      transcoder(&native) {
+    if (!transcoder.ok()) fatal1("file out: cannot convert byte codes: %s", transcoder.error());
+    // jumps widened to fit the native layout get their original form again
+    transcoder.layout_as_compiled(external_bytecode_word_size);
   }
 
-  void put_word(int word) {
-    char* p = (char*) &word;
-    put_byte(p[0]);
-    put_byte(p[1]);
-    put_byte(p[2]);
-    put_byte(p[3]);
-  }
-
-  void put_oop(oop obj) {
-    result->append(falseObj);
-    result->append(obj);
-  }
-
-  void align(u_char* hp) {
-    u_char* end = (u_char*) (((int) hp + 3) & (~3));
-    while (hp < end) {
-      put_byte(255);
-      hp++;
-    }
-  }
+  int size_of_codes() const { return transcoder.padded_length() / external_bytecode_word_size; }
 };
 
 objArrayOop methodOopDesc::fileout_body() {
-  // Convert sends into canonical form
-  // Do not uncustomize since we need the mixin to do that.
   BlockScavenge bs;
   ResourceMark rm;
-  methodStream out;
-  
-  CodeIterator c(this);
-  do {
-    if (Bytecodes::send_type(c.code()) != Bytecodes::no_send) {
-      // Send
-      Bytecodes::Code original = Bytecodes::original_send_code_for(c.code());
-      out.put_byte(original);
-      if (Bytecodes::format(original) == Bytecodes::BBOO) {
-        out.put_byte(c.byte_at(1));
-        out.align(c.hp() + 2);
-      } else {
-        out.align(c.hp() + 1);
-      }
-      out.put_oop( c.ic()->selector());
-      out.put_oop( smiOop_zero);
-    } else if (c.is_primitive_call()) {
-      // Primitive call
-      Bytecodes::Code original = Bytecodes::original_primitive_call_code_for(c.code());
-      out.put_byte(original);
-      out.align(c.hp() + 1);
-      if (   c.code() == Bytecodes::prim_call
-      	  || c.code() == Bytecodes::prim_call_failure
-      	  || c.code() == Bytecodes::prim_call_self
-      	  || c.code() == Bytecodes::prim_call_self_failure) {
-        primitive_desc* pdesc = primitives::lookup((fntype) c.word_at(1));
-        out.put_oop(pdesc->selector());
-      } else {
-        out.put_oop(c.oop_at(1));
-      }
-      if (Bytecodes::format(original) == Bytecodes::BOL) {
-       out.put_word(c.word_at(5));
-      }
-    } else if (c.is_dll_call()) {
-      // DLL call
-      InterpretedDLL_Cache* ic = c.dll_cache();
-      out.put_byte(c.code());
-      out.align(c.hp() + 1);
-      out.put_oop(ic->dll_name());
-      out.put_oop(ic->funct_name());
-      out.put_oop(smiOop_zero);
-      out.put_byte(ic->number_of_arguments());
+  return oopFactory::new_objArray(fileout_pairs());
+}
+
+// The pairs of fileout_body (resource allocated):
+// (true, SmallInteger) is a byte, (false, oop) an oop slot.
+GrowableArray<oop>* methodOopDesc::fileout_pairs() {
+  ExternalForm form(this);
+  ExternalCodeSink sink(form.transcoder.padded_length());
+  form.transcoder.emit(&sink);
+  if (!form.transcoder.ok()) fatal1("file out: cannot convert byte codes: %s", form.transcoder.error());
+
+  GrowableArray<oop>* result = new GrowableArray<oop>(2 * sink.length());
+  for (int pos = 0; pos < sink.length(); ) {
+    if (sink.is_oop_at(pos)) {
+      result->append(falseObj);
+      result->append(sink.oop_at(pos));
+      pos += external_bytecode_word_size;
     } else {
-      // Otherwise
-      out.put_byte(c.code());
-      switch(c.format()) {
-        case Bytecodes::B:
-	  break;
-        case Bytecodes::BB: 
-	  out.put_byte(c.byte_at(1));
-          break;
-        case Bytecodes::BBB:
-	  out.put_byte(c.byte_at(1));
-	  out.put_byte(c.byte_at(2));
-          break;
-        case Bytecodes::BBBB:
-	  out.put_byte(c.byte_at(1));
-	  out.put_byte(c.byte_at(2));
-	  out.put_byte(c.byte_at(3));
-          break;
-        case Bytecodes::BBO:
-	  out.put_byte(c.byte_at(1));
-	  out.align(c.hp() + 2);
-          out.put_oop( c.oop_at(2));
-          break;
-        case Bytecodes::BBL:
- 	  out.put_byte(c.byte_at(1));
-	  out.align(c.hp() + 2);
-          out.put_word(c.word_at(2));
-          break;
-        case Bytecodes::BO:
-	  out.align(c.hp() + 1);
-          out.put_oop( c.oop_at(1));
-          break;
-        case Bytecodes::BOL:
-          out.put_oop( c.oop_at(1));
-	  out.align(c.hp() + 2);
-          out.put_word(c.word_at(5));
-          break;
-        case Bytecodes::BLL:
-	  out.align(c.hp() + 1);
-          out.put_word(c.word_at(1));
-          out.put_word(c.word_at(5));
-          break;
-        case Bytecodes::BL:
-	  out.align(c.hp() + 1);
-          out.put_word(c.word_at(1));
-          break;
-        case Bytecodes::BBS: {
-	    int length = c.byte_at(1) == 0 ? 256 : c.byte_at(1);
-            out.put_byte(length);
-            for(int index = 0; index < length; index++) {
-              out.put_byte(c.byte_at(2 + index));
-	    }
-	    break;
-        }
-	default:
-          std->print_cr("Format unknown %s", Bytecodes::format_as_string(c.format()));
-	  fatal("aborting");
+      result->append(trueObj);
+      result->append(as_smiOop(sink.byte_at(pos)));
+      pos++;
+    }
+  }
+  return result;
+}
+
+int methodOopDesc::fileout_size_of_codes() {
+  ResourceMark rm;
+  ExternalForm form(this);
+  return form.size_of_codes();
+}
+
+int methodOopDesc::fileout_object_size() {
+  // the header has the same number of words in both layouts
+  return header_size() + fileout_size_of_codes();
+}
+
+smiOop methodOopDesc::fileout_size_and_flags() {
+  int size = fileout_size_of_codes();
+  return (smiOop) (intptr_t)
+    ((flags() << method_flags_mask_bitno) + (nofArgs() << method_args_mask_bitno) + (size << method_size_mask_bitno));
+}
+
+objArrayOop methodOopDesc::fileout_debug_info() {
+  objArrayOop info = debugInfo();
+  if (info == NULL || !info->is_objArray()) return info;
+  BlockScavenge bs;
+  ResourceMark rm;
+  ExternalForm form(this);
+  objArrayOop copy = info->copy();
+  remap_temp_info_bcis(copy, &form.transcoder);
+  return copy;
+}
+
+// Checks that the file out form of the method reads back (as in bootstrap_object) into its
+// unlinked native code, and that sizes and debug info agree. Returns false (and prints) if not.
+bool methodOopDesc::verify_fileout() {
+  BlockScavenge bs;
+  ResourceMark rm;
+  ExternalForm form(this);
+  GrowableArray<oop>* pairs = fileout_pairs();
+
+  // read the pairs back like bootstrap_object
+  int external_length = fileout_size_of_codes() * external_bytecode_word_size;
+  ExternalCode code(external_length);
+  int index = 0;
+  for (int i = 0; i < pairs->length(); i += 2) {
+    if (index >= external_length) { index = -1; break; }
+    if (pairs->at(i) == trueObj) {
+      code.set_byte(index, (u_char) smiOop(pairs->at(i + 1))->value());
+      index++;
+    } else {
+      code.set_oop(index, pairs->at(i + 1));
+      index += external_bytecode_word_size;
+    }
+  }
+  const char* problem = NULL;
+  if (index != external_length) problem = "body length does not match the size";
+  if (problem == NULL && fileout_object_size() != header_size() + fileout_size_of_codes()) problem = "object size";
+  if (problem == NULL && get_unsigned_bitfield((long) fileout_size_and_flags(), method_size_mask_bitno, method_size_mask_size) != fileout_size_of_codes())
+    problem = "size and flags";
+
+  BytecodeTranscoder back(&code);
+  if (problem == NULL && !back.ok()) problem = back.error();
+  if (problem == NULL) {
+    back.layout(oopSize);
+    if (back.padded_length() != (int) form.canonical.bytes.size()) problem = "code size after read back";
+  }
+  if (problem == NULL) {
+    cvector<u_char> native(back.padded_length(), 0);
+    NativeCode sink(&native[0], (int) native.size());
+    back.emit(&sink);
+    if (!back.ok()) problem = back.error();
+    else if (native != form.canonical.bytes) problem = "code differs after read back";
+  }
+  if (problem == NULL) {
+    // bcis: native -> external (fileout_debug_info) -> native (as when read back) is the identity
+    objArrayOop info = debugInfo();
+    if (info != NULL && info->is_objArray()) {
+      objArrayOop copy = fileout_debug_info();
+      remap_temp_info_bcis(copy, &back);
+      for (int i = 1; i <= info->length(); i++) {
+        if (copy->obj_at(i) != info->obj_at(i)) { problem = "debug info bcis"; break; }
       }
     }
-  } while (c.advance());
-  return oopFactory::new_objArray(out.result);
+  }
+  if (problem != NULL) {
+    stdOut->print("file out check failed (%s): ", problem);
+    if (is_blockMethod()) stdOut->print("[] in ");
+    (is_blockMethod() ? enclosing_method_selector() : selector())->print_symbol_on(stdOut);
+    stdOut->cr();
+    return false;
+  }
+  return true;
+}
+
+class MethodCollector : public ObjectClosure {
+ public:
+  GrowableArray<methodOop>* methods;
+  MethodCollector() { methods = new GrowableArray<methodOop>(50000); }
+  void do_object(memOop obj) { if (obj->is_method()) methods->append(methodOop(obj)); }
+};
+
+void methodOopDesc::verify_fileout_all() {
+  BlockScavenge bs;
+  ResourceMark rm;
+  MethodCollector collector;
+  Universe::object_iterate(&collector);
+  int failures = 0;
+  for (int i = 0; i < collector.methods->length(); i++) {
+    if (!collector.methods->at(i)->verify_fileout()) failures++;
+  }
+  stdOut->print_cr("file out check: %d methods, %d failures", collector.methods->length(), failures);
+}
+
+// +VerifyFileOut: the code of the methods as read from the image, to compare with their file out form.
+struct LoadedMethod {
+  methodOop    method;
+  ExternalCode code;
+  LoadedMethod(methodOop m, const ExternalCode& c) : method(m), code(c) {}
+};
+static cvector<LoadedMethod> loaded_methods;
+
+void methodOopDesc::remember_loaded_code(methodOop m, const ExternalCode& code) {
+  loaded_methods.push_back(LoadedMethod(m, code));
+}
+
+// Compares the file out form of the methods read from the image with their code in the image file.
+// A long operand may be written as bytes or as a SmallInteger (old file outs); both are accepted.
+void methodOopDesc::verify_fileout_against_image() {
+  BlockScavenge bs;
+  int differences = 0;
+  for (int i = 0; i < (int) loaded_methods.size(); i++) {
+    ResourceMark rm;
+    LoadedMethod& lm = loaded_methods[i];
+    ExternalCode& original = lm.code;
+    GrowableArray<oop>* pairs = lm.method->fileout_pairs();
+    ExternalCode written(lm.method->fileout_size_of_codes() * external_bytecode_word_size);
+    int index = 0;
+    for (int k = 0; k < pairs->length() && index < written.length(); k += 2) {
+      if (pairs->at(k) == trueObj) { written.set_byte(index, (u_char) smiOop(pairs->at(k + 1))->value()); index++; }
+      else                         { written.set_oop(index, pairs->at(k + 1)); index += external_bytecode_word_size; }
+    }
+    int diff_at = original.length() == written.length() ? -1 : 0;
+    for (int pos = 0; diff_at < 0 && pos < original.length(); ) {
+      if (pos % 4 == 0 && (original.has_oop_at(pos) || written.has_oop_at(pos))) {
+        bool same;
+        if (original.has_oop_at(pos) && written.has_oop_at(pos)) same = original.oop_at(pos) == written.oop_at(pos);
+        else same = original.long_at(pos) == written.long_at(pos);
+        if (!same) diff_at = pos;
+        pos += 4;
+      } else {
+        if (original.byte_at(pos) != written.byte_at(pos)) diff_at = pos;
+        pos++;
+      }
+    }
+    if (diff_at >= 0) {
+      if (differences++ < 20) {
+        stdOut->print("file out differs from the image at byte %d (length %d, image %d): ", diff_at, written.length(), original.length());
+        methodOop m = lm.method;
+        if (m->is_blockMethod()) stdOut->print("[] in ");
+        (m->is_blockMethod() ? m->enclosing_method_selector() : m->selector())->print_symbol_on(stdOut);
+        stdOut->cr();
+      }
+    }
+  }
+  stdOut->print_cr("file out vs. image: %d methods, %d differ", (int) loaded_methods.size(), differences);
+  loaded_methods.clear();
+  loaded_methods.shrink_to_fit();
 }
 
 methodOopDesc::Method_Inlining_Info methodOopDesc::method_inlining_info() const {
@@ -727,11 +980,11 @@ GrowableArray<int>* methodOopDesc::expression_stack_mapping(int bci) {
 
 
 static void lookup_primitive_and_patch(u_char* p, u_char byte) {
-  assert((int)p % 4 == 0, "first instruction supposed to be aligned");
+  assert((intptr_t)p % oopSize == 0, "first instruction supposed to be aligned");
   *p = byte;	// patch byte
-  p += 4;	// advance to primitive name
+  p += oopSize;	// advance to primitive name
   //(*(symbolOop*)p)->print_symbol_on();
-  *(int*)p = (int)primitives::lookup(*(symbolOop*)p)->fn();
+  *(intptr_t*)p = (intptr_t)primitives::lookup(*(symbolOop*)p)->fn();
 }
 
 bool methodOopDesc::is_primitiveMethod() const {
@@ -771,8 +1024,8 @@ methodOop methodOopDesc::methodOop_from_hcode(u_char* hp) {
 
 
 int methodOopDesc::end_bci() const {
-  int last_entry = this->size_of_codes() * 4;
-  for (int index = 0; index < 4; index++)
+  int last_entry = this->size_of_codes() * oopSize;
+  for (int index = 0; index < oopSize; index++)
     if (byte_at(last_entry-index) != Bytecodes::halt) return last_entry+1-index;
   fatal("should never reach the point");
   return 0;

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_NCODE_HPP_HPP
+#define VM_CODE_NCODE_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -50,7 +52,7 @@ class NCodeBase : public PrintableCHeapObj {
   virtual void relocate() {};
   virtual void verify() = 0;
  protected:
-  void verify2(char* name);
+  void verify2(const char* name);
 };
 
 
@@ -82,3 +84,6 @@ class OopNCode : public NCodeBase {
 NCodeBase* findThing(void* addr);   // returns NULL if addr not in a zone
 
 #endif
+
+
+#endif // VM_CODE_NCODE_HPP_HPP

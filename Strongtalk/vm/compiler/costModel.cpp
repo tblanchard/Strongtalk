@@ -21,9 +21,44 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "symbolOop.hpp"
+#include "methodOop.hpp"
+#include "costModel.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_costModel.cpp.incl"
 
 
 int CostModel::_cost[Bytecodes::number_of_codes];
@@ -79,11 +114,11 @@ void CostModel::set_cost_for_send(Bytecodes::SendType type, int cost) {
 
   
 void CostModel::print() {
-  std->print("%40s: %s\n", "Bytecode", "Cost");
+  stdOut->print("%40s: %s\n", "Bytecode", "Cost");
   for (int i = 0; i < Bytecodes::number_of_codes; i++) {
     Bytecodes::Code code = Bytecodes::Code(i);
     if (Bytecodes::is_defined(code)) {
-      std->print("%40s: %d\n", Bytecodes::name(code), cost_for(code));
+      stdOut->print("%40s: %d\n", Bytecodes::name(code), cost_for(code));
     }
   }
 }

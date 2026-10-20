@@ -21,9 +21,115 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "proxyOop.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "prim_def.hpp"
+#include "block_prims.hpp"
+#include "recompiler.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "abort.hpp"
+#include "uncommonBranch.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "oldCodeGenerator.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "interpreter.hpp"
+#include "doubleOop.hpp"
+#include "loopOpt.hpp"
+#include "regAlloc.hpp"
+#include "stubRoutines.hpp"
+#include "oopFactory.hpp"
+#include "objArrayOop.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_oldCodeGenerator.cpp.incl"
 
 
 static bool bb_needs_jump;
@@ -390,9 +496,9 @@ static int result_counter = 0;
 
 static void trace_result(int compilation, methodOop method, oop result) {
   ResourceMark rm;
-  std->print("%6d: 0x%08x (compilation %4d, ", result_counter++, int(result), compilation);
+  stdOut->print("%6d: 0x%08x (compilation %4d, ", result_counter++, intptr_t(result), compilation);
   method->selector()->print_value();
-  std->print(")\n", compilation);
+  stdOut->print(")\n", compilation);
 }
 
 
@@ -554,7 +660,7 @@ static char* nmethodAddr() {
 static void incCounter() {
   // Generates code to increment the nmethod execution counter
   char* addr = nmethodAddr() + nmethod::invocationCountOffset();
-  theMacroAssm->incl(Address(int(addr), relocInfo::internal_word_type));
+  theMacroAssm->incl(Address(x86_imm32(addr), relocInfo::internal_word_type));
 }
 
 
@@ -581,9 +687,9 @@ static Assembler::Condition mapToCC(BranchOpCode op) {
 
 static void primitiveCall(InlinedScope* scope, primitive_desc* pdesc) {
   if (pdesc->can_perform_NLR()) {
-    call_C((char*)(&pdesc->fn()), relocInfo::prim_type, pdesc->needs_delta_fp_code(), scope->nlrTestPoint()->label);
+    call_C((char*)(pdesc->fn()), relocInfo::prim_type, pdesc->needs_delta_fp_code(), scope->nlrTestPoint()->label);
   } else {
-    call_C((char*)(&pdesc->fn()), relocInfo::prim_type, pdesc->needs_delta_fp_code());
+    call_C((char*)(pdesc->fn()), relocInfo::prim_type, pdesc->needs_delta_fp_code());
   }
 }
 
@@ -613,10 +719,10 @@ static void checkRecompilation(Label& recompile_stub_call, Register t) {
   if (RecompilationPolicy::needRecompileCounter(theCompiler)) {
     // increment the nmethod execution counter and check limit
     char* addr = nmethodAddr() + nmethod::invocationCountOffset();
-    theMacroAssm->movl(t, Address(int(addr), relocInfo::internal_word_type));
+    theMacroAssm->movl(t, Address(x86_imm32(addr), relocInfo::internal_word_type));
     theMacroAssm->incl(t);
     theMacroAssm->cmpl(t, theCompiler->get_invocation_counter_limit());
-    theMacroAssm->movl(Address(int(addr), relocInfo::internal_word_type), t);
+    theMacroAssm->movl(Address(x86_imm32(addr), relocInfo::internal_word_type), t);
     theMacroAssm->jcc(Assembler::greaterEqual, recompile_stub_call);
   }
 }
@@ -852,7 +958,7 @@ void DLLNode::gen() {
   // CompiledDLL_Cache
   // This code pattern must correspond to the CompiledDLL_Cache layout
   // (make sure assembler is not optimizing mov reg, 0 into xor reg, reg!)
-  theMacroAssm->movl(edx, int(function()));	// part of CompiledDLL_Cache
+  theMacroAssm->movl(edx, x86_imm32(function()));	// part of CompiledDLL_Cache
   theMacroAssm->inline_oop(dll_name());		// part of CompiledDLL_Cache
   theMacroAssm->inline_oop(function_name());	// part of CompiledDLL_Cache
   theMacroAssm->call(entry, relocInfo::runtime_call_type);
@@ -1015,7 +1121,7 @@ void TArithRRNode::gen() {
         theMacroAssm->test(x, Mem_Tag);
         theMacroAssm->jcc(Assembler::notZero, next(1)->label);
       }
-      arithRCOp(_op, x, int(y));			// y is smiOop -> needs no relocation info
+      arithRCOp(_op, x, x86_imm32(y));			// y is smiOop -> needs no relocation info
       if (result) store(x, _dest, temp2, temp3);
     } else {
       // operation fails always
@@ -1068,7 +1174,7 @@ void ArithRRNode::gen() {
     Register x;
     bool result = setupRegister(_dest, arg1, _op, x, temp1);
     if (y->is_smi()) {
-      arithRCOp(_op, x, int(y));		// y is smiOop -> needs no relocation info
+      arithRCOp(_op, x, x86_imm32(y));		// y is smiOop -> needs no relocation info
     } else {
       arithROOp(_op, x, y);
     }
@@ -1138,13 +1244,19 @@ void FloatArithRRNode::gen() {
 
 
 static Address doubleKlass_addr() {
-  return Address((int)&doubleKlassObj, relocInfo::external_word_type);
+  return Address(x86_imm32(&doubleKlassObj), relocInfo::external_word_type);
 }
 
 
 static oop oopify_float() {
   double x;
+#if defined(_MSC_VER) && defined(_M_IX86)
   __asm fstp x							// get top of FPU stack
+#else
+  // called from generated x86 code with the value on the x87 FPU stack
+  fatal("oopify_float is only available with the x86-32 backend");
+  x = 0.0;
+#endif
   BlockScavenge bs;						// because all registers are saved on the stack
   return oopFactory::new_double(x);				// box the FloatValue
 }
@@ -1248,14 +1360,14 @@ void ContextCreateNode::gen() {
     case 1:  primitiveCall(scope(), primitives::context_allocate1()); break;
     case 2:  primitiveCall(scope(), primitives::context_allocate2()); break;
     default: assert(_pdesc == primitives::context_allocate(), "bad context create prim");
-	     theMacroAssm->pushl((int)as_smiOop(_contextSize));
+	     theMacroAssm->pushl(x86_imm32(as_smiOop(_contextSize)));
 	     primitiveCall(scope(), _pdesc);
 	     theMacroAssm->addl(esp, oopSize);	// pop argument, this is not a Pascal call - should fix this
   }
   Register context = Mapping::asRegister(resultLoc);
   if (_src == NULL) {
     assert(scope()->isMethodScope() || scope()->method()->block_info() == methodOopDesc::expects_nil, "inconsistency");
-    theMacroAssm->movl(Address(context, contextOopDesc::parent_byte_offset()), NULL);
+    theMacroAssm->movl(Address(context, contextOopDesc::parent_byte_offset()), (int) 0);
     // NULL for now; the interpreter uses nil. However, some of the
     // context verification code called from compiled code checks for
     // parents that are either a frame pointer, NULL or a context.
@@ -1273,7 +1385,8 @@ void ContextCreateNode::gen() {
 void ContextInitNode::gen() {
   BasicNode::gen();
   // initialize context fields
-  for (int i = nofTemps() - 1; i >= 0; i--) {
+  int i;
+  for (i = nofTemps() - 1; i >= 0; i--) {
     PReg* src = _initializers->at(i)->preg();
     PReg* dest;
     if (src->isBlockPReg()) {
@@ -1456,7 +1569,8 @@ static void generalTypeTest(Register obj, Register klassReg, bool hasUnknown,
   GrowableArray<Label*>    labels(len);	// list of nodes   excluding smi case
 
   // compute klasses & nodes list without smi case
-  for (int i = 0; i < len; i++) {
+  int i;
+  for (i = 0; i < len; i++) {
     const klassOop klass = classes->at(i);
     if (klass == Universe::smiKlassObj()) {
       smi_case = i + 1;
@@ -1726,7 +1840,7 @@ void BlockCreateNode::materialize() {
     case 1:   primitiveCall(scope(), primitives::block_allocate1()); break;
     case 2:   primitiveCall(scope(), primitives::block_allocate2()); break;
     default:  assert(_pdesc == primitives::block_allocate(), "bad block clone prim");
-	      theMacroAssm->pushl((int)as_smiOop(nofArgs));
+	      theMacroAssm->pushl(x86_imm32(as_smiOop(nofArgs)));
 	      primitiveCall(scope(), _pdesc);
 	      theMacroAssm->addl(esp, oopSize); // pop argument, this is not a Pascal call - should fix this
   }
@@ -1758,7 +1872,7 @@ void BlockCreateNode::materialize() {
   theMacroAssm->Store(contextReg, closureReg, blockClosureOopDesc::context_byte_offset());
   // assert(theCompiler->jumpTableID == closure->parent_id(), "nmethod id must be the same");
   // fix this: RELOCATION INFORMATION IS NEEDED WHEN MOVING THE JUMPTABLE (Snapshot reading etc.)
-  theMacroAssm->movl(Address(closureReg, blockClosureOopDesc::method_or_entry_byte_offset()), int(closure->jump_table_entry()));
+  theMacroAssm->movl(Address(closureReg, blockClosureOopDesc::method_or_entry_byte_offset()), x86_imm32(closure->jump_table_entry()));
   if (VerifyCode) verifyBlockCode(closureReg);
   theMacroAssm->store_check(closureReg, temp1);
 }
@@ -1904,7 +2018,8 @@ void LoopHeaderNode::generateArrayLoopTests(Label& prev, Label& failure) {
     // without an index range check, we need to check it here.
     PReg* loopArray = _upperLoad->src();
     AbstractArrayAtNode* atNode;
-    for (int i = _arrayAccesses->length() - 1; i >= 0; i--) {
+    int i;
+    for (i = _arrayAccesses->length() - 1; i >= 0; i--) {
       atNode = _arrayAccesses->at(i);
       if (atNode->src() == loopArray && !atNode->needsBoundsCheck()) break;
     }
@@ -1958,7 +2073,7 @@ void ArrayAtNode::gen() {
   Register index = temp2; load(_arg, index);	// index is modified -> load always into register
   Register array = movePRegToReg(_src, temp1);	// array is read_only
   // first element is at index 1 => subtract smi(1) (doesn't change smi/oop property)
-  theMacroAssm->subl(index, int(smiOop_one));
+  theMacroAssm->subl(index, x86_imm32(smiOop_one));
   // preload size for bounds check if necessary
   if (_needBoundsCheck) {
     theMacroAssm->movl(size, Address(array, byteOffset(_sizeOffset)));
@@ -2044,7 +2159,7 @@ void ArrayAtPutNode::gen() {
   Register index = temp2; load(_arg, index);	// index is modified -> load always into register
   Register array = temp1; load(_src, array);	// array may be modified -> load always into register
   // first element is at index 1 => subtract smi(1) (doesn't change smi/oop property)
-  theMacroAssm->subl(index, int(smiOop_one));
+  theMacroAssm->subl(index, x86_imm32(smiOop_one));
   // preload size for bounds check if necessary
   if (_needBoundsCheck) {
     theMacroAssm->movl(size, Address(array, byteOffset(_sizeOffset)));

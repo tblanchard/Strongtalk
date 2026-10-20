@@ -21,9 +21,88 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_prettyPrinter.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "prim.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "prettyPrinter.hpp"
+#include "oopFactory.hpp"
+#include "doubleOop.hpp"
+#include "interpretedIC.hpp"
+#include "dByteArrayOop.hpp"
+#include "floats.hpp"
+#include "methodIterator.hpp"
+#include "tempDecoder.hpp"
 // ToDo list for pretty printer
 // - convert the stream stuff to ostream.
 // - improve the namedesc printout for temps etc.
@@ -151,7 +230,7 @@ class PrintParams : public TempDecoder {
     elements = new GrowableArray<astNode*>(10);
     TempDecoder::decode(method);
  }
- void PrintParams::parameter(byteArrayOop name, int index);
+ void parameter(byteArrayOop name, int index);
 };
 
 
@@ -165,26 +244,26 @@ class leafNode : public astNode {
      return false;
    }
    int  width(prettyPrintStream* output) { return output->width_of_string(string()); }
-   virtual char* string() = 0;
+   virtual const char* string() = 0;
 };
 
 
 class paramNode : public leafNode {
  private:
    int   no;
-   char* str;
+   const char* str;
  public:
    paramNode(int bci, scopeNode* scope, int no);
-   char* string()  { return str;  }
+   const char* string()  { return str;  }
    bool is_param() { return true; }
 };
 
 
 class nameValueNode : public astNode {
-  char* name;
+  const char* name;
   char* value;
  public:
-   nameValueNode(char* name, char* value) : astNode(0, 0) {
+   nameValueNode(const char* name, char* value) : astNode(0, 0) {
      this->name  = name;
      this->value = value;
    }
@@ -203,12 +282,12 @@ class nameValueNode : public astNode {
 
 class nameNode : public leafNode {
  private:
-   char* str;
+   const char* str;
  public:
-   nameNode(char* str) : leafNode(0,0) {
+   nameNode(const char* str) : leafNode(0,0) {
      this->str = str;
    }
-   char* string()  { return str;  }
+   const char* string()  { return str;  }
 };
 
 
@@ -388,7 +467,7 @@ class scopeNode : public astNode {
   }
 
   astNode* heap_temp_at(int no) {
-    char* name = heap_temp_string(0, no, 0);
+    const char* name = heap_temp_string(0, no, 0);
     if (!fr()) return new nameNode(name);
     char* value = fr()->context_temp_at(no)->print_value_string();
     return new nameValueNode(name, value);
@@ -396,14 +475,14 @@ class scopeNode : public astNode {
 
   astNode* stack_temp_at(int no) {
     byteArrayOop res = find_stack_temp(method(), 0, no);
-    char* name =  res ? res->as_string() : create_name("t", no);
+    const char* name =  res ? res->as_string() : create_name("t", no);
     if (!fr()) return new nameNode(name);
     char* value = fr()->temp_at(no)->print_value_string();
     return new nameValueNode(name, value);
   }
 
   astNode* parameter_at(int index, bool in_block = false) {
-    char* name = param_string(index, in_block);
+    const char* name = param_string(index, in_block);
     if (!fr()) return new nameNode(name);
     char* value = fr()->argument_at(index)->print_value_string();
     return new nameValueNode(name, value);
@@ -864,21 +943,21 @@ class messageNode : public astNode {
 class selfNode : public leafNode {
  public:
    selfNode(int bci, scopeNode* scope) : leafNode(bci, scope) {}
-   char* string() { return "self"; }
+   const char* string() { return "self"; }
 };
 
 
 class ignoreReceiver : public leafNode {
  public:
    ignoreReceiver(int bci, scopeNode* scope) : leafNode(bci, scope) {}
-   char* string() { return ""; }
+   const char* string() { return ""; }
 };
 
 
 class superNode : public leafNode {
  public:
    superNode(int bci, scopeNode* scope) : leafNode(bci, scope) {}
-   char* string() { return "super"; }
+   const char* string() { return "super"; }
 };
 
 
@@ -889,7 +968,7 @@ class literalNode : public leafNode {
    literalNode(int bci, scopeNode* scope, char* str) : leafNode(bci, scope) {
      this->str = str;
    }
-   char* string() { return str; }
+   const char* string() { return str; }
 };
 
 
@@ -978,7 +1057,7 @@ class smiNode : public leafNode {
     this->str      = NEW_RESOURCE_ARRAY(char, 10);
     sprintf(this->str, "%d", value);
   }
-  char* string() { return str; }
+  const char* string() { return str; }
 };
 
 class doubleNode : public leafNode {
@@ -992,7 +1071,7 @@ class doubleNode : public leafNode {
     this->str   = NEW_RESOURCE_ARRAY(char, 30);
     sprintf(this->str, "%1.10gd", value);
   }
-  char* string() { return str; }
+  const char* string() { return str; }
 };
 
 
@@ -1014,7 +1093,7 @@ class characterNode : public leafNode {
     }
     this->str = "$%c";
   }
-  char* string() { return str; } 
+  const char* string() { return str; } 
 };
 
 
@@ -1109,7 +1188,7 @@ class stackTempNode : public leafNode {
      this->offset        = offset;
      this->str           = scope->stack_temp_string(this_bci(), offset);
    }
-   char* string() { return str; }
+   const char* string() { return str; }
 };
 
 
@@ -1124,7 +1203,7 @@ class heapTempNode : public leafNode {
      this->context_level = context_level;
      this->str           = scope->heap_temp_string(this_bci(), offset, context_level);
    }
-   char* string() { return str; }
+   const char* string() { return str; }
 };
 
 class floatNode : public leafNode {
@@ -1135,7 +1214,7 @@ class floatNode : public leafNode {
   : leafNode(bci, scope) {
     this->str = scope->stack_temp_string(this_bci(), no);
   }
-  char* string() { return str; }
+  const char* string() { return str; }
 };
 
 
@@ -1152,7 +1231,7 @@ class instVarNode : public leafNode {
        str = symbolOop(obj)->as_string();
      }
    }
-   char* string() { return str; }
+   const char* string() { return str; }
 };
 
 
@@ -1169,7 +1248,7 @@ class classVarNode : public leafNode {
        str = symbolOop(obj)->as_string();
      }
    }
-   char* string() { return str; }
+   const char* string() { return str; }
 };
 
 
@@ -1178,7 +1257,7 @@ class primitiveResultNode : public leafNode {
    bool is_primitive_result()  { return true; }
    primitiveResultNode(int bci, scopeNode* scope) 
    : leafNode(bci, scope) { }
-   char* string() { return "`primitive result`"; }
+   const char* string() { return "`primitive result`"; }
 };
 
 
@@ -1192,7 +1271,7 @@ class assocNode : public leafNode {
      this->assoc = assoc;
      this->str   = assoc->key()->as_string();
    }
-   char* string() { return str; }
+   const char* string() { return str; }
 };
 
 
@@ -1252,22 +1331,22 @@ static astNode* get_literal_node(oop obj, int bci, scopeNode* scope) {
   return new characterNode(bci, scope, obj);
 }
 
-void prettyPrintStream::print() { std->print("pretty-printer stream"); }
+void prettyPrintStream::print() { stdOut->print("pretty-printer stream"); }
 
 void defaultPrettyPrintStream::indent() {
   for (int i = 0; i < indentation; i++) {
 	space(); space();
   }
 }
-void defaultPrettyPrintStream::print(char* str)  {
+void defaultPrettyPrintStream::print(const char* str)  {
   for (int i = 0; str[i]; i++)
     print_char(str[i]);
 }
 void defaultPrettyPrintStream::print_char(char c)  {
-  std->print("%c", c);
+  stdOut->print("%c", c);
   pos += width_of_char(c);
 }
-int defaultPrettyPrintStream::width_of_string(char* str) {
+int defaultPrettyPrintStream::width_of_string(const char* str) {
   int w = 0;
   for (int i = 0; str[i]; i++)
     w += width_of_char(str[i]);
@@ -1421,7 +1500,8 @@ void MethodPrettyPrinter::normal_send(symbolOop selector, bool is_prim) {
   messageNode* msg = new messageNode(bci(), scope(), selector, is_prim);
 
   GrowableArray<astNode*>* arguments = new GrowableArray<astNode*>(10);
-  for (int index = 0; index < nargs; index++)
+  int index;
+  for (index = 0; index < nargs; index++)
     arguments->push(_pop());
     
   for (index = 0; index < nargs; index++)
@@ -1438,7 +1518,8 @@ void MethodPrettyPrinter::special_send(astNode* receiver, symbolOop selector, bo
   messageNode* msg = new messageNode(bci(), scope(), selector, is_prim);
 
   GrowableArray<astNode*>* arguments = new GrowableArray<astNode*>(10);
-  for (int index = 0; index < nargs; index++)
+  int index;
+  for (index = 0; index < nargs; index++)
     arguments->push(_pop());
     
   for (index = 0; index < nargs; index++)
@@ -1511,10 +1592,10 @@ class StackChecker {
   public:
    MethodPrettyPrinter* pp;
    int size; 
-   char* name;
+   const char* name;
    int offset;
 
-  StackChecker(char* name, MethodPrettyPrinter* pp, int offset = 0) {
+  StackChecker(const char* name, MethodPrettyPrinter* pp, int offset = 0) {
     this->pp     = pp;
     this->size   = pp->_size();
     this->name   = name;
@@ -1523,8 +1604,8 @@ class StackChecker {
 
   ~StackChecker() {
     if (pp->_size() != size + offset) {
-      std->print_cr("StackTracer found misaligned stack");
-      std->print_cr("Expecting %d but found %d", size + offset, pp->_size());
+      stdOut->print_cr("StackTracer found misaligned stack");
+      stdOut->print_cr("Expecting %d but found %d", size + offset, pp->_size());
       fatal("aborting");
     }
   }
@@ -1582,7 +1663,8 @@ void MethodPrettyPrinter::dll_call_node(DLLCallNode* node) {
   int nargs = node->nofArgs();
 
   GrowableArray<astNode*>* arguments = new GrowableArray<astNode*>(10);
-  for (int index = 0; index < nargs; index++)
+  int index;
+  for (index = 0; index < nargs; index++)
     arguments->push(_pop());
     
   for (index = 0; index < nargs; index++)

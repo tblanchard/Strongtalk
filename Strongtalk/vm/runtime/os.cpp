@@ -21,6 +21,14 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
+#include "config.hpp"
+#include "error.hpp"
+#include "lprintf.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "macros.hpp"
+#include "os.hpp"
 #ifndef __GNUC__
 
 #ifdef MICROSOFT
@@ -32,7 +40,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include <winbase.h>
 #endif
 
-# include "incls/_os.cpp.incl"
 
 static HANDLE main_process;
 static HANDLE main_thread;
@@ -54,7 +61,7 @@ static inline double fileTimeAsDouble(FILETIME* time) {
   return result;
 }
 
-int os::getenv(char* name,char* buffer,int len) {
+int os::getenv(const char* name,char* buffer,int len) {
  int result = GetEnvironmentVariable(name, buffer, len);
  return result != 0;
 }
@@ -192,12 +199,12 @@ void os::fatalExit(int num) {
   FatalExit(num);
 }
 
-dll_func os::dll_lookup(char* name, DLL* library) {
+dll_func os::dll_lookup(const char* name, DLL* library) {
   dll_func result = (dll_func) GetProcAddress((HINSTANCE) library, name);
   return result;
 }
 
-DLL* os::dll_load(char* name) {
+DLL* os::dll_load(const char* name) {
   HINSTANCE lib = LoadLibrary(name);
   return (DLL*) lib;
 }
@@ -233,8 +240,8 @@ char* exception_name(int code) {
   }
 }
 
-void trace_stack_at_exception(int* sp, int* fp, char* pc);
-void suspend_process_at_stack_overflow(int *sp, int* fp, char* pc);
+void trace_stack_at_exception(intptr_t* sp, intptr_t* fp, char* pc);
+void suspend_process_at_stack_overflow(intptr_t* sp, intptr_t* fp, char* pc);
 
 LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
   int code = exceptionInfo->ExceptionRecord->ExceptionCode;
@@ -352,7 +359,7 @@ void os::sleep(int ms) {
   Sleep(ms);
 }
 
-void os::fetch_top_frame(Thread* thread, int** sp, int** fp, char** pc) {
+void os::fetch_top_frame(Thread* thread, intptr_t** sp, intptr_t** fp, char** pc) {
   CONTEXT context;
   context.ContextFlags = CONTEXT_CONTROL;
   if (GetThreadContext(thread, &context)) {
@@ -432,7 +439,7 @@ void os::initialize_system_info() {
   initialze_performance_counter();
 }
 
-int os::message_box(char* title, char* message) {
+int os::message_box(const char* title, const char* message) {
   int result = MessageBox(NULL, message, title,
                           MB_YESNO | MB_ICONERROR | MB_SYSTEMMODAL | MB_DEFAULT_DESKTOP_ONLY);
   return result == IDYES;

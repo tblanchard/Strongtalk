@@ -20,14 +20,17 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_SMIKLASS_HPP_HPP
+#define VM_OOPS_SMIKLASS_HPP_HPP
 
 
+void set_smiKlass_vtbl(Klass* k);
 class smiKlass: public Klass {
  public:
   friend void set_smiKlass_vtbl(Klass* k);
 
   bool oop_is_smi() const { return true; }
-  char* name()      const { return "smi"; }
+  const char* name()      const { return "smi"; }
 
   // Reflective properties
   bool can_have_instance_variables() const { return false; }
@@ -45,3 +48,6 @@ class smiKlass: public Klass {
   // printing operations
   void oop_print_value(oop obj, outputStream* st);
 };
+
+
+#endif // VM_OOPS_SMIKLASS_HPP_HPP

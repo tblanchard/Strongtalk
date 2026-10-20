@@ -21,12 +21,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
+#if 0 // unused x86 code, kept for reference
 /********** This file is not used right now; I'm leaving it in in case
  ********** the code is ever needed (It looks like fast process switching
  ********** code, which might be handy someday)
  */
 
-# include "incls/_process_asm.cpp.incl"
 
 void Process::transfer() {
   processSemaphore = true;
@@ -59,3 +59,5 @@ void Process::transfer() {
   asm jmp EBX;
 }
 
+
+#endif

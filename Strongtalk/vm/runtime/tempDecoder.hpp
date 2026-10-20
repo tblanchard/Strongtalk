@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_TEMPDECODER_HPP_HPP
+#define VM_RUNTIME_TEMPDECODER_HPP_HPP
 
 // TempDecoder decodes the method annotation describing
 // the names of parameters and temporaries.
@@ -64,3 +66,6 @@ byteArrayOop find_parameter_name(methodOop method, int no);
 byteArrayOop find_stack_temp(methodOop method, int bci, int no);
 byteArrayOop find_heap_temp(methodOop method, int bci, int no);
 byteArrayOop find_stack_float_temp(methodOop method, int bci, int fno);
+
+
+#endif // VM_RUNTIME_TEMPDECODER_HPP_HPP

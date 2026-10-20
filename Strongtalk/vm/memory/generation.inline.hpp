@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_GENERATION_INLINE_HPP_HPP
+#define VM_MEMORY_GENERATION_INLINE_HPP_HPP
 
 inline bool newGeneration::is_new(memOop p, char *boundary) {
   return (char*)p < boundary; }
@@ -28,3 +30,6 @@ inline bool newGeneration::is_new(oop p, char *boundary) {
   return p->is_mem() && is_new(memOop(p), boundary); }
 
 
+
+
+#endif // VM_MEMORY_GENERATION_INLINE_HPP_HPP

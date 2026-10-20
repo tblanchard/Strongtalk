@@ -21,9 +21,88 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_evaluator.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "prim.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objectIDTable.hpp"
+#include "nmethodScopes.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "vmOperations.hpp"
+#include "abort.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "delta.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "prettyPrinter.hpp"
+#include "oopFactory.hpp"
+#include "evaluator.hpp"
+#include "interpretedIC.hpp"
 // The single_step_handler is called from single_step_stub
 // when a single step has taken place
 // return the distance between the current and the next_bci
@@ -32,9 +111,9 @@ extern "C" void single_step_handler() {
   evaluator::single_step(DeltaProcess::active()->last_Delta_fp());
 }
 
-int* saved_frame;
+intptr_t* saved_frame;
 
-bool patch_last_delta_frame(int* fr, int* dist) {
+bool patch_last_delta_frame(intptr_t* fr, int* dist) {
   // change the current to next bci;
   frame v(NULL, fr, NULL);
 
@@ -54,14 +133,14 @@ bool patch_last_delta_frame(int* fr, int* dist) {
   return true;
 }
 
-void restore_hp(int* fr, int dist) {
+void restore_hp(intptr_t* fr, int dist) {
   frame v(NULL, fr, NULL);
   v.set_hp(v.hp() - dist);
 }
 
 static bool is_aborting = false;
 
-void evaluator::single_step(int* fr) {
+void evaluator::single_step(intptr_t* fr) {
   int dist;
   if (!patch_last_delta_frame(fr, &dist)) return;
   
@@ -169,7 +248,7 @@ bool TokenStream::is_table_entry(oop* addr) {
   unsigned int length;
   if (sscanf(current(), "!%d%n", &value, &length) == 1 && strlen(current()) == length) {
     if(!objectIDTable::is_index_ok(value)) {
-      std->print_cr("Could not find index %d in object table.", value);
+      stdOut->print_cr("Could not find index %d in object table.", value);
       return true;
     }
     *addr = objectIDTable::at(value);
@@ -180,10 +259,10 @@ bool TokenStream::is_table_entry(oop* addr) {
 
 
 bool TokenStream::is_object_search(oop* addr) {
-  int address;
+  uintptr_t address;
   oop obj;
-  unsigned int length;
-  if (sscanf(current(), "0x%x%n", &address, &length) == 1 && strlen(current()) == length) {
+  int length;
+  if (sscanf(current(), "0x%lx%n", &address, &length) == 1 && strlen(current()) == (size_t) length) {
     if (obj = oop(Universe::object_start((oop*) address))) {
       *addr = obj;
       return true;
@@ -232,7 +311,7 @@ bool evaluator::get_oop(TokenStream* st, oop* addr) {
   if (st->is_object_search(addr)) { st->advance(); return true; }
   if (st->is_name(addr))          { st->advance(); return true; }
   if (st->is_symbol(addr))        { st->advance(); return true; }
-  std->print_cr("Error: could not oop'ify [%s]", st->current());
+  stdOut->print_cr("Error: could not oop'ify [%s]", st->current());
   return false; 
 }
 
@@ -240,9 +319,9 @@ bool evaluator::get_oop(TokenStream* st, oop* addr) {
 bool validate_lookup(oop receiver, symbolOop selector) {
  LookupKey key(receiver->klass(), selector);
  if (lookupCache::lookup(&key).is_empty()) {
-   std->print_cr("Lookup error");
-   key.print_on(std);
-   std->cr();
+   stdOut->print_cr("Lookup error");
+   key.print_on(stdOut);
+   stdOut->cr();
    return false;
  }
  return true;
@@ -286,7 +365,7 @@ void evaluator::eval_message(TokenStream* st) {
     result = Delta::call_generic(&cache, receiver, selector, nofArgs, arguments);
   }
   result->print_value();
-  std->cr();
+  stdOut->cr();
 }
 
 void evaluator::top_command(TokenStream* st) {
@@ -299,7 +378,7 @@ void evaluator::top_command(TokenStream* st) {
     }
     st->advance();
     if (!st->eos()) {
-      std->print_cr("warning: garbage at end");
+      stdOut->print_cr("warning: garbage at end");
     }
   }
   DeltaProcess::active()->trace_top(1, number_of_frames_to_show);
@@ -311,14 +390,14 @@ void evaluator::change_debug_flag(TokenStream* st, bool value) {
     st->current();
     bool r = value;
     if (!debugFlags::boolAtPut(st->current(), &r)) { 
-      std->print_cr("boolean flag %s not found", st->current());
+      stdOut->print_cr("boolean flag %s not found", st->current());
     }
     st->advance();
     if (!st->eos()) {
-      std->print_cr("warning: garbage at end");
+      stdOut->print_cr("warning: garbage at end");
     }
   } else {
-    std->print_cr("boolean flag expected");
+    stdOut->print_cr("boolean flag expected");
   }
 }
 
@@ -339,7 +418,7 @@ void evaluator::show_command(TokenStream* st) {
       }
       st->advance();
       if (!st->eos()) {
-        std->print_cr("warning: garbage at end");
+        stdOut->print_cr("warning: garbage at end");
       }
     }    
   }
@@ -375,8 +454,8 @@ bool evaluator::process_line() {
     if (st.is_status())  { print_status();                                   return true;  }
     if (st.is_abort())   {
       if (DeltaProcess::active()->is_scheduler()) {
-        std->print_cr("You cannot abort in the scheduler");
-	std->print_cr("Try another command");
+        stdOut->print_cr("You cannot abort in the scheduler");
+	stdOut->print_cr("Try another command");
       } else {
         dispatchTable::reset(); 
         is_aborting = true; 
@@ -393,10 +472,10 @@ bool evaluator::process_line() {
     if (get_oop(&st, &receiver)) {
       st.advance();
       if (!st.eos()) {
-        std->print_cr("warning: garbage at end");
+        stdOut->print_cr("warning: garbage at end");
       }
       receiver->print();
-      std->cr();
+      stdOut->cr();
       return true;
     }
   }
@@ -407,13 +486,13 @@ bool evaluator::process_line() {
 
 void evaluator::read_eval_loop() {
   do {
-    std->print("Eval> ");
+    stdOut->print("Eval> ");
   } while (process_line());
 }
 
 
 void evaluator::print_mini_help() {
-  std->print_cr("Use '?' for help ('c' to continue)");
+  stdOut->print_cr("Use '?' for help ('c' to continue)");
 }
 
 class ProcessStatusClosure : public ProcessClosure {
@@ -423,43 +502,43 @@ class ProcessStatusClosure : public ProcessClosure {
    ProcessStatusClosure() { index = 1; }
 
   void do_process(DeltaProcess* p) {
-    std->print(" %d:%s ", index++, DeltaProcess::active() == p ? "*" : " ");
+    stdOut->print(" %d:%s ", index++, DeltaProcess::active() == p ? "*" : " ");
     p->print();
   }
 };
 
 void evaluator::print_status() {
-  std->print_cr("Processes:");
+  stdOut->print_cr("Processes:");
   ProcessStatusClosure iter;
   Processes::process_iterate(&iter);
 }
 
 void evaluator::print_help() {
-  std->cr();
-  std->print_cr("<command>  ::= 'q'     | 'quit'    -> quits the system");
-  std->print_cr("             | 's'     | 'step'    -> single step byte code");
-  std->print_cr("             | 'n'     | 'next'    -> single step statement");
-  std->print_cr("             | 'e'     | 'end'     -> single step to end of method");
-  std->print_cr("             | 'c'     | 'cont'    -> continue execution");
-  std->print_cr("                       | 'abort'   -> aborts the current process");
-  std->print_cr("                       | 'genesis' -> aborts all processes and restarts the scheduler");
-  std->print_cr("                       | 'break'   -> provokes fatal() to get into C++ debugger");
-  std->print_cr("                       | 'event'   -> prints the event log");
-  std->print_cr("                       | 'stack'   -> prints the stack of current process");
-  std->print_cr("                       | 'status'  -> prints the status all processes");
-  std->print_cr("                       | 'top' <n> -> prints the top of current process");
-  std->print_cr("                       | 'show' <s> <n> -> prints some activation");
-  std->print_cr("             | '?'     | 'help'    -> prints this help\n");
-  std->print_cr("             | '^' <expr>          -> evaluates the expression");
-  std->print_cr("             | '-' name            -> turns off debug flag");
-  std->print_cr("             | '+' name            -> turns on debug flag");
-  std->print_cr("             | <object>            -> prints this object\n");
-  std->cr();
-  std->print_cr("<expr>     ::= <unary>  | <binary>  | <keyword>\n");
-  std->print_cr("<object>   ::= <number>            -> smi(number)");
-  std->print_cr("             | !<number>           -> objectTable[number]");
-  std->print_cr("             | 0x<hex_number>      -> object_start(number)");
-  std->print_cr("             | name                -> Smalltalk at: #name");
-  std->print_cr("             | #name               -> new_symbol(name)");
-  std->cr();
+  stdOut->cr();
+  stdOut->print_cr("<command>  ::= 'q'     | 'quit'    -> quits the system");
+  stdOut->print_cr("             | 's'     | 'step'    -> single step byte code");
+  stdOut->print_cr("             | 'n'     | 'next'    -> single step statement");
+  stdOut->print_cr("             | 'e'     | 'end'     -> single step to end of method");
+  stdOut->print_cr("             | 'c'     | 'cont'    -> continue execution");
+  stdOut->print_cr("                       | 'abort'   -> aborts the current process");
+  stdOut->print_cr("                       | 'genesis' -> aborts all processes and restarts the scheduler");
+  stdOut->print_cr("                       | 'break'   -> provokes fatal() to get into C++ debugger");
+  stdOut->print_cr("                       | 'event'   -> prints the event log");
+  stdOut->print_cr("                       | 'stack'   -> prints the stack of current process");
+  stdOut->print_cr("                       | 'status'  -> prints the status all processes");
+  stdOut->print_cr("                       | 'top' <n> -> prints the top of current process");
+  stdOut->print_cr("                       | 'show' <s> <n> -> prints some activation");
+  stdOut->print_cr("             | '?'     | 'help'    -> prints this help\n");
+  stdOut->print_cr("             | '^' <expr>          -> evaluates the expression");
+  stdOut->print_cr("             | '-' name            -> turns off debug flag");
+  stdOut->print_cr("             | '+' name            -> turns on debug flag");
+  stdOut->print_cr("             | <object>            -> prints this object\n");
+  stdOut->cr();
+  stdOut->print_cr("<expr>     ::= <unary>  | <binary>  | <keyword>\n");
+  stdOut->print_cr("<object>   ::= <number>            -> smi(number)");
+  stdOut->print_cr("             | !<number>           -> objectTable[number]");
+  stdOut->print_cr("             | 0x<hex_number>      -> object_start(number)");
+  stdOut->print_cr("             | name                -> Smalltalk at: #name");
+  stdOut->print_cr("             | #name               -> new_symbol(name)");
+  stdOut->cr();
 }

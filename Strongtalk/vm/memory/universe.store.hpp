@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_UNIVERSE_STORE_HPP_HPP
+#define VM_MEMORY_UNIVERSE_STORE_HPP_HPP
 
 
 inline void Universe::store(oop* p, oop contents, bool cs) {
@@ -27,3 +29,6 @@ inline void Universe::store(oop* p, oop contents, bool cs) {
   if (cs) remembered_set->record_store(p);
 }
 
+
+
+#endif // VM_MEMORY_UNIVERSE_STORE_HPP_HPP

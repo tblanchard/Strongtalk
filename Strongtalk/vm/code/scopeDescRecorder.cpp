@@ -21,11 +21,98 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "compUtils.hpp"
+#include "vframe.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "scope.hpp"
+#include "pcDesc.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_scopeDescRecorder.cpp.incl"
 
 // Todo list 
 // - Insert Logical addresses
@@ -146,6 +233,7 @@ void LogicalAddress::generate(ScopeDescRecorder* rec) {
   }
 }
 
+// Array of word sized entries (used both for oops and for int values).
 class Array: public ResourceObj {
  private:
   int index;
@@ -153,14 +241,16 @@ class Array: public ResourceObj {
 
   int offset;
 
-  int* values;
+  intptr_t* values;
  public:
   Array(int size);
 
   int length() { return index; }
   void extend(int newSize);
-  int insertIfAbsent(int value);  // returns index for value
-  void copy_to(int*& addr);
+  int insertIfAbsent(intptr_t value);  // returns index for value
+  void copy_words_to(int*& addr);      // copy each entry as a word (oop sized)
+  void copy_ints_to(int*& addr);       // copy each entry as an int, then pad to a word boundary
+  static int ints_size_in_bytes(int length) { return roundTo(length * (int) sizeof(int), BytesPerWord); }
 };
 
 class ByteArray : public ResourceObj {
@@ -233,7 +323,7 @@ inline int ScopeDescRecorder::getValueIndex(int v) {
 }
 
 inline int ScopeDescRecorder::getOopIndex(oop o) {
-  return o == 0 ? 0 : oops->insertIfAbsent((int)o) + 1;
+  return o == 0 ? 0 : oops->insertIfAbsent((intptr_t)o) + 1;
 }
 
 void ScopeDescRecorder::emit_illegal_node(bool is_last) {
@@ -264,10 +354,10 @@ static ScopeDesc*     _getNextScopeDesc() {
 Array::Array(int sz) {
   size   = sz;
   index  = 0;
-  values = NEW_RESOURCE_ARRAY(int, sz);
+  values = NEW_RESOURCE_ARRAY(intptr_t, sz);
 }
 
-int Array::insertIfAbsent(int value){
+int Array::insertIfAbsent(intptr_t value){
   for (int i = 0; i < index; i ++)
     if (values[i] == value)
       return i;
@@ -278,17 +368,29 @@ int Array::insertIfAbsent(int value){
 }
 
 void Array::extend(int newSize) {
-  int* newValues = NEW_RESOURCE_ARRAY(int, newSize);
+  intptr_t* newValues = NEW_RESOURCE_ARRAY(intptr_t, newSize);
   for(int i=0;i < index; i++)
     newValues[i] = values[i];
   values = newValues;
   size   = newSize;
 }
 
-void Array::copy_to(int*& addr) {
+void Array::copy_words_to(int*& addr) {
+  intptr_t* to = (intptr_t*) addr;
   for(int i=0;i < length(); i++) {
-    *addr++ = values[i];
+    *to++ = values[i];
   }
+  addr = (int*) to;
+}
+
+void Array::copy_ints_to(int*& addr) {
+  char* start = (char*) addr;
+  for(int i=0;i < length(); i++) {
+    assert(values[i] == (int) values[i], "value does not fit in an int");
+    *addr++ = (int) values[i];
+  }
+  // keep the following section word aligned
+  while ((char*) addr - start < ints_size_in_bytes(length())) *addr++ = 0;
 }
 
 ByteArray::ByteArray(int size) {
@@ -330,7 +432,7 @@ void ByteArray::appendWord(int p) {
 #endif
 
 void ByteArray::alignToWord() {
-  int fill_size = (sizeof(int) - (size()%sizeof(int))) % sizeof(int);
+  int fill_size = (BytesPerWord - (size()%BytesPerWord)) % BytesPerWord;
   for(int i = 0; i < fill_size; i++)
     appendByte(0); 
 }
@@ -695,7 +797,7 @@ void ScopeDescRecorder::generate() {
 void ScopeDescRecorder::generateDependencies() {
   int end_marker = 0;
   for (int index = 0; index < dependants->length(); index++) {
-    int i = oops->insertIfAbsent((int)dependants->at(index));
+    int i = oops->insertIfAbsent((intptr_t)dependants->at(index));
     if (i > end_marker)  end_marker = i;
   }
   dependants_end = end_marker;
@@ -943,7 +1045,7 @@ Location ScopeDescRecorder::convert_location(Location loc) {
   ScopeInfo scope = theCompiler->scopes->at(scope_id)->scopeInfo();
   assert(scope, "scope must exist");
   if (scope->offset == INVALID_OFFSET) {
-    std->print_cr(loc.name());
+    stdOut->print_cr(loc.name());
     theCompiler->print_code(false);
     fatal("compiler error: context location appears outside its scope");    // Urs 5/96
   }
@@ -955,7 +1057,7 @@ int ScopeDescRecorder::size() {
   return   sizeof(nmethodScopes)
          + codes->size()
          + oops->length()   * sizeof(oop)
-         + values->length() * sizeof(int)
+         + Array::ints_size_in_bytes(values->length())
          + pcs->length()    * sizeof(PcDesc);
 }
 
@@ -988,10 +1090,10 @@ void ScopeDescRecorder::copyTo(nmethod* nm) {
     codes->copy_to( p);
 
     d->set_oops_offset((char*) p - (char*) start);
-    oops->copy_to( p);
+    oops->copy_words_to( p);
 
     d->set_value_offset((char*) p - (char*) start);
-    values->copy_to( p);
+    values->copy_ints_to( p);
 
     d->set_pcs_offset((char*) p - (char*) start);
     pcs->copy_to( p);

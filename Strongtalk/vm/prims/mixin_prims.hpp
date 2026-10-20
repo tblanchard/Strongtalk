@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_MIXIN_PRIMS_HPP_HPP
+#define VM_PRIMS_MIXIN_PRIMS_HPP_HPP
 
 // Primitives for mixins
 
@@ -219,3 +221,6 @@ class mixinOopPrimitives : AllStatic {
   static PRIM_DECL_1(set_uninstalled, oop mixin);
 
 };
+
+
+#endif // VM_PRIMS_MIXIN_PRIMS_HPP_HPP

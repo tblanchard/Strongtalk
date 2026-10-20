@@ -21,10 +21,96 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "loopOpt.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_loopOpt.cpp.incl"
 
 GrowableArray<BB*>* CompiledLoop::_bbs;
 
@@ -508,7 +594,8 @@ class TTHoister : public Closure<InlinedScope*> {
   void do_it(InlinedScope* s) {
     GrowableArray<NonTrivialNode*>* tests = s->typeTests();
     int len = tests->length();
-    for (int i = 0; i < len; i++) {
+    int i;
+    for (i = 0; i < len; i++) {
       NonTrivialNode* n = tests->at(i);
       assert(n->doesTypeTests(), "shouldn't be in list");
       if (n->deleted) continue;
@@ -539,7 +626,8 @@ void CompiledLoop::hoistTypeTests() {
   // add type tests to loop header for testing (avoid duplicates)
   // (currently quadratic algorithm but there should be very few)
   GrowableArray<HoistedTypeTest*>* headerTests = new GrowableArray<HoistedTypeTest*>(_hoistableTests->length());
-  for (int i = _hoistableTests->length() - 1; i >= 0; i--) {
+  int i;
+  for (i = _hoistableTests->length() - 1; i >= 0; i--) {
     HoistedTypeTest* t = _hoistableTests->at(i);
     PReg* tested = t->testedPR;
     for (int j = headerTests->length() - 1; j >= 0; j--) {
@@ -671,11 +759,11 @@ void CompiledLoop::findRegCandidates() {
 }
 
 void CompiledLoop::print() {
-  std->print("((CompiledLoop*)%#x) = [N%d..N%d], cond = [N%d..N%d], body = [N%d..N%d] (bci %d..%d)\n", 
+  stdOut->print("((CompiledLoop*)%#x) = [N%d..N%d], cond = [N%d..N%d], body = [N%d..N%d] (bci %d..%d)\n", 
           this, _firstNodeID, _lastNodeID, _startOfCond->id(), _endOfCond->id(), 
 	  _startOfBody->id(), _endOfBody->id(),
 	  _startOfLoop->bci(), _endOfLoop->bci());
-  std->print("\tloopVar=%s, lower=%s, upper=%s\n", _loopVar->safeName(), _lowerBound->safeName(), _upperBound->safeName());
+  stdOut->print("\tloopVar=%s, lower=%s, upper=%s\n", _loopVar->safeName(), _lowerBound->safeName(), _upperBound->safeName());
 }
 
 
@@ -697,13 +785,13 @@ void HoistedTypeTest::print_test_on(outputStream* s) {
 
 
 void HoistedTypeTest::print() {
-  std->print("((HoistedTypeTest*)%#x): ", this);
-  print_test_on(std);
-  std->cr();
+  stdOut->print("((HoistedTypeTest*)%#x): ", this);
+  print_test_on(stdOut);
+  stdOut->cr();
 }
 
 void LoopRegCandidate::print() {
-  std->print("((LoopRegCandidate*)%#x): %s, %d uses, %d defs\n", this, _preg->name(), _nuses, _ndefs);
+  stdOut->print("((LoopRegCandidate*)%#x): %s, %d uses, %d defs\n", this, _preg->name(), _nuses, _ndefs);
 }
 
 # endif

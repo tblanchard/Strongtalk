@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_MIXINOOP_HPP_HPP
+#define VM_OOPS_MIXINOOP_HPP_HPP
 
 // mixin objects holds the description of a class
 // All classes are results of mixin invocations.
@@ -34,6 +36,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 //    [class mixin       ]-  (Mixin)
 //    [instance variables]*
 
+mixinOop as_mixinOop(void* p);
 class mixinOopDesc: public memOopDesc {
  private:
    objArrayOop _methods;
@@ -111,3 +114,6 @@ class mixinOopDesc: public memOopDesc {
 
   friend mixinKlass;
 };
+
+
+#endif // VM_OOPS_MIXINOOP_HPP_HPP

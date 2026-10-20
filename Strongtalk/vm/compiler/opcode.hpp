@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_OPCODE_HPP_HPP
+#define VM_COMPILER_OPCODE_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -66,3 +68,6 @@ extern char* ArithOpName[];		// indexed by ArithOpCode
 extern bool  ArithOpIsCommutative[];	// indexed by ArithOpCode
 
 #endif
+
+
+#endif // VM_COMPILER_OPCODE_HPP_HPP

@@ -22,8 +22,26 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_util.cpp.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "iterator.hpp"
+#include "os.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "debug.hpp"
 # include <string.h>
 
 int Indent = 0;
@@ -89,8 +107,8 @@ void copy_oops_up(oop* from, oop* to, int count) {
 }
 */
 void copy_oops_down(oop* from, oop* to, int count) {
-  assert(maskBits(int(from), Tag_Size) == 0, "not word aligned");
-  assert(maskBits(int(to), Tag_Size) == 0, "not word aligned");
+  assert(maskBits(intptr_t(from), Tag_Size) == 0, "not word aligned");
+  assert(maskBits(intptr_t(to), Tag_Size) == 0, "not word aligned");
   assert(count >= 0, "negative count");
   DO_DOWN(*--from)
   }

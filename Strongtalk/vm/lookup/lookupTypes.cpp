@@ -21,9 +21,25 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_lookupTypes.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "util.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "lookupTypes.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
 # include <string.h>
 
 #ifdef junk
@@ -32,14 +48,14 @@ void printLookupType(LookupType l) {
   lprintf(lookupTypeName(l)); 
 }
 
-static void addFlag(bool& flag, char* name, const char* add) {
+static void addFlag(bool& flag, const char* name, const char* add) {
   if (!flag) strcat(name, " { ");
   flag = true;
   strcat(name, add);
 }
 
 char* lookupTypeName(LookupType l) {
-  char* name = NEW_RESOURCE_ARRAY(char, 80);
+  const char* name = NEW_RESOURCE_ARRAY(char, 80);
   switch (withoutExtraBits(l)) {
    case NormalLookupType:
     strcpy(name, "NormalLookup");

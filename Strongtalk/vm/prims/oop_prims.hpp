@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_OOP_PRIMS_HPP_HPP
+#define VM_PRIMS_OOP_PRIMS_HPP_HPP
 
 // Primitives applying to all objects
 
@@ -201,3 +203,6 @@ class oopPrimitives : AllStatic {
   //%
   static PRIM_DECL_3(performArguments, oop receiver, oop selector, oop args);
 }; 
+
+
+#endif // VM_PRIMS_OOP_PRIMS_HPP_HPP

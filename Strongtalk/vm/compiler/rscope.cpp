@@ -21,11 +21,105 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "abort.hpp"
+#include "uncommonBranch.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "compUtils.hpp"
+#include "vframe.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "scope.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "methodKlass.hpp"
+#include "compiledPIC.hpp"
 # ifdef DELTA_COMPILER
 
-# include "incls/_rscope.cpp.incl"
 
 RScope::RScope(RNonDummyScope* s, int bci) : _senderBCI(bci) {
   _sender = s; 
@@ -227,7 +321,8 @@ bool RNonDummyScope::isNotUncommonAt(int bci) const {
   assert(bci >= 0 && bci < ncodes, "bci out of range");
 
   // check if program got uncommon trap in the past
-  for (int i = 0; i < uncommon.length(); i++) {
+  int i;
+  for (i = 0; i < uncommon.length(); i++) {
     if (uncommon.at(i)->bci() == bci) return true;
   }
 
@@ -265,7 +360,8 @@ klassOop RInlinedScope::receiverKlass() const { return desc->selfKlass(); }
 
 void RNonDummyScope::unify(RNonDummyScope* s) {
   assert(ncodes == s->ncodes, "should be the same");
-  for (int i = 0; i < ncodes; i++) {
+  int i;
+  for (i = 0; i < ncodes; i++) {
     _subScopes[i] = s->_subScopes[i];
     if (_subScopes[i]) {
       for (int j = _subScopes[i]->length() - 1; j >= 0; j--) {
@@ -375,7 +471,8 @@ RNonDummyScope* RNonDummyScope::constructRScopes(const nmethod* nm, bool trusted
   FOR_EACH_SCOPE(nm->scopes(), s) {
     // search s' sender RScope
     ScopeDesc* sender = s->sender();
-    for (RNonDummyScope* rsender = current; rsender; rsender = rsender->sender()) {
+    RNonDummyScope* rsender;
+    for (rsender = current; rsender; rsender = rsender->sender()) {
       if (rsender->isInlinedScope() &&
 	  ((RInlinedScope*)rsender)->desc->is_equal(sender))
 	break;
@@ -513,51 +610,52 @@ void RInterpretedScope::extend() {
 }
 
 void RScope::print() { 
-  std->print("; sender: %#lx@%ld; count %ld\n", PrintHexAddresses ? _sender : 0, _senderBCI, nsends);
+  stdOut->print("; sender: %#lx@%ld; count %ld\n", PrintHexAddresses ? _sender : 0, _senderBCI, nsends);
 }
 
 void RNonDummyScope::printSubScopes() const {
-  for (int i = 0; i < ncodes && _subScopes[i] == NULL; i++) ;
+  int i;
+  for (i = 0; i < ncodes && _subScopes[i] == NULL; i++) ;
   if (i < ncodes) {
-    std->print("{ ");
+    stdOut->print("{ ");
     for (i = 0; i < ncodes; i++) {
-      std->print("%#lx ", PrintHexAddresses ? _subScopes[i] : 0);
+      stdOut->print("%#lx ", PrintHexAddresses ? _subScopes[i] : 0);
     }
-    std->print("}");
+    stdOut->print("}");
   } else {
-    std->print("none");
+    stdOut->print("none");
   }
 }
   
 void RInterpretedScope::print_short() {
-  std->print("((RInterpretedScope*)%#lx) \"%s\" #%ld", PrintHexAddresses ? this : 0, _key->print_string(), nsends);
+  stdOut->print("((RInterpretedScope*)%#lx) \"%s\" #%ld", PrintHexAddresses ? this : 0, _key->print_string(), nsends);
 }
   
 void RInlinedScope::print_short() {
-  std->print("((RInlinedScope*)%#lx) \"%s\" #%ld", PrintHexAddresses ? this : 0, desc->selector()->as_string(), nsends);
+  stdOut->print("((RInlinedScope*)%#lx) \"%s\" #%ld", PrintHexAddresses ? this : 0, desc->selector()->as_string(), nsends);
 }
   
 void RInlinedScope::print() {
   print_short();
-  std->print(": scope %#lx; subScopes: ", PrintHexAddresses ? desc : 0);
+  stdOut->print(": scope %#lx; subScopes: ", PrintHexAddresses ? desc : 0);
   printSubScopes();
-  if (uncommon.nonEmpty()) { std->print("; uncommon "); uncommon.print(); }
+  if (uncommon.nonEmpty()) { stdOut->print("; uncommon "); uncommon.print(); }
   RScope::print();
 }
 
 void RPICScope::print_short() {
-  std->print("((RPICScope*)%#lx) \"%s\" #%ld", PrintHexAddresses ? this : 0, method()->selector()->as_string(), nsends);
+  stdOut->print("((RPICScope*)%#lx) \"%s\" #%ld", PrintHexAddresses ? this : 0, method()->selector()->as_string(), nsends);
 }
   
 void RPICScope::print() {
   print_short();
-  std->print(": IC %#lx; subScopes: ", PrintHexAddresses ? _sd : 0);
+  stdOut->print(": IC %#lx; subScopes: ", PrintHexAddresses ? _sd : 0);
   printSubScopes();
-  if (uncommon.nonEmpty()) { std->print("; uncommon "); uncommon.print(); }
+  if (uncommon.nonEmpty()) { stdOut->print("; uncommon "); uncommon.print(); }
 }
 
 void RUntakenScope::print_short() {
-  std->print("((RUntakenScope*)%#lx) \"%s\"", PrintHexAddresses ? this : 0);
+  stdOut->print("((RUntakenScope*)%#lx) \"%s\"", PrintHexAddresses ? this : 0);
 }
 
 void RUntakenScope::print() {
@@ -567,16 +665,16 @@ void RUntakenScope::print() {
 }
 
 void RUncommonBranch::print() {
-  std->print("((RUncommonScope*)%#lx) : %#lx@%ld\n", PrintHexAddresses ? this : 0, PrintHexAddresses ? scope : 0, bci());
+  stdOut->print("((RUncommonScope*)%#lx) : %#lx@%ld\n", PrintHexAddresses ? this : 0, PrintHexAddresses ? scope : 0, bci());
 }
 
-void RUninlinableScope::print_short()	{ std->print("((RUninlinableScope*)%#lx)", PrintHexAddresses ? this : 0); }
-void RNullScope::print_short() 		{ std->print("((RNullScope*)%#lx)", PrintHexAddresses ? this : 0); }
+void RUninlinableScope::print_short()	{ stdOut->print("((RUninlinableScope*)%#lx)", PrintHexAddresses ? this : 0); }
+void RNullScope::print_short() 		{ stdOut->print("((RNullScope*)%#lx)", PrintHexAddresses ? this : 0); }
 
 void RNullScope::printTree(int bci, int level) const { }
 
 void RScope::printTree(int bci, int level) const {
-  std->print("%*s%3ld: ", level * 2, "", bci); ((RScope*)this)->print_short(); std->print("\n");
+  stdOut->print("%*s%3ld: ", level * 2, "", bci); ((RScope*)this)->print_short(); stdOut->print("\n");
 }
 
 void RNonDummyScope::printTree(int senderBCI, int level) const {
@@ -584,13 +682,15 @@ void RNonDummyScope::printTree(int senderBCI, int level) const {
   int u = 0;	      // current position in uncommon
   for (int bci = 0; bci < ncodes; bci++) {
     if (_subScopes[bci]) {
-      for (int j = 0; j < _subScopes[bci]->length(); j++) {
+      int j;
+      for (j = 0; j < _subScopes[bci]->length(); j++) {
 	_subScopes[bci]->at(j)->printTree(bci, level + 1);
       }
     }
-    for (int j = u; j < uncommon.length() && uncommon.at(j)->bci() < bci; u++, j++) ;
+    int j;
+    for (j = u; j < uncommon.length() && uncommon.at(j)->bci() < bci; u++, j++) ;
     if (j < uncommon.length() && uncommon.at(j)->bci() == bci) {
-      std->print("  %*s%3ld: uncommon\n", level * 2, "", bci);
+      stdOut->print("  %*s%3ld: uncommon\n", level * 2, "", bci);
     }
   }
 }
@@ -601,7 +701,7 @@ void RDatabaseScope::print() {
 }
 
 void RDatabaseScope::print_short() {
-  std->print("((RDatabaseScope*)%#lx)  \"%s\"", PrintHexAddresses ? this : 0, _key->print_string());
+  stdOut->print("((RDatabaseScope*)%#lx)  \"%s\"", PrintHexAddresses ? this : 0, _key->print_string());
 }
 
 bool RDatabaseScope::equivalent(InlinedScope* s) const {
@@ -664,7 +764,8 @@ void RInlinedScope::print_inlining_database_on(outputStream* st, GrowableArray<P
 
   // find scope in uncommon list
   int scope = desc->offset();
-  for (int u = 0; uncommon && u < uncommon->length() - 1 && uncommon->at(u)->scope < scope; u++) ;
+  int u;
+  for (u = 0; uncommon && u < uncommon->length() - 1 && uncommon->at(u)->scope < scope; u++) ;
   PcDesc* current_uncommon = next_uncommon(scope, u, uncommon);
 
   // File out subscopes

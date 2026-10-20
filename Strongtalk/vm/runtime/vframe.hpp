@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
-
+#ifndef VM_RUNTIME_VFRAME_HPP_HPP
+#define VM_RUNTIME_VFRAME_HPP_HPP
+#include "growableArray.hpp"
+#include "frame.hpp"
 
 // vframes are virtual stack frames representing source level activations.
 // A deltaVFrame represents an activation of a Delta level method. A single
@@ -210,6 +213,8 @@ class interpretedVFrame: public deltaVFrame {
 
 #ifdef DELTA_COMPILER
 
+#include "location.hpp"
+
 class compiledVFrame: public deltaVFrame {
  public:
   // Constructors
@@ -224,7 +229,7 @@ class compiledVFrame: public deltaVFrame {
 
   // Returns the contextOop for this interpreter frame
   // NULL is returned is no context exists.
-  contextOop compiledVFrame::compiled_context() const;
+  contextOop compiled_context() const;
 
   // Rewind the bci one step
   void rewind_bci(); 
@@ -408,3 +413,6 @@ class cChunk: public cVFrame {
   // Virtual defined in vframe
   oop callee_argument_at(int index) const;
 };
+
+
+#endif // VM_RUNTIME_VFRAME_HPP_HPP

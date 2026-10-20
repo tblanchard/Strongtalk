@@ -236,6 +236,25 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					main.cpp,
+					makeDeps.cpp,
+					"*.asm",
+					"*.bat",
+					"*.sh",
+					"*.tmp",
+					"*.db",
+					"*.bmp",
+					"*.sln",
+					"*.vcproj",
+					Makefile,
+					"*.inc",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					DELTA_COMPILER,
+				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/Strongtalk/vm/**";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -244,6 +263,25 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					main.cpp,
+					makeDeps.cpp,
+					"*.asm",
+					"*.bat",
+					"*.sh",
+					"*.tmp",
+					"*.db",
+					"*.bmp",
+					"*.sln",
+					"*.vcproj",
+					Makefile,
+					"*.inc",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					DELTA_COMPILER,
+				);
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/Strongtalk/vm/**";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

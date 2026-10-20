@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_SPLIT_HPP_HPP
+#define VM_COMPILER_SPLIT_HPP_HPP
 
 
 /************* This file is not currently used and should not be in the build */
@@ -56,3 +58,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   };
 
 # endif
+
+
+#endif // VM_COMPILER_SPLIT_HPP_HPP

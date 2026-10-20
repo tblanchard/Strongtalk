@@ -21,6 +21,14 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
+#ifndef memOop_hpp
+#define memOop_hpp
+
+#include "oop.hpp"
+#include "util.hpp"
+#include "universe.hpp"
+#include "markOop.hpp"
+
 // memOops are all oops that actually take up space in the heap (i.e.,
 // aren't immediates like smis)
 
@@ -29,6 +37,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 // should clean up order of member functions  -Urs
 
+memOop as_memOop(void* p);
 class memOopDesc: public oopDesc {
  protected:
   // instance variable
@@ -47,7 +56,7 @@ class memOopDesc: public oopDesc {
   friend memOop as_memOop(void* p);
 
   // conversion from memOop to memOopDesc*
-  memOopDesc* addr() const		{ return (memOopDesc*) (int(this) - Mem_Tag); }
+  memOopDesc* addr() const		{ return (memOopDesc*) ((long)this - Mem_Tag); }
   
   // space operations, is_old/new work w/o conversion to memOopDesc*
   // since oop > pointer (Mem_Tag >= 0)!
@@ -187,6 +196,8 @@ class memOopDesc: public oopDesc {
 
 inline memOop as_memOop(void* p)
 { 
-    assert((int(p) & Tag_Mask) == 0, "not an aligned C pointer");
-    return memOop(int(p) + Mem_Tag);
+    assert((intptr_t(p) & Tag_Mask) == 0, "not an aligned C pointer");
+    return memOop((long)p + Mem_Tag);
 }
+
+#endif // memOop_hpp

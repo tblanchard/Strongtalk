@@ -22,9 +22,69 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_delta.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "objArrayOop.hpp"
+#include "delta.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
 // Implementation of DeltaCallCache
 
 DeltaCallCache* DeltaCallCache::_root = NULL;	// anchor of all DeltaCallCaches
@@ -89,12 +149,14 @@ oop Delta::call(oop receiver, oop selector, oop arg1) {
 
 oop Delta::call(oop receiver, oop selector, oop arg1, oop arg2) {
   static DeltaCallCache cache;
-  return call_generic(&cache, receiver, selector, 2, &arg1);
+  oop args[] = { arg1, arg2 };	// (parameters are not contiguous in memory on all ABIs)
+  return call_generic(&cache, receiver, selector, 2, args);
 }
 
 oop Delta::call(oop receiver, oop selector, oop arg1, oop arg2, oop arg3) {
   static DeltaCallCache cache;
-  return call_generic(&cache, receiver, selector, 3, &arg1);
+  oop args[] = { arg1, arg2, arg3 };	// (parameters are not contiguous in memory on all ABIs)
+  return call_generic(&cache, receiver, selector, 3, args);
 }
 
 oop Delta::call(oop receiver, oop selector, objArrayOop args) {

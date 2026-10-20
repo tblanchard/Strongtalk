@@ -21,11 +21,105 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "rframe.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "methodKlass.hpp"
 # ifdef DELTA_COMPILER
 
-# include "incls/_inliner.cpp.incl"
 
 // ----------- inlining policy ---------------
 
@@ -79,12 +173,12 @@ bool InliningPolicy::isCriticalArraySelector(const symbolOop sel) {
 bool InliningPolicy::isCriticalBoolSelector(const symbolOop sel) {
   return  sel == vmSymbols::and_() ||
       	  sel == vmSymbols::or_() ||
-      	  sel == vmSymbols::and() ||
-      	  sel == vmSymbols::or() ||
+      	  sel == vmSymbols::and_op() ||
+      	  sel == vmSymbols::or_op() ||
       	  sel == vmSymbols::and1() ||
       	  sel == vmSymbols::or1() ||
-      	  sel == vmSymbols::and() ||
-      	  sel == vmSymbols::not() ||
+      	  sel == vmSymbols::and_op() ||
+      	  sel == vmSymbols::not_op() ||
       	  sel == vmSymbols::xor_() ||
       	  sel == vmSymbols::eqv_();
 }
@@ -196,7 +290,8 @@ char* InliningPolicy::basic_shouldInline(methodOop method) {
 
   // compute the cost limit based on the provided arguments
   int cost_limit = method->is_blockMethod() ? MaxBlockInlineCost : MaxFnInlineCost;
-  for (int i = method->number_of_arguments() - 1; i >= 0; i--) {
+  int i;
+  for (i = method->number_of_arguments() - 1; i >= 0; i--) {
     klassOop k = nthArgKlass(i);
     if (k && k->klass_part()->oop_is_block()) cost_limit += BlockArgAdditionalAllowedInlineCost;
   }
@@ -448,7 +543,8 @@ Expr* Inliner::inlineMerge(SendInfo* info) {
   GrowableArray<klassOop>* 	klasses2= new GrowableArray<klassOop>(nexprs);
   const bool containsUnknown = r->containsUnknown();
 
-  for (int i = 0; i < nexprs; i++) {    
+  int i;
+  for (i = 0; i < nexprs; i++) {    
     Expr* nth = r->exprs->at(i)->shallowCopy(r->preg(), NULL);
     assert(!nth->isConstantExpr() || nth->next == NULL ||
 	   nth->constant() == nth->next->constant(),
@@ -659,7 +755,8 @@ Expr* Inliner::picPredict() {
   // extract klasses from PIC
   GrowableArray<Expr*> klasses(5);
   MergeExpr* allKlasses = new MergeExpr(_info->rcvr->preg(), NULL);
-  for (int i = 0; i < l->length(); i++) {
+  int i;
+  for (i = 0; i < l->length(); i++) {
     RScope* r = l->at(i);
     Expr* expr = r->receiverExpr(_info->rcvr->preg());
     if (expr->isUnknownExpr()) {
@@ -678,12 +775,13 @@ Expr* Inliner::picPredict() {
   int nstatic = _info->rcvr->nklasses();
   if (npic != 0 && _info->rcvr->isMergeExpr()) {
     Expr* newRcvr = _info->rcvr;
-    for (int i = ((MergeExpr*)_info->rcvr)->exprs->length() - 1; i >= 0; i--) {
+    int i;
+    for (i = ((MergeExpr*)_info->rcvr)->exprs->length() - 1; i >= 0; i--) {
       Expr* e = ((MergeExpr*)_info->rcvr)->exprs->at(i);
       if (e->isUnknownExpr()) continue;
       if (!allKlasses->findKlass(e->klass())) {
 	if (PrintInlining) {
-	  std->print("%*s*discarding static type info for send %s (not found in PIC): ", 
+	  stdOut->print("%*s*discarding static type info for send %s (not found in PIC): ", 
 	             depth, "", _info->sel->as_string());
 	  e->print();
 	}
@@ -703,7 +801,7 @@ Expr* Inliner::picPredict() {
     // use the PIC information for this case
     if (CompilerDebug) {
 #ifndef PRODUCT // otherwise we get a syntax error (C++ compiler bug?) - gri 11/28/01
-      expr->klass()->klass_part()->print_name_on(cout(PrintInlining));
+      if (PrintInlining) expr->klass()->klass_part()->print_name_on(stdOut);
       cout(PrintInlining)->print(" ");
 #endif
     }
@@ -1021,7 +1119,7 @@ InlinedScope* Inliner::notify(const char* msg) {
 }
 
 void Inliner::print() {
-  std->print("((Inliner*)%#x)\n", PrintHexAddresses ? this : 0);
+  stdOut->print("((Inliner*)%#x)\n", PrintHexAddresses ? this : 0);
 }
 
 Expr* Inliner::inlineBlockInvocation(SendInfo* info) {

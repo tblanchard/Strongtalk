@@ -21,11 +21,74 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "bytecodes.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "objArrayOop.hpp"
+#include "delta.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "abort.hpp"
+#include "compiledPIC.hpp"
+#include "timer.hpp"
+#include "blockOop.hpp"
 #ifdef DELTA_COMPILER
 
-# include "incls/_zone.cpp.incl"
 
 # define LRU_RESOLUTION     16	/* resolution (in secs) of LRU timer */
 
@@ -303,7 +366,7 @@ void zone::compact(bool forced) {
   char* firstFree = NULL;
   if (!forced) adjustPolicy();
   if (needsCompaction()) {
-    if (PrintCodeReclamation) std->print("I");
+    if (PrintCodeReclamation) stdOut->print("I");
     firstFree = methodHeap->compact(moveInsts);
   }
   // unchainFrames();
@@ -396,7 +459,7 @@ void zone::PICs_do(void f(PIC* pic)) {
 }
 
 # define NMLINE(format, n, ntot, ntot2) 				      \
-  std->print(format, (n), 100.0 * (n) / (ntot), 100.0 * (n) / (ntot2))
+  stdOut->print(format, (n), 100.0 * (n) / (ntot), 100.0 * (n) / (ntot2))
 
 class nmsizes {
   int n, insts, locs, scopes;
@@ -409,11 +472,11 @@ class nmsizes {
 
   bool isEmpty() { return n == 0; }
 
-  void print(char* name, nmsizes& tot) {
+  void print(const char* name, nmsizes& tot) {
     int bigTotal = tot.total();
     int myTotal = total();
     if (! isEmpty()) {
-      std->print("%-13s (%ld methods): ", name, n);
+      stdOut->print("%-13s (%ld methods): ", name, n);
       NMLINE("headers = %ld (%2.0f%%/%2.0f%%); ", n*sizeof(nmethod),
 	     myTotal, bigTotal);
       NMLINE("insts = %ld (%2.0f%%/%2.0f%%);\n", insts, myTotal, bigTotal);
@@ -424,7 +487,7 @@ class nmsizes {
   }
 
   void print(char* title, int t) {
-    std->print_cr("   %3d %s nmethods %2d%% = %4dK (hdr %2d%%, inst %2d%%, locs %2d%%, debug %2d%%)",
+    stdOut->print_cr("   %3d %s nmethods %2d%% = %4dK (hdr %2d%%, inst %2d%%, locs %2d%%, debug %2d%%)",
                   n,
 		  title,
                   total() * 100 / t,
@@ -457,18 +520,18 @@ void zone::print() {
     }
   }
 
-  std->print_cr("Zone:");
+  stdOut->print_cr("Zone:");
 
   if (!nms.isEmpty()) {
-    std->print_cr("  Code (%dK, %d%% used)", methodHeap->capacity() / K, (methodHeap->usedBytes() * 100) / methodHeap->capacity());
+    stdOut->print_cr("  Code (%dK, %d%% used)", methodHeap->capacity() / K, (methodHeap->usedBytes() * 100) / methodHeap->capacity());
     nms.print("live", methodHeap->capacity());
   }
   if (uncommon) {
-    std->print_cr("(%d live uncommon nmethods)", uncommon);
+    stdOut->print_cr("(%d live uncommon nmethods)", uncommon);
   }
   if (!zombies.isEmpty()) {
     zombies.print("dead", methodHeap->capacity());
-    std->print_cr("  PICs (%dK, %d%% used)", picHeap->capacity() / K, (picHeap->usedBytes() * 100) / picHeap->capacity());
+    stdOut->print_cr("  PICs (%dK, %d%% used)", picHeap->capacity() / K, (picHeap->usedBytes() * 100) / picHeap->capacity());
   }
 
   int n     = 0;
@@ -480,7 +543,7 @@ void zone::print() {
   int total = insts + n * sizeof(PIC);
 
   if (n > 0) {
-    std->print_cr("   %3d entries = %dK (hdr %2d%%, inst %2d%%)",
+    stdOut->print_cr("   %3d entries = %dK (hdr %2d%%, inst %2d%%)",
                   n,
    		  total / K,
                   n * sizeof(PIC) * 100 / total,
@@ -634,9 +697,9 @@ void zone::mark_dependents_for_deoptimization() {
       for (int index = 0; index < nms->length(); index++) {
         nmethod* elem = nms->at(index);	
 	if (TraceApplyChange) {
-          std->print("invalidating "); 
-          elem->print_value_on(std);
-          std->cr();
+          stdOut->print("invalidating "); 
+          elem->print_value_on(stdOut);
+          stdOut->cr();
         }
 	elem->mark_for_deoptimization();
       }

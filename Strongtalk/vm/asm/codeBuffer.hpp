@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_ASM_CODEBUFFER_HPP_HPP
+#define VM_ASM_CODEBUFFER_HPP_HPP
 
+#include "relocInfo.hpp"
 #ifdef DELTA_COMPILER
 
 class  MacroAssembler;
@@ -65,3 +68,6 @@ class CodeBuffer: public PrintableResourceObj {
 };
 
 #endif
+
+
+#endif // VM_ASM_CODEBUFFER_HPP_HPP

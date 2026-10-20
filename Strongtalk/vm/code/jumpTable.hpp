@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_JUMPTABLE_HPP_HPP
+#define VM_CODE_JUMPTABLE_HPP_HPP
 
 // The jumpTable constitutes the interface between interpreter code and optimized code.
 // This indirection makes it possible to invalidate optimized code without 
@@ -155,3 +157,6 @@ class jumpTableEntry : public ValueObj {
 };
 
 #endif
+
+
+#endif // VM_CODE_JUMPTABLE_HPP_HPP

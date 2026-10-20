@@ -21,9 +21,37 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_allocation.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "abort.hpp"
 ResourceArea resource_area;
 
 void PrintableResourceObj::print_short() { print(); }
@@ -91,9 +119,9 @@ void ResourceAreaChunk::print() {
   lprintf(": [%#lx, %#lx), prev = %#lx\n", bottom, top, prev);
 }
 
-void ResourceAreaChunk::print_short() { std->print("ResourceAreaChunk %#lx", this); }
+void ResourceAreaChunk::print_short() { stdOut->print("ResourceAreaChunk %#lx", this); }
 void ResourceAreaChunk::print_alloc(char* addr, int size) {
-  std->print_cr("allocating %ld bytes at %#lx", size, addr);
+  stdOut->print_cr("allocating %ld bytes at %#lx", size, addr);
 }
 
 ResourceArea::ResourceArea() {
@@ -184,7 +212,7 @@ ResourceAreaChunk* Resources::new_chunk(int min_capacity,
     res = new ResourceAreaChunk(min_capacity, previous);
     _allocated += res->capacity();
     if (PrintResourceChunkAllocation) {
-      std->print("*allocating new resource area chunk of >=%d bytes, new total = %d bytes\n", min_capacity, _allocated);
+      stdOut->print("*allocating new resource area chunk of >=%d bytes, new total = %d bytes\n", min_capacity, _allocated);
     }
   }
   _in_consistent_state = true;
@@ -229,7 +257,8 @@ ResourceMark::~ResourceMark() {
     lprintf("deallocating to mark %#lx\n", top);
   }
   ResourceAreaChunk* prevc;
-  for (ResourceAreaChunk* c = area->chunk; c != chunk; c = prevc) {
+  ResourceAreaChunk* c;
+  for (c = area->chunk; c != chunk; c = prevc) {
     // deallocate all chunks behind marked chunk
     prevc = c->prev;
     resources.addToFreeList(c);
@@ -268,12 +297,12 @@ NoGCVerifier::~NoGCVerifier() {
 }
 
 char *align(void* p, int alignment) {
-  int number = (int) p;
-  int adjust =  alignment - (number%alignment) % alignment;
+  intptr_t number = (intptr_t) p;
+  intptr_t adjust =  alignment - (number%alignment) % alignment;
   return (char*) number + adjust;
 }
 
-char* AllocatePageAligned(int size, char* name) {
+char* AllocatePageAligned(int size, const char* name) {
   int page_size = Universe::page_size();
   char* block = align(malloc(size + page_size), page_size);
   if (PrintHeapAllocation)
@@ -281,7 +310,7 @@ char* AllocatePageAligned(int size, char* name) {
   return block;
 }
 
-char* AllocateHeap(int size, char* name) {
+char* AllocateHeap(int size, const char* name) {
   if (PrintHeapAllocation) lprintf("Heap %7d %s\n", size, name);
   return (char*) malloc(size);
 }

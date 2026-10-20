@@ -21,25 +21,41 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_arguments.cpp.incl"
-# include <ctype.h>
-
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "disclaimer.hpp"
+#include "debug.hpp"
+#include "arguments.hpp"
+#include <ctype.h>
+#include <stdio.h>
 // Recipe for setting flags for the VM:
 // 1. Read the file .deltarc
 // 2. Process the arguments
 
 //char* boot_filename = "delta.bst";
-char* boot_filename = SYSTEM_NAME ".bst";
-char* rc_filename   = "." SYSTEM_NAME "rc";
+const char* boot_filename = SYSTEM_NAME ".bst";
+const char* rc_filename   = "." SYSTEM_NAME "rc";
 
-static void set_bool_flag(char* name, bool value) {
+static void set_bool_flag(const char* name, bool value) {
   bool s = value;
   if (!debugFlags::boolAtPut(name, &s))
     fprintf(stderr, "Boolean flag %s unknown.\n", name);
 }
 
-static void set_int_flag(char* name, int value) {
+static void set_int_flag(const char* name, int value) {
   int v = value;
   if (!debugFlags::intAtPut(name, &v))
     fprintf(stderr, "Integer flag %s unknown.\n", name);
@@ -57,7 +73,7 @@ static void process_token(char* token) {
   }
 }
 
-void process_settings_file(char* file_name, bool quiet) {
+void process_settings_file(const char* file_name, bool quiet) {
   FILE* stream = fopen(file_name, "rb");
   if (stream == NULL) {
     if (quiet) return;

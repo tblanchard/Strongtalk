@@ -21,9 +21,15 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_lprintf.cpp.incl"
+#include "config.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "os.hpp"
 #include <string.h>
+#include <iostream>
+#include "debug.hpp"
+#include "ostream.hpp"
 
 static FILE* logFile = NULL;
 static char fname[80];
@@ -54,11 +60,11 @@ static void check_log_file() {
 }
 
 
-extern "C" void lprintf(char* m, ...) {
+extern "C" void lprintf(const char* m, ...) {
   char buf[1024];
   va_list ap;
   va_start(ap, m);
-  vsprintf(buf, m, ap);
+  vsnprintf(buf, sizeof(buf), m, ap);
   va_end(ap);
 
   check_log_file();
@@ -84,7 +90,7 @@ extern "C" void lputc(char c) {
   }
 }
 
-extern "C" void lputs(char* str) {
+extern "C" void lputs(const char* str) {
   check_log_file();
   if (LogVMMessages) {
     fputs(str, logFile);
@@ -96,30 +102,30 @@ extern "C" void lputs(char* str) {
   }
 }
 
-extern "C" void error(char* format, ...) {
-  std->print_cr("VM Error:");
+extern "C" void error(const char* format, ...) {
+  stdOut->print_cr("VM Error:");
   va_list ap;
   va_start(ap, format);
-  std->vprint_cr(format, ap);
+  stdOut->vprint_cr(format, ap);
   va_end(ap);
-  DEBUG_EXCEPTION
+  DEBUG_EXCEPTION;
 }
 
-extern "C" void warning(char* format, ...) {
-  std->print_cr("VM Warning:");
+extern "C" void warning(const char* format, ...) {
+  stdOut->print_cr("VM Warning:");
   va_list ap;
   va_start(ap, format);
-  std->vprint_cr(format, ap);
+  stdOut->vprint_cr(format, ap);
   va_end(ap);
   if (BreakAtWarning) DEBUG_EXCEPTION;
 }
 
-extern "C" void compiler_warning(char* format, ...) {
+extern "C" void compiler_warning(const char* format, ...) {
   if (PrintCompilerWarnings) {
-    std->print_cr("Compiler Warning:");
+    stdOut->print_cr("Compiler Warning:");
     va_list ap;
     va_start(ap, format);
-    std->vprint_cr(format, ap);
+    stdOut->vprint_cr(format, ap);
     va_end(ap);
     if (BreakAtWarning) DEBUG_EXCEPTION;
   }

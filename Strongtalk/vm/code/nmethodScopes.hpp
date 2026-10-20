@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_NMETHODSCOPES_HPP_HPP
+#define VM_CODE_NMETHODSCOPES_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -54,7 +56,7 @@ class nmethodScopes : public ValueObj {
  private:
   static uint16 pack_word_aligned(int value) {
     assert(value %  BytesPerWord == 0, "value should be word aligned");
-    assert(value >> BytesPerWord <= nthMask(BitsPerByte*sizeof(uint16)),
+    assert(value >> LogBytesPerWord <= nthMask(BitsPerByte*sizeof(uint16)),
 	   "value exceeds limit");
     return value >> LogBytesPerWord;
   }
@@ -172,3 +174,6 @@ class nmethodScopes : public ValueObj {
 
 
 #endif
+
+
+#endif // VM_CODE_NMETHODSCOPES_HPP_HPP

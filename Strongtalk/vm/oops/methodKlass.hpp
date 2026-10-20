@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_METHODKLASS_HPP_HPP
+#define VM_OOPS_METHODKLASS_HPP_HPP
 
+void set_methodKlass_vtbl(Klass* k);
 class methodKlass : public memOopKlass {
  public:
   bool oop_is_method() const { return true; }
@@ -60,9 +63,12 @@ class methodKlass : public memOopKlass {
   // printing support
   void oop_print_on(oop obj, outputStream* st);
   void oop_print_value_on(oop obj, outputStream* st);
-  char* name() const { return "method"; }
+  const char* name() const { return "method"; }
 
   // Construction (called from primitive)
   methodOop constructMethod(oop name, int flags, int nofArgs, objArrayOop debugInfo,
 			                byteArrayOop bytes, objArrayOop oops);
 };
+
+
+#endif // VM_OOPS_METHODKLASS_HPP_HPP

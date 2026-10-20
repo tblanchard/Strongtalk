@@ -21,9 +21,51 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_proxy_prims.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "prim_def.hpp"
+#include "symbolOop.hpp"
+#include "klassOop.hpp"
+#include "proxyOop.hpp"
+#include "oopFactory.hpp"
+#include "universe.inline.hpp"
+#include "doubleOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "prim_impl.hpp"
+#include "proxy_prims.hpp"
 TRACE_FUNC(TraceProxyPrims, "proxy")
 
 int proxyOopPrimitives::number_of_calls;
@@ -33,11 +75,10 @@ int proxyOopPrimitives::number_of_calls;
 PRIM_DECL_1(proxyOopPrimitives::getSmi, oop receiver) {
   PROLOGUE_1("getSmi", receiver);
   ASSERT_RECEIVER;
-  unsigned int value   = (unsigned int) proxyOop(receiver)->get_pointer();
-  unsigned int topBits = value >> (BitsPerWord - Tag_Size);
-  if ((topBits != 0) && (topBits != 3))
+  smi value = (smi) proxyOop(receiver)->get_pointer();
+  if (value < smi_min || value > smi_max)
     return markSymbol(vmSymbols::smi_conversion_failed());
-  return as_smiOop((int) value);
+  return as_smiOop(value);
 }
 
 PRIM_DECL_2(proxyOopPrimitives::set, oop receiver, oop value) {
@@ -59,17 +100,18 @@ PRIM_DECL_3(proxyOopPrimitives::setHighLow, oop receiver, oop high, oop low) {
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!low->is_smi())
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
-  unsigned int h     = (unsigned int) smiOop(high)->value();
-  unsigned int l     = (unsigned int) smiOop(low)->value();
-  unsigned int value = (h << 16) | l;
-  proxyOop(receiver)->set_pointer((void*) value);
+  uint32_t h     = (uint32_t) smiOop(high)->value();
+  uint32_t l     = (uint32_t) smiOop(low)->value();
+  uint32_t value = (h << 16) | l;
+  proxyOop(receiver)->set_pointer((void*) (uintptr_t) value);
   return receiver;
 }
 
 PRIM_DECL_1(proxyOopPrimitives::getHigh, oop receiver) {
   PROLOGUE_1("getHigh", receiver);
   ASSERT_RECEIVER;
-  unsigned int value = (int) proxyOop(receiver)->get_pointer();
+  // high 16 bits of the low 32 bits of the pointer
+  uint32_t value = (uint32_t) (uintptr_t) proxyOop(receiver)->get_pointer();
   value = value >> 16;
   return as_smiOop(value);
 }
@@ -77,7 +119,7 @@ PRIM_DECL_1(proxyOopPrimitives::getHigh, oop receiver) {
 PRIM_DECL_1(proxyOopPrimitives::getLow, oop receiver) {
   PROLOGUE_1("getLow", receiver);
   ASSERT_RECEIVER;
-  unsigned int value = (int) proxyOop(receiver)->get_pointer();
+  uint32_t value = (uint32_t) (uintptr_t) proxyOop(receiver)->get_pointer();
   value &= 0x0000ffff;
   return as_smiOop(value);
 }
@@ -239,19 +281,20 @@ PRIM_DECL_3(proxyOopPrimitives::doublePrecisionFloatAtPut, oop receiver, oop off
   return receiver;
 }
 
-static bool convert_to_arg(oop arg, int* addr) {
+// Call-out arguments are word sized (integer/pointer registers on arm64).
+static bool convert_to_arg(oop arg, intptr_t* addr) {
   if (arg->is_smi()) {
     *addr = smiOop(arg)->value();
     return true;
   }
   if (arg->is_proxy()) {
-    *addr = (int) proxyOop(arg)->get_pointer();
+    *addr = (intptr_t) proxyOop(arg)->get_pointer();
     return true;
   }
   return false;
 }
 
-typedef void* (__stdcall *call_out_func_0)();
+typedef void* (*call_out_func_0)();
 PRIM_DECL_2(proxyOopPrimitives::callOut0, oop receiver, oop result) {
   PROLOGUE_2("callOut0", receiver, result);
   ASSERT_RECEIVER;
@@ -263,12 +306,12 @@ PRIM_DECL_2(proxyOopPrimitives::callOut0, oop receiver, oop result) {
   return result;
 }
 
-typedef void* (__stdcall *call_out_func_1)(int a);
+typedef void* (*call_out_func_1)(intptr_t a);
 PRIM_DECL_3(proxyOopPrimitives::callOut1, oop receiver, oop arg1, oop result) {
   PROLOGUE_3("callOut1", receiver, arg1, result);
   ASSERT_RECEIVER;
 
-  int a1;
+  intptr_t a1;
   if (!convert_to_arg(arg1, &a1)) 
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
@@ -280,16 +323,16 @@ PRIM_DECL_3(proxyOopPrimitives::callOut1, oop receiver, oop arg1, oop result) {
   return result;
 }
 
-typedef void* (__stdcall *call_out_func_2)(int a, int b);
+typedef void* (*call_out_func_2)(intptr_t a, intptr_t b);
 PRIM_DECL_4(proxyOopPrimitives::callOut2, oop receiver, oop arg1, oop arg2, oop result) {
   PROLOGUE_4("callOut2", receiver, arg1, arg2, result);
   ASSERT_RECEIVER;
 
-  int a1;
+  intptr_t a1;
   if (!convert_to_arg(arg1, &a1)) 
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  int a2;
+  intptr_t a2;
   if (!convert_to_arg(arg2, &a2)) 
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
 
@@ -301,20 +344,20 @@ PRIM_DECL_4(proxyOopPrimitives::callOut2, oop receiver, oop arg1, oop arg2, oop 
   return result;
 }
 
-typedef void* (__stdcall *call_out_func_3)(int a, int b, int c);
+typedef void* (*call_out_func_3)(intptr_t a, intptr_t b, intptr_t c);
 PRIM_DECL_5(proxyOopPrimitives::callOut3, oop receiver, oop arg1, oop arg2, oop arg3, oop result) {
   PROLOGUE_5("callOut3", receiver, arg1, arg2, arg3, result);
   ASSERT_RECEIVER;
 
-  int a1;
+  intptr_t a1;
   if (!convert_to_arg(arg1, &a1)) 
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  int a2;
+  intptr_t a2;
   if (!convert_to_arg(arg2, &a2)) 
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
 
-  int a3;
+  intptr_t a3;
   if (!convert_to_arg(arg3, &a3)) 
     return markSymbol(vmSymbols::third_argument_has_wrong_type());
 
@@ -326,24 +369,24 @@ PRIM_DECL_5(proxyOopPrimitives::callOut3, oop receiver, oop arg1, oop arg2, oop 
   return result;
 }
 
-typedef void* (__stdcall *call_out_func_4)(int a, int b, int c, int d);
+typedef void* (*call_out_func_4)(intptr_t a, intptr_t b, intptr_t c, intptr_t d);
 PRIM_DECL_6(proxyOopPrimitives::callOut4, oop receiver, oop arg1, oop arg2, oop arg3, oop arg4, oop result) {
   PROLOGUE_6("callOut4", receiver, arg1, arg2, arg3, arg4, result);
   ASSERT_RECEIVER;
 
-  int a1;
+  intptr_t a1;
   if (!convert_to_arg(arg1, &a1)) 
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  int a2;
+  intptr_t a2;
   if (!convert_to_arg(arg2, &a2)) 
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
 
-  int a3;
+  intptr_t a3;
   if (!convert_to_arg(arg3, &a3)) 
     return markSymbol(vmSymbols::third_argument_has_wrong_type());
 
-  int a4;
+  intptr_t a4;
   if (!convert_to_arg(arg4, &a4)) 
     return markSymbol(vmSymbols::fourth_argument_has_wrong_type());
 
@@ -355,29 +398,29 @@ PRIM_DECL_6(proxyOopPrimitives::callOut4, oop receiver, oop arg1, oop arg2, oop 
   return result;
 }
 
-typedef void* (__stdcall *call_out_func_5)(int a, int b, int c, int d, int e);
+typedef void* (*call_out_func_5)(intptr_t a, intptr_t b, intptr_t c, intptr_t d, intptr_t e);
 
 PRIM_DECL_7(proxyOopPrimitives::callOut5, oop receiver, oop arg1, oop arg2, oop arg3, oop arg4, oop arg5, oop result) {
   PROLOGUE_7("callOut5", receiver, arg1, arg2, arg3, arg4, arg5, result);
   ASSERT_RECEIVER;
 
-  int a1;
+  intptr_t a1;
   if (!convert_to_arg(arg1, &a1)) 
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
 
-  int a2;
+  intptr_t a2;
   if (!convert_to_arg(arg2, &a2)) 
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
 
-  int a3;
+  intptr_t a3;
   if (!convert_to_arg(arg3, &a3)) 
     return markSymbol(vmSymbols::third_argument_has_wrong_type());
 
-  int a4;
+  intptr_t a4;
   if (!convert_to_arg(arg4, &a4)) 
     return markSymbol(vmSymbols::fourth_argument_has_wrong_type());
 
-  int a5;
+  intptr_t a5;
   if (!convert_to_arg(arg5, &a5)) 
     return markSymbol(vmSymbols::fifth_argument_has_wrong_type());
 

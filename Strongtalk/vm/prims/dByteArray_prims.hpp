@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_DBYTEARRAY_PRIMS_HPP_HPP
+#define VM_PRIMS_DBYTEARRAY_PRIMS_HPP_HPP
 
 // Primitives for byte arrays
 
@@ -103,3 +105,6 @@ class doubleByteArrayPrimitives : AllStatic {
   static PRIM_DECL_1(hash, oop receiver);
 };
 
+
+
+#endif // VM_PRIMS_DBYTEARRAY_PRIMS_HPP_HPP

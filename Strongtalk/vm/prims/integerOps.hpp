@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_INTEGEROPS_HPP_HPP
+#define VM_PRIMS_INTEGEROPS_HPP_HPP
 
 
 // Integer is the representation for arbitrary long integers. A non-
@@ -32,6 +34,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 class IntegerOps;
 typedef unsigned int Digit;
+const int logB = sizeof(Digit) * 8;	// B = 2^logB is the digit base
 
 class Integer: ValueObj {
  private:
@@ -138,9 +141,9 @@ class IntegerOps: AllStatic {
   static void div(Integer& x, Integer& y, Integer& z);	// z := x div y
   static void mod(Integer& x, Integer& y, Integer& z);	// z := x mod y
 
-  static void and(Integer& x, Integer& y, Integer& z);	// z := x and y, bitwise, assuming 2's complement representation
-  static void or (Integer& x, Integer& y, Integer& z);	// z := x or  y, bitwise, assuming 2's complement representation
-  static void xor(Integer& x, Integer& y, Integer& z);	// z := x xor y, bitwise, assuming 2's complement representation
+  static void and_(Integer& x, Integer& y, Integer& z);	// z := x and y, bitwise, assuming 2's complement representation
+  static void or_(Integer& x, Integer& y, Integer& z);	// z := x or  y, bitwise, assuming 2's complement representation
+  static void xor_(Integer& x, Integer& y, Integer& z);	// z := x xor y, bitwise, assuming 2's complement representation
   static void ash(Integer& x, int      n, Integer& z);	// z := x * 2^n
 
   static int  cmp(Integer& x, Integer& y            );	// returns < 0 for x < y; 0 for x = y; > 0 for x > y
@@ -158,3 +161,6 @@ class IntegerOps: AllStatic {
   // testing/debugging
   static void self_test();
 };
+
+
+#endif // VM_PRIMS_INTEGEROPS_HPP_HPP

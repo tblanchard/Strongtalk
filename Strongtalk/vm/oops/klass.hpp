@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_KLASS_HPP
+#define VM_OOPS_KLASS_HPP
 
+#include "smiOop.hpp"
 // A Klass is the the part of the klassOop that provides:
 //  1: language level class object (method dictionary etc.)
 //  2: provide vm dispatch behavior for the object
@@ -48,6 +51,7 @@ const int vtbl_position = 0;
 //    [superKlass           ]  super
 //    [mixin                ]  the mixin for the class
 
+klassOop as_klassOop(void* p);
 class Klass : ValueObj {
  protected:
   smiOop        _non_indexable_size;
@@ -102,10 +106,11 @@ class Klass : ValueObj {
   bool           includes_classVar(symbolOop name);  // Tells whether the name is present
 
   // virtual pointer value
-  int    vtbl_value() const           { return ((int*) this)[vtbl_position]; }
-  void set_vtbl_value(int vtbl) {
-    assert(vtbl % 4 == 0, "VTBL should be aligned");
-    ((int*) this)[vtbl_position] = vtbl; }
+  // the C++ vtbl pointer of the Klass (a word)
+  intptr_t vtbl_value() const          { return ((intptr_t*) this)[vtbl_position]; }
+  void set_vtbl_value(intptr_t vtbl) {
+    assert(vtbl % sizeof(void*) == 0, "VTBL should be aligned");
+    ((intptr_t*) this)[vtbl_position] = vtbl; }
 
   void bootstrap_klass_part_one(bootstrap* bs);
   void bootstrap_klass_part_two(bootstrap* bs);
@@ -161,7 +166,7 @@ class Klass : ValueObj {
   virtual Format format() { return no_klass; }
 
   static Format format_from_symbol(symbolOop format);
-  static char*  name_from_format(Format format);
+  static const char*  name_from_format(Format format);
 
   // Tells whether the two klass have same layout (format and instance variables)
   bool has_same_layout_as(klassOop klass);
@@ -170,11 +175,11 @@ class Klass : ValueObj {
   virtual klassOop create_subclass(mixinOop mixin, Format format);
 
  protected:
-  static klassOop create_generic_class(klassOop super_class, mixinOop mixin, int vtbl);
+  static klassOop create_generic_class(klassOop super_class, mixinOop mixin, intptr_t vtbl);
 
  public:
 
-  virtual char* name() const { return ""; }
+  virtual const char* name() const { return ""; }
   void  print_klass();
   void print_name_on(outputStream* st);
 
@@ -268,3 +273,4 @@ inline klassOop as_klassOop(void* p)
 { 
 	return klassOop(as_memOop(p)); 
 }
+#endif // VM_OOPS_KLASS_HPP

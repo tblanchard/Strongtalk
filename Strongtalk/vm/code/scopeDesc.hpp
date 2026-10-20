@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_SCOPEDESC_HPP_HPP
+#define VM_CODE_SCOPEDESC_HPP_HPP
 
+#include "key.hpp"
 #ifdef DELTA_COMPILER
 
 class NameDescClosure {
@@ -149,7 +152,7 @@ class ScopeDesc : public PrintableResourceObj {		// abstract
   virtual bool isTopLevelBlockScope() const	{ return false; }
   virtual bool isNonInlinedBlockScope() const	{ return false; }
 
-  virtual NameDesc* self() const		= NULL;
+  virtual NameDesc* self() const		= 0;
   NameDesc* temporary	    (int index, bool canFail = false);
   NameDesc* contextTemporary(int index, bool canFail = false);
   NameDesc* exprStackElem   (int bci, bool includeTrivial = true);
@@ -280,3 +283,6 @@ class NonInlinedBlockScopeDesc : public PrintableResourceObj {
 };
 
 #endif
+
+
+#endif // VM_CODE_SCOPEDESC_HPP_HPP

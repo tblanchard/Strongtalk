@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_DEFUSE_HPP_HPP
+#define VM_COMPILER_DEFUSE_HPP_HPP
 
 // Defs represent PReg definitions, Uses the uses.  Each basic block
 // has a list of the defs and uses it contains, and a PReg has a list
@@ -114,3 +116,6 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   void forAllUsesDo(const GrowableArray<PRegBBIndex*>* l, Closure<Use*>* f);
   void printDefsAndUses(const GrowableArray<PRegBBIndex*>* l);	// for debugging
 # endif
+
+
+#endif // VM_COMPILER_DEFUSE_HPP_HPP

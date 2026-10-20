@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_AGETABLE_HPP_HPP
+#define VM_MEMORY_AGETABLE_HPP_HPP
 
 // Age table for feedback-mediated tenuring (generation scavenging).
 // Note: all sizes are in oopSize
@@ -42,3 +44,6 @@ class ageTable: public CHeapObj {
   int tenure_size(int age);
   int tenuring_threshold(int oop_size);
 };
+
+
+#endif // VM_MEMORY_AGETABLE_HPP_HPP

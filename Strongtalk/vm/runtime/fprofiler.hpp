@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_FPROFILER_HPP_HPP
+#define VM_RUNTIME_FPROFILER_HPP_HPP
 
 
 // a simple flat profiler for Delta
@@ -78,3 +80,6 @@ class FlatProfiler: AllStatic {
 
   static DeltaProcess* process() { return proc; }
 };
+
+
+#endif // VM_RUNTIME_FPROFILER_HPP_HPP

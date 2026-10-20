@@ -20,6 +20,12 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_METHODOOP_HPP_HPP
+#define VM_OOPS_METHODOOP_HPP_HPP
+
+#include "bytecodes.hpp"
+#include "vframe.hpp"
+#include "frame.hpp"
 
 // A methodOop is a method with byte codes.
 
@@ -33,6 +39,7 @@ const int method_flags_mask_bitno =  method_args_mask_bitno + method_args_mask_s
 const int method_flags_mask_size  =  8;
 
 
+methodOop as_methodOop(void* p);
 class methodOopDesc : public memOopDesc {
  private:
   objArrayOop _debugInfo;
@@ -47,18 +54,18 @@ class methodOopDesc : public memOopDesc {
 
  public:
   // offsets for code generation
-  static int selector_or_method_byte_offset()	{ return int(&(((methodOopDesc*)NULL)->_selector_or_method)) - Mem_Tag; }
-  static int counters_byte_offset()		{ return int(&(((methodOopDesc*)NULL)->_counters)) - Mem_Tag; }
+  static int selector_or_method_byte_offset()	{ return (long)(&(((methodOopDesc*)NULL)->_selector_or_method)) - Mem_Tag; }
+  static int counters_byte_offset()		{ return (long)(&(((methodOopDesc*)NULL)->_counters)) - Mem_Tag; }
   static int codes_byte_offset()		{ return sizeof(methodOopDesc) - Mem_Tag; }
 
   smiOop size_and_flags() const { return addr()->_size_and_flags; }	
   void set_size_and_flags(int size, int nofArgs, int flags) {
-    addr()->_size_and_flags = (smiOop)
+    addr()->_size_and_flags = (smiOop) (intptr_t)
       ((flags << method_flags_mask_bitno) + (nofArgs << method_args_mask_bitno) + (size << method_size_mask_bitno));
   }
 
   int flags() const { 
-    return get_unsigned_bitfield((int)size_and_flags(), method_flags_mask_bitno, method_flags_mask_size);
+    return get_unsigned_bitfield((long)size_and_flags(), method_flags_mask_bitno, method_flags_mask_size);
   }
 
   void set_flags(int flags) {
@@ -66,7 +73,7 @@ class methodOopDesc : public memOopDesc {
   }
 
   int nofArgs() const {			 // number of arguments (excluding receiver)
-    return get_unsigned_bitfield((int)size_and_flags(), method_args_mask_bitno, method_args_mask_size); }
+    return get_unsigned_bitfield((long)size_and_flags(), method_args_mask_bitno, method_args_mask_size); }
 
  public:
   friend methodOop as_methodOop(void* p) { return methodOop(as_memOop(p)); }
@@ -101,6 +108,19 @@ class methodOopDesc : public memOopDesc {
   // (false, oop)          means oop
   objArrayOop fileout_body();
 
+  // The other file out information, for the external (32-bit) layout of the code.
+  int         fileout_size_of_codes();	// in 4-byte words
+  int         fileout_object_size();		// in 32-bit words
+  smiOop      fileout_size_and_flags();
+  objArrayOop fileout_debug_info();		// a copy with bcis of the external layout
+  GrowableArray<oop>* fileout_pairs();		// the contents of fileout_body (resource allocated)
+
+  // Debugging: checks that the file out form reads back into this method (+VerifyFileOut)
+  bool        verify_fileout();
+  static void verify_fileout_all();
+  static void remember_loaded_code(methodOop m, const class ExternalCode& code);
+  static void verify_fileout_against_image();	// after bootstrap, see remember_loaded_code
+
   // Accessor operaions on counters.
   //   invocation counter - tells how many times this methodOop has been executed (may decay over time)
   //   sharing counter    - tells how many callers this methodOop has.
@@ -134,8 +154,13 @@ class methodOopDesc : public memOopDesc {
   bool was_never_executed();		// was method never executed? (count = 0, empty inline caches)
 
   int size_of_codes() const {		// size of byte codes in words
-    return get_unsigned_bitfield((int) size_and_flags(), method_size_mask_bitno, method_size_mask_size); 
+    return get_unsigned_bitfield((long) size_and_flags(), method_size_mask_bitno, method_size_mask_size); 
   }
+
+  // Installs converted byte codes (see bytecodeTranscoder.hpp)
+  void install_codes(class BytecodeTranscoder* t);
+  void remap_temp_info(class BytecodeTranscoder* t);
+  static void remap_temp_info_bcis(objArrayOop tempInfo, class BytecodeTranscoder* t);
 
   void set_size_of_code(int size) {
     set_size_and_flags(size, nofArgs(), flags());
@@ -182,8 +207,8 @@ class methodOopDesc : public memOopDesc {
 
   // Stack frame layout if there's a float section (offset & size in oops relative to ebp)
   int  float_offset(int float_no) const;
-  int  float_section_start_offset() const	{ return frame_temp_offset - number_of_stack_temporaries(); }
-  int  float_section_size() const		{ return total_number_of_floats()*floatSize/oopSize; }
+  int  float_section_start_offset() const	{ return first_temp_offset - number_of_stack_temporaries(); }
+  int  float_section_size() const		{ return total_number_of_floats()*floatSlotWords; }
 
   // Testers
   bool is_accessMethod() const			{ return *codes() == Bytecodes::return_instVar; }
@@ -227,7 +252,8 @@ class methodOopDesc : public memOopDesc {
     never_inline  = 0,
     normal_inline = 1,
     always_inline = 2,
-  } method_inlining_info() const;
+  };
+  Method_Inlining_Info method_inlining_info() const;
 
   void set_method_inlining_info(Method_Inlining_Info info);
 
@@ -236,7 +262,8 @@ class methodOopDesc : public memOopDesc {
     expects_self	= 1, 			// 'copying' block
     expects_parameter	= 2,			// 'copying' block
     expects_context	= 3			// 'full' block
-  } block_info() const;
+  };
+  Block_Info block_info() const;
 
   // Tells if an activation of this method has a context stored as temp 0.
   bool activation_has_context() const { 
@@ -332,3 +359,6 @@ class methodOopDesc : public memOopDesc {
 
   friend methodKlass;
 };
+
+
+#endif // VM_OOPS_METHODOOP_HPP_HPP

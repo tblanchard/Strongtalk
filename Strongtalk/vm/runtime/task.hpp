@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_TASK_HPP_HPP
+#define VM_RUNTIME_TASK_HPP_HPP
 
 // A PeriodicTask has the sole purpose of executing its task
 // function with regular intervals.
@@ -49,3 +51,6 @@ class PeriodicTask: public CHeapObj {
 
   virtual void task() = 0;
 };
+
+
+#endif // VM_RUNTIME_TASK_HPP_HPP

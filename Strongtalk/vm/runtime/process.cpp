@@ -21,14 +21,97 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_process.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "timer.hpp"
+#include "sweeper.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "processOop.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "prim.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "shell.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objArrayOop.hpp"
+#include "ic_iterator.hpp"
+#include "frame.hpp"
+#include "vmOperations.hpp"
+#include "abort.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "delta.hpp"
+#include "blockOop.inline.hpp"
+#include "vframe.hpp"
+#include "oopFactory.hpp"
+#include "evaluator.hpp"
+#include "interpretedIC.hpp"
+#include "markSweep.hpp"
+#include "stackChunk.hpp"
 // The tricky part is to restore the original return address of the primitive before
 // the delta call. This is necessary for a consistent stack during the delta call.
 extern "C" char*  C_frame_return_addr;
 extern "C" bool have_nlr_through_C;
-extern "C" int  nlr_home;
+extern "C" intptr_t nlr_home;
 extern "C" int  nlr_home_id;
 extern "C" oop  nlr_result;
 
@@ -73,7 +156,7 @@ void unwindInfo::update_nlr_targets(compiledVFrame* f, contextOop con) {
   // Convert the nlr information if:
   //    nlr_home     is the frame pointer of f
   // && nlr_home_id  is the offset of f's scope
-  if (f->fr().fp() == (int*) nlr_home() && f->scope()->offset() == nlr_home_id()) {
+  if (f->fr().fp() == (intptr_t*) nlr_home() && f->scope()->offset() == nlr_home_id()) {
     _nlr_home_context = con;
   }
 }
@@ -82,15 +165,15 @@ bool processSemaphore = false;
 
 // For current Delta process, the last FP/Sp is stored in these global vars, not
 // the instance vars of the process
-int* last_Delta_fp = NULL;
+intptr_t* last_Delta_fp = NULL;
 oop* last_Delta_sp = NULL;
 
 // last_Delta_fp
-int* DeltaProcess::last_Delta_fp() const { 
+intptr_t* DeltaProcess::last_Delta_fp() const { 
   return this == _active_delta_process ? ::last_Delta_fp : _last_Delta_fp; 
 }
 
-void DeltaProcess::set_last_Delta_fp(int* fp) { 
+void DeltaProcess::set_last_Delta_fp(intptr_t* fp) { 
   if (this == _active_delta_process) {
     ::last_Delta_fp = fp;
   } else {
@@ -134,9 +217,9 @@ void Process::external_resume_current() {
 
 void Process::basic_transfer(Process* target) {
   if (TraceProcessEvents) {
-    std->print("Process: "); print();
-    std->print(" -> "); target->print();
-    std->cr();
+    stdOut->print("Process: "); print();
+    stdOut->print(" -> "); target->print();
+    stdOut->cr();
   }
   os::transfer(_thread, _event, target->_thread, target->_event);
 }
@@ -222,7 +305,7 @@ void VMProcess::loop() {
 }
 
 void VMProcess::print() {
-  std->print_cr("VMProcess");
+  stdOut->print_cr("VMProcess");
 }
 
 void VMProcess::execute(VM_Operation* op) {
@@ -349,9 +432,9 @@ void DeltaProcess::transfer_and_continue() {
     set_active(scheduler());
 
     if (TraceProcessEvents) {
-      std->print("Async call: "); print();
-      std->print("        to: "); scheduler()->print();
-      std->cr();
+      stdOut->print("Async call: "); print();
+      stdOut->print("        to: "); scheduler()->print();
+      stdOut->cr();
     }
   }
   os::transfer_and_continue(_thread, _event, scheduler()->_thread, scheduler()->_event);
@@ -362,7 +445,7 @@ bool DeltaProcess::wait_for_async_dll(int timeout_in_ms) {
   if (Processes::has_completed_async_call()) return true;
 
   if (TraceProcessEvents) {
-    std->print("Waiting for async %d ms", timeout_in_ms);
+    stdOut->print("Waiting for async %d ms", timeout_in_ms);
   }
 
   _is_idle = true;
@@ -371,7 +454,7 @@ bool DeltaProcess::wait_for_async_dll(int timeout_in_ms) {
 
 
   if (TraceProcessEvents) {
-    std->print_cr(result ? " {timeout}" : " {async}");
+    stdOut->print_cr(result ? " {timeout}" : " {async}");
   }
 
   return result;
@@ -387,7 +470,7 @@ void DeltaProcess::async_dll_call_completed() {
 
 void DeltaProcess::wait_for_control() {
   if (TraceProcessEvents) {
-    std->print("*");
+    stdOut->print("*");
   }
 
   set_state(yielded_after_async_dll);
@@ -451,8 +534,8 @@ DeltaProcess::DeltaProcess(oop receiver, symbolOop selector) {
 }
 
 frame DeltaProcess::profile_top_frame() {
-  int*  sp;
-  int*  fp;
+  intptr_t*  sp;
+  intptr_t* fp;
   char* pc;
   os::fetch_top_frame(_thread, &sp, &fp, &pc);
   frame result((oop*)sp, fp, pc);
@@ -469,21 +552,21 @@ DeltaProcess::~DeltaProcess() {
 
 void DeltaProcess::print() {
   processObj()->print_value();
-  std->print(" ");
+  stdOut->print(" ");
   switch (state()) {
-    case initialized:             std->print_cr("initialized");            break;
-    case running:                 std->print_cr("running");                break;
-    case yielded:                 std->print_cr("yielded");                break;
-    case in_async_dll:            std->print_cr("in asynchronous dll all");break;
-    case yielded_after_async_dll: std->print_cr("yielded after asynchronous dll"); break;
-    case preempted:               std->print_cr("preempted");              break;
-    case completed:               std->print_cr("completed");              break;
-    case boolean_error:           std->print_cr("boolean error");          break;
-    case lookup_error:            std->print_cr("lookup error");           break;
-    case primitive_lookup_error:  std->print_cr("primitive lookup error"); break;
-    case DLL_lookup_error:        std->print_cr("DLL lookup error");       break;
-    case NLR_error:               std->print_cr("NLR error");              break;
-    case stack_overflow:          std->print_cr("stack overflow");         break;
+    case initialized:             stdOut->print_cr("initialized");            break;
+    case running:                 stdOut->print_cr("running");                break;
+    case yielded:                 stdOut->print_cr("yielded");                break;
+    case in_async_dll:            stdOut->print_cr("in asynchronous dll all");break;
+    case yielded_after_async_dll: stdOut->print_cr("yielded after asynchronous dll"); break;
+    case preempted:               stdOut->print_cr("preempted");              break;
+    case completed:               stdOut->print_cr("completed");              break;
+    case boolean_error:           stdOut->print_cr("boolean error");          break;
+    case lookup_error:            stdOut->print_cr("lookup error");           break;
+    case primitive_lookup_error:  stdOut->print_cr("primitive lookup error"); break;
+    case DLL_lookup_error:        stdOut->print_cr("DLL lookup error");       break;
+    case NLR_error:               stdOut->print_cr("NLR error");              break;
+    case stack_overflow:          stdOut->print_cr("stack overflow");         break;
   }
 }
 
@@ -597,11 +680,11 @@ void DeltaProcess::exit_uncommon() {
 
 static oop*        old_sp;
 static oop*        new_sp;
-static int*        old_fp;
-static int*        cur_fp;
+static intptr_t* old_fp;
+static intptr_t*   cur_fp;
 static objArrayOop frame_array;
 
-extern "C" oop* setup_deoptimization_and_return_new_sp(oop* old_sp, int* old_fp, objArrayOop frame_array, int* current_frame) {
+extern "C" oop* setup_deoptimization_and_return_new_sp(oop* old_sp, intptr_t* old_fp, objArrayOop frame_array, intptr_t* current_frame) {
   ResourceMark rm;
 
   // Save all parameters for later use (check unpack_frame_array)
@@ -652,17 +735,17 @@ extern "C" void unpack_frame_array() {
   assert(*pc_addr = -1, "just checking");
 
   if (TraceDeoptimization) {
-    std->print("[Unpacking]");
+    stdOut->print("[Unpacking]");
     if (nlr_through_unpacking) {
-      std->print(" NLR %s", (nlr_home == (int) cur_fp) ? "inside" : "outside");
+      stdOut->print(" NLR %s", (nlr_home == (intptr_t) cur_fp) ? "inside" : "outside");
     }
-    std->cr();
-    std->print(" - array ");
+    stdOut->cr();
+    stdOut->print(" - array ");
     frame_array->print_value();
-    std->print_cr(" @ 0x%lx", old_fp);
+    stdOut->print_cr(" @ 0x%lx", old_fp);
   }
 
-  bool must_find_nlr_target = nlr_through_unpacking && nlr_home == (int) cur_fp;
+  bool must_find_nlr_target = nlr_through_unpacking && nlr_home == (intptr_t) cur_fp;
   bool nlr_target_found     = false; // For verification
 
   // link for the current frame
@@ -687,7 +770,7 @@ extern "C" void unpack_frame_array() {
     assert(locals_obj->is_smi(), "expecting smi");
     int locals   = locals_obj->value();
 
-    current = frame(current_sp, (int*) current_sp + locals + 2);
+    current = frame(current_sp, (intptr_t*) current_sp + locals + 2);
 
     // fill in the locals
     for (int index = 0; index < locals; index++) {
@@ -744,22 +827,22 @@ extern "C" void unpack_frame_array() {
       oop frame_oop = oop(current.fp());
       con->set_parent(frame_oop);
 
-      if (nlr_through_unpacking && nlr_home == (int) cur_fp) {
+      if (nlr_through_unpacking && nlr_home == (intptr_t) cur_fp) {
         if (nlr_home_context == con) {
 	  // This frame is the target of the NLR
 	  // set nlr_home to frame pointer of current frame
-	  nlr_home = (int) current.fp();
+	  nlr_home = (intptr_t) current.fp();
 	  // compute number of arguments to pop
           nlr_home_id = ~method->number_of_arguments();
           nlr_target_found = true;
-	  // std->print("target frame for NLR (%d, 0x%lx):",method->number_of_arguments(), nlr_home_id);
+	  // stdOut->print("target frame for NLR (%d, 0x%lx):",method->number_of_arguments(), nlr_home_id);
         }
       }
     }
 
     if (TraceDeoptimization) {
       frame v(current_sp, current.fp(), current_pc);
-      v.print_for_deoptimization(std);
+      v.print_for_deoptimization(stdOut);
     }
 
     first = false;
@@ -781,7 +864,7 @@ extern "C" void verify_at_end_of_deoptimization() {
     BlockScavenge bs;
     ResourceMark rm;
     DeltaProcess::active()->verify();
-    std->print_cr("[Stack after unpacking]");
+    stdOut->print_cr("[Stack after unpacking]");
     DeltaProcess::active()->trace_stack_for_deoptimization();
   }
 }
@@ -792,12 +875,12 @@ extern "C" void unpack_unoptimized_frames();
 
 void DeltaProcess::deoptimize_stretch(frame* first_frame, frame* last_frame) {
   if (TraceDeoptimization) {
-    std->print_cr("[Deoptimizing]");
+    stdOut->print_cr("[Deoptimizing]");
     frame c = *first_frame;
-    c.print_for_deoptimization(std);
+    c.print_for_deoptimization(stdOut);
     while (c.fp() != last_frame->fp()) {
       c = c.sender();
-      c.print_for_deoptimization(std);
+      c.print_for_deoptimization(stdOut);
     }
   }
 
@@ -872,7 +955,7 @@ void DeltaProcess::trace_stack() {
 }
 
 void DeltaProcess::trace_stack_from(vframe* start_frame) {
-  std->print_cr("- Stack trace");
+  stdOut->print_cr("- Stack trace");
   int  vframe_no   = 1;
   for (vframe* f = start_frame; f; f = f->sender() ) {
     if (f->is_delta_frame()) {
@@ -881,7 +964,7 @@ void DeltaProcess::trace_stack_from(vframe* start_frame) {
       f->print();
     }
     if (vframe_no == StackPrintLimit) {
-      std->print_cr("...<more frames>...");
+      stdOut->print_cr("...<more frames>...");
       return;
     }
   }
@@ -892,10 +975,10 @@ void DeltaProcess::trace_stack_for_deoptimization(frame* f) {
     int  vframe_no   = 1;
     frame v = f ? *f : last_frame();
     do {
-      v.print_for_deoptimization(std);
+      v.print_for_deoptimization(stdOut);
       v = v.sender();
       if (vframe_no == StackPrintLimit) {
-        std->print_cr("...<more frames>...");
+        stdOut->print_cr("...<more frames>...");
         return;
       }
       vframe_no++;
@@ -906,7 +989,7 @@ void DeltaProcess::trace_stack_for_deoptimization(frame* f) {
 void DeltaProcess::trace_top(int start_frame, int number_of_frames) {
   FlagSetting fs(ActivationShowCode, true);
 
-  std->print_cr("- Stack trace (%d, %d)", start_frame, number_of_frames);
+  stdOut->print_cr("- Stack trace (%d, %d)", start_frame, number_of_frames);
   int  vframe_no = 1;
 
   for (vframe* f = last_delta_vframe(); f; f = f->sender() ) {
@@ -987,7 +1070,7 @@ bool Processes::has_completed_async_call() {
 }
 
 void Processes::print() {
-  std->print_cr("All processes:");
+  stdOut->print_cr("All processes:");
   ALL_PROCESSES(p) {
     ResourceMark rm;
     p->print();
@@ -1085,7 +1168,8 @@ void Processes::deoptimized_wrt_marked_nmethods() {
 void Processes::deoptimize_wrt(nmethod* nm) {
   GrowableArray<nmethod*>* nms = nm->invalidation_family();
   // mark family for deoptimization
-  for (int index = 0; index < nms->length(); index++)
+  int index;
+  for (index = 0; index < nms->length(); index++)
     nms->at(index)->mark_for_deoptimization();
 
   // deoptimize
@@ -1098,7 +1182,8 @@ void Processes::deoptimize_wrt(nmethod* nm) {
 
 void Processes::deoptimize_wrt(GrowableArray<nmethod*>* list) {
   // mark for deoptimization
-  for (int i = 0; i < list->length(); i++) {
+  int i;
+  for (i = 0; i < list->length(); i++) {
     nmethod* nm = list->at(i);
     GrowableArray<nmethod*>* nms = nm->invalidation_family();
     for (int index = 0; index < nms->length(); index++)
@@ -1131,10 +1216,10 @@ void Processes::deoptimize_all() {
 void handle_error(ProcessState error) {
   DeltaProcess* proc = DeltaProcess::active();
   if (proc->is_scheduler()) {
-    std->print_cr("Error happend in the scheduler");
-    std->print("Status: ");
-    proc->status_symbol()->print_symbol_on(std);
-    std->cr();
+    stdOut->print_cr("Error happend in the scheduler");
+    stdOut->print("Status: ");
+    proc->status_symbol()->print_symbol_on(stdOut);
+    stdOut->cr();
     evaluator::read_eval_loop();
   } else {
     proc->suspend(error);
@@ -1181,10 +1266,10 @@ extern "C" void suspend_on_NLR_error() {
 }
 
 
-void trace_stack_at_exception(int* sp, int* fp, char* pc) {
+void trace_stack_at_exception(intptr_t* sp, intptr_t* fp, char* pc) {
   ResourceMark rm;
 
-  std->print_cr("Trace at exception");
+  stdOut->print_cr("Trace at exception");
 
   vframe* vf;
   if (last_Delta_fp) {
@@ -1197,7 +1282,7 @@ void trace_stack_at_exception(int* sp, int* fp, char* pc) {
   DeltaProcess::trace_stack_from(vf);
 }
 
-void suspend_process_at_stack_overflow(int *sp, int* fp, char* pc) {
+void suspend_process_at_stack_overflow(intptr_t* sp, intptr_t* fp, char* pc) {
   DeltaProcess* proc = DeltaProcess::active();
 
   proc->set_last_Delta_pc(pc);
@@ -1205,7 +1290,7 @@ void suspend_process_at_stack_overflow(int *sp, int* fp, char* pc) {
   last_Delta_sp = (oop*) sp;
 
   if (proc->is_scheduler()) {
-    std->print_cr("Stack overflow happend in scheduler");
+    stdOut->print_cr("Stack overflow happend in scheduler");
   } else {
     proc->suspend(stack_overflow);
     proc->set_terminating();

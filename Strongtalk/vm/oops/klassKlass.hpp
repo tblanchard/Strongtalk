@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_KLASSKLASS_HPP_HPP
+#define VM_OOPS_KLASSKLASS_HPP_HPP
 
+void set_klassKlass_vtbl(Klass* k);
 class klassKlass: public memOopKlass {
  public:
   friend void set_klassKlass_vtbl(Klass* k);
@@ -51,7 +54,7 @@ class klassKlass: public memOopKlass {
 
   bool oop_verify(oop obj);
 
-  char* name() const { return "klass"; }
+  const char* name() const { return "klass"; }
 
   // printing operations
   void oop_print_on(oop obj, outputStream* st);
@@ -64,3 +67,6 @@ class klassKlass: public memOopKlass {
   // Sizing
   int oop_header_size() const { return klassOopDesc::header_size(); }
 };
+
+
+#endif // VM_OOPS_KLASSKLASS_HPP_HPP

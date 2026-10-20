@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_PREG_HPP_HPP
+#define VM_COMPILER_PREG_HPP_HPP
 
 # ifdef DELTA_COMPILER
 
@@ -171,8 +173,8 @@ class PReg: public PrintableResourceObj {
  public:
   virtual void print();
   virtual void print_short()			{ lprintf("%s\n", name()); }
-  virtual char* name() const;			// string representing the preg name
-  char* safeName() const;			// same as name() but handles NULL receiver
+  virtual const char* name() const;			// string representing the preg name
+  const char* safeName() const;			// same as name() but handles NULL receiver
   virtual char* prefix() const 			{ return "P"; }
   virtual bool verify() const;
   virtual NameNode* nameNode(bool mustBeLegal = true) const; // for debugging info
@@ -270,7 +272,7 @@ class BlockPReg : public SAPReg {
   GrowableArray<Location*>* contextCopies() const	{ return _contextCopies; }
   void		        addContextCopy(Location* l);
   char*			prefix() const			{ return "BlkP"; }
-  char*			name() const;
+  const char*		name() const;
   bool			verify() const;
   void			print();
 
@@ -285,11 +287,12 @@ class NoPReg : public PReg {	// "no result" register (should have no uses)
   virtual bool isNoPReg() const 		{ return true; }
   bool canCopyPropagate() const 		{ return false; }
   NameNode* nameNode(bool mustBeLegal) const;
-  char* name() const 				{ return "nil"; }
+  const char* name() const 				{ return "nil"; }
   bool verify() const;
 };
 
 
+ConstPReg* new_ConstPReg(InlinedScope* s, oop c);
 class ConstPReg : public PReg {
   // ConstPRegs are used to CSE constants; at register allocation time,
   // they can either get a register (if one is available), or they're
@@ -313,7 +316,7 @@ class ConstPReg : public PReg {
   bool needsRegister() const;
   NameNode* nameNode(bool mustBeLegal = true) const;
   char* prefix() const				{ return "ConstP"; }
-  char* name() const;
+  const char* name() const;
   bool verify() const;
 };
 
@@ -336,10 +339,13 @@ class SplitPReg : public SAPReg {
   bool	isLiveAt(Node* n) const;
   bool	isSplitPReg() const 	    		{ return true; }
   char*	prefix() const				{ return "SplitP"; }
-  char*	name() const;
+  const char*	name() const;
 };
 #endif
 
 
 # endif
   
+
+
+#endif // VM_COMPILER_PREG_HPP_HPP

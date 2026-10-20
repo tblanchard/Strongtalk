@@ -21,11 +21,117 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "inliningdb.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "associationOop.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "dispatchTable.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "recompiler.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "oldCodeGenerator.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "locations.hpp"
+#include "pregMapping.hpp"
+#include "interpreter.hpp"
+#include "oopFactory.hpp"
+#include "codeGenerator.hpp"
+#include "timer.hpp"
+#include "regAlloc.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "disassembler.hpp"
 # ifdef DELTA_COMPILER
 
-# include "incls/_compiler.cpp.incl"
 
 # ifdef ASSERT
     bool verifyOften = false;
@@ -105,9 +211,9 @@ Compiler::Compiler(blockClosureOop blk, NonInlinedBlockScopeDesc* scope) : _scop
     LookupKey* outer = &parentNMethod->outermost()->key;
     rs = InliningDatabase::lookup_and_remove(outer, key);
     if (rs && TraceInliningDatabase) {
-      std->print("ID block compile: ");
+      stdOut->print("ID block compile: ");
       key->print();
-      std->cr();
+      stdOut->cr();
     }
   }
   initialize(rs);
@@ -343,8 +449,8 @@ bool NewBackendGuard::_first_use = true;
 nmethod* Compiler::compile() {
   NewBackendGuard guard;
 
-  if ((PrintProgress > 0) && (nofCompilations % PrintProgress == 0)) std->print(".");
-  char* compiling;
+  if ((PrintProgress > 0) && (nofCompilations % PrintProgress == 0)) stdOut->print(".");
+  const char* compiling;
   if (DeltaProcess::active()->isUncommon()) {
     compiling = recompilee ? "Uncommon-Recompiling " : "Uncommon-Compiling ";
   } else {
@@ -367,8 +473,8 @@ nmethod* Compiler::compile() {
   TraceTime t(compiling, should_trace);
     
   if (should_trace || PrintCode) {
-    print_key(std);
-    if (PrintCode || PrintInlining) std->print("\n");
+    print_key(stdOut);
+    if (PrintCode || PrintInlining) stdOut->print("\n");
   }
 
   topScope->genCode();
@@ -472,7 +578,7 @@ nmethod* Compiler::compile() {
 
   if (verifyOften) nm->verify();
 
-  if (PrintDebugInfo) nm->print_inlining(std, true);
+  if (PrintDebugInfo) nm->print_inlining(stdOut, true);
 
   return nm;
 }
@@ -669,7 +775,7 @@ void Compiler::print_key(outputStream* str) {
   str->print(" (no. %d, method %#x", nofCompilations, method);
   // print the parent scope offset for block compiles.
   if (blockScope) {
-    std->print(", parent offset %d", blockScope->parent()->offset());
+    stdOut->print(", parent offset %d", blockScope->parent()->offset());
   }
   str->print(")...");
 }
@@ -747,7 +853,7 @@ void Compiler::copy_noninlined_block_info(nmethod* nm) {
 
 #ifdef DEBUG
 outputStream* cout(bool flag) {
-  return (flag || theCompiler == NULL) ? std : theCompiler->messages;
+  return (flag || theCompiler == NULL) ? stdOut : theCompiler->messages;
 }
 
 void print_cout() {

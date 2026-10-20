@@ -21,11 +21,80 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_methodPrinter.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "associationOop.hpp"
+#include "bytecodes.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "iCache.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "symbolOop.hpp"
+#include "methodOop.hpp"
+#include "ic_iterator.hpp"
+#include "klassOop.hpp"
+#include "ncode.hpp"
+#include "key.hpp"
+#include "location.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "scopeDesc.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "prim.hpp"
+#include "methodPrinter.hpp"
+#include "universe.inline.hpp"
+#include "doubleOop.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
 MethodPrinterClosure::MethodPrinterClosure(outputStream* stream) {
-  st = stream ? stream : std;
+  st = stream ? stream : stdOut;
 }
 
 void MethodPrinterClosure::indent() {
@@ -301,7 +370,8 @@ void MethodPrinterClosure::allocate_closure(AllocationType type, int nofArgs, me
   {
     st->inc();
     st->inc();
-    MethodIterator it(meth, &MethodPrinterClosure(st));
+    MethodPrinterClosure blk(st);
+    MethodIterator it(meth, &blk);
     st->dec();
     st->dec();
   }

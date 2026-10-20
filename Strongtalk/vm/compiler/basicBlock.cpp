@@ -21,10 +21,96 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "regAlloc.hpp"
 # ifdef DELTA_COMPILER
-# include "incls/_basicBlock.cpp.incl"
 
 int BB::genCounter = 0;
 
@@ -121,7 +207,8 @@ bool regAssignedBetween(const PReg* r, const Node* startNode, Node* endNode) {
     BB* bb = n->bb();
     if (bb == bbWithoutDefs) continue; // no defs here
     bool hasDefs = false;
-    for (int i = 0; i < bb->duInfo.info->length(); i++) {// forall def/use info lists
+    int i;
+    for (i = 0; i < bb->duInfo.info->length(); i++) {// forall def/use info lists
       DUInfo* dui = bb->duInfo.info->at(i);
       if (dui->reg == r && !dui->defs.isEmpty()) {
 	// yes, it has a def
@@ -144,7 +231,8 @@ bool regAssignedBetween(const PReg* r, const Node* startNode, Node* endNode) {
 void BB::bruteForceCopyPropagate() {
   const int len = duInfo.info->length();
   
-  for (int i = 0; i < len; i++) {		// forall def/use info lists
+  int i;
+  for (i = 0; i < len; i++) {		// forall def/use info lists
     DUInfo* dui = duInfo.info->at(i);
     const PReg* r = dui->reg;
     if (!r->isSAPReg() || !r->loc.equals(unAllocated)) {
@@ -190,7 +278,8 @@ void BB::localCopyPropagate() {
   const int len = duInfo.info->length();
   SimpleBitVector used = 0;		// hardwired registers used
   SimpleBitVector usedTwice = 0;
-  for (int i = 0; i < len; i++) {
+  int i;
+  for (i = 0; i < len; i++) {
     PReg* r = duInfo.info->at(i)->reg;
     if (!r->loc.equals(unAllocated) && r->loc.isRegisterLocation()) {
       if (used.isAllocated(r->loc.number())) {
@@ -227,7 +316,8 @@ void BB::localCopyPropagate() {
 	if (!src->isSinglyAssigned()) {
 	  // careful: r is only equivalent to src as long as src isn't reassigned
 	  // within this basic block
-	  for (int j = 0; j < len; j++) {
+	  int j;
+	  for (j = 0; j < len; j++) {
 	    PReg* r = duInfo.info->at(j)->reg;
 	    if (r == src) break;
 	  }
@@ -406,7 +496,8 @@ void BB::localAlloc(GrowableArray<BitVector*>* hardwired,
   regClasses.append(NULL);   	    // first reg class has index 1
 
   int  use_count[nofRegisters], def_count[nofRegisters];
-  for (int i = 0; i < nofRegisters; i++) use_count[i] = def_count[i] = 0;
+  int i;
+  for (i = 0; i < nofRegisters; i++) use_count[i] = def_count[i] = 0;
 
   for (Node* nn = first; nn != last->next(); nn = nn->next()) {
     if (nn->deleted) continue;
@@ -496,7 +587,8 @@ void BB::slowLocalAlloc(GrowableArray<BitVector*>* hardwired,
   // clear temporary data structures
   localRegs->clear();
   lives->clear();
-  for (int i = 0; i < nofLocalRegisters; i++) {
+  int i;
+  for (i = 0; i < nofLocalRegisters; i++) {
     hardwired->at(i)->setLength(nnodes);
     hardwired->at(i)->clear();
   }
@@ -543,7 +635,8 @@ void BB::slowLocalAlloc(GrowableArray<BitVector*>* hardwired,
     if (n->deleted) continue;
     SimpleBitVector v = n->trashedMask();
     if (v.isEmpty()) continue;	// nothing trashed (normal case)
-    for (int i = 0; i < nofLocalRegisters; i++) {
+    int i;
+    for (i = 0; i < nofLocalRegisters; i++) {
       if (v.isAllocated(i)) hardwired->at(i)->add(n->num());
     }
   }
@@ -643,7 +736,8 @@ static void printPrevBBs(BB* b, const char* str) {
 
 void BB::print_short() {
   lprintf("BB%-3ld[%d] %#lx (%ld, %ld); prevs ", id(), _loopDepth, this, first->id(), last->id());
-  for (int i = 0; i < nPredecessors(); i++) printPrevBBs(prev(i),  (i == nPredecessors() - 1) ? " : " : ", ");
+  int i;
+  for (i = 0; i < nPredecessors(); i++) printPrevBBs(prev(i),  (i == nPredecessors() - 1) ? " : " : ", ");
   lprintf("; ");
   if (next ()) lprintf("next BB%ld", next ()->id());
   for (i = 1; i < nSuccessors(); i++) printPrevBBs(next(i), (i == nSuccessors() - 1) ? " : " : ", ");
@@ -722,7 +816,8 @@ void BBIterator::buildBBs() {
   // now, the list contains the BBs in reverse order
   bbCount = list->length();
   bbTable = new GrowableArray<BB*>(bbCount);
-  for (int i = bbCount-1; i >= 0; i--) {
+  int i;
+  for (i = bbCount-1; i >= 0; i--) {
     BB* bb = list->at(i);
     bb->_id = bbCount - i - 1;
     bbTable->append(bb);
@@ -753,7 +848,8 @@ _loopDepth = loopDepth;
   //       missing successors (e.g. TypeTestNode with no next(0) = NULL)
   //       cause the BB graph to screw up after this node. (gri 7/22/96)
   int n = last->nSuccessors();
-  for (int i = 0; i < n; i++) {
+  int i;
+  for (i = 0; i < n; i++) {
     Node* next = last->next(i);
     BB* nextBB = next->newBB();
   }	
@@ -785,7 +881,8 @@ void BBIterator::makeUses() {
   const int ExtraPRegs = 10;
   int n = PReg::currentNo + ExtraPRegs;
   pregTable = new GrowableArray<PReg*>(n);
-  for (int i = 0; i < n; i++) pregTable->append(NULL);
+  int i;
+  for (i = 0; i < n; i++) pregTable->append(NULL);
   for (i = 0; i < bbCount; i++) { bbTable->at(i)->makeUses(); }
   usesBuilt = true;
 }
@@ -798,7 +895,8 @@ void BBIterator::localAlloc() {
     GrowableArray<BitVector*> hardwired(nofLocalRegisters, nofLocalRegisters, NULL); 
     GrowableArray<PReg*> localRegs(BasicNode::currentID);
     GrowableArray<BitVector*> lives(BasicNode::currentID);    
-    for (int i = 0; i < nofLocalRegisters; i++) {
+    int i;
+    for (i = 0; i < nofLocalRegisters; i++) {
       hardwired.at_put(i, new BitVector(roundTo(BasicNode::currentID, BitsPerWord)));
     }
   
@@ -964,7 +1062,7 @@ void BBIterator::print_code(bool suppressTrivial) {
   for (int i = 0; i < list->length(); i++) {
     BB* bb = list->at(i);
     if (bb->nnodes > 0) bb->print_code(suppressTrivial);
-    if (bb->next() != NULL) std->print_cr("\tgoto N%d", bb->next()->first->id());
+    if (bb->next() != NULL) stdOut->print_cr("\tgoto N%d", bb->next()->first->id());
     if (!suppressTrivial) lprintf("\n");
   }
 }
@@ -994,13 +1092,15 @@ bool BBIterator::verifyLabels() {
 void BBIterator::globalCopyPropagate() {
   // do global copy propagation of singly-assigned PRegs
 
-  for (int i = 0; i < pregTable->length(); i++) {
+  int i;
+  for (i = 0; i < pregTable->length(); i++) {
     PReg* r = pregTable->at(i);
     if (!r || r->isConstPReg() || !r->canCopyPropagate()) continue;
     Def* def = NULL;
     // get definition
     int dulength = r->dus.length();
-    for (int e = 0; e < dulength; e++) {
+    int e;
+    for (e = 0; e < dulength; e++) {
       PRegBBIndex* index = r->dus.at(e);
       DUInfo* info = index->bb->duInfo.info->at(index->index);
       if (info->defs.length()) {
@@ -1050,7 +1150,8 @@ void BBIterator::globalCopyPropagate() {
 
 void BBIterator::eliminateUnneededResults() {
   // eliminate nodes producing results that are never used
-  for (int i = 0; i < pregTable->length(); i++) {
+  int i;
+  for (i = 0; i < pregTable->length(); i++) {
     PReg* r = pregTable->at(i);
     if (r && r->isOnlySoftUsed()) {
       r->eliminate(false);
@@ -1060,13 +1161,15 @@ void BBIterator::eliminateUnneededResults() {
 
 
 void BBIterator::apply(BBDoFn f) {
-  for (int i = 0; i < bbCount; i++) { f(bbTable->at(i)); }
+  int i;
+  for (i = 0; i < bbCount; i++) { f(bbTable->at(i)); }
 }
 
 
 void BBIterator::verify() {
   if (bbTable) {
-    for (int i = 0; i < bbCount; i++) { bbTable->at(i)->verify(); }
+    int i;
+    for (i = 0; i < bbCount; i++) { bbTable->at(i)->verify(); }
     if (pregTable) {
       for (i = 0; i < pregTable->length(); i++) {
         if (pregTable->at(i)) pregTable->at(i)->verify();

@@ -20,7 +20,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_UTIL_HPP
+#define VM_MEMORY_UTIL_HPP
 
+#include "config.hpp"
+#include "oopsHierarchy.hpp"
 
 // conveniences
 
@@ -32,7 +36,7 @@ extern oop catchThisOne;
 // utilities
 
 extern "C" void copy_oops_up(oop* from, oop* to, int count);
-extern "C" void set_oops(oop* to, int count, oop value = NULL);
+extern "C" void set_oops(oop* to, int count, oop value = 0);
 
 char* copy_string(char* s);
 char* copy_string(char* s, smi len);
@@ -48,11 +52,12 @@ inline void copy_oops_overlapping(oop* from, oop* to, int count) {
   else if (from > to) copy_oops_up(from, to, count);
 }
 
+// Note: these operate on int-sized elements (not oop-sized words).
 inline void copy_words(int* from, int* to, int count) {
-  copy_oops((oop*) from, (oop*) to, count);
+  for (int i = 0; i < count; i++) to[i] = from[i];
 }
 inline void set_words(int* from, int count, int value = 0) {
-  set_oops((oop*) from, count, (oop) value);
+  for (int i = 0; i < count; i++) from[i] = value;
 }
 
 inline int min(int a, int b)		{ return a < b ? a : b; }
@@ -67,7 +72,16 @@ const int K = 1024;
 const int M = K * K;
 
 const int oopSize   = sizeof(oop);
+
+// Largest array body (in bytes) the allocation primitives accept; object sizes are ints inside the VM.
+const smi max_array_bytes = INT_MAX / 2;
 const int floatSize = sizeof(double);
+
+// A float in the float section of an interpreted activation takes two words on all hosts
+// (8 bytes on 32-bit hosts, 16 on 64-bit hosts). This keeps the frame layout (in words) and
+// the float numbering produced by the image's compiler independent of the word size.
+const int floatSlotWords = 2;
+const int floatSlotSize  = floatSlotWords * oopSize;
 
 inline int byte_size(void* from, void* to) {
   return (char*) to - (char*) from;
@@ -82,3 +96,5 @@ inline int byte_size(void* from, void* to) {
   inline void Unused(int x) { x, 0; }
   inline void Unused(void *x) { x, 0; }
 #endif
+
+#endif // VM_MEMORY_UTIL_HPP

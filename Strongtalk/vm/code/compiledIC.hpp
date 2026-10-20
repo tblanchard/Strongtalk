@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_COMPILEDIC_HPP_HPP
+#define VM_CODE_COMPILEDIC_HPP_HPP
 
 #ifdef DELTA_COMPILER
 
@@ -205,3 +207,6 @@ inline PrimitiveIC* PrimitiveIC_from_return_addr(char* return_addr)
 }
 
 #endif
+
+
+#endif // VM_CODE_COMPILEDIC_HPP_HPP

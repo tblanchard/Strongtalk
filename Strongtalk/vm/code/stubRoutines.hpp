@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_CODE_STUBROUTINES_HPP_HPP
+#define VM_CODE_STUBROUTINES_HPP_HPP
 
 
 // StubRoutines contains a set of little assembly run-time routines.
@@ -125,3 +127,6 @@ class StubRoutines: AllStatic {
 
   static void init();				// must be called in system initialization phase
 };
+
+
+#endif // VM_CODE_STUBROUTINES_HPP_HPP

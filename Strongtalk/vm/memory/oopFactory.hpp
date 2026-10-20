@@ -20,22 +20,27 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_MEMORY_OOPFACTORY_HPP_HPP
+#define VM_MEMORY_OOPFACTORY_HPP_HPP
 
 // The oopFactory is a utility to create new objects.
 
 class oopFactory : AllStatic {
  public:
   static byteArrayOop   new_byteArray(int size);
-  static byteArrayOop   new_byteArray(char* name);
+  static byteArrayOop   new_byteArray(const char* name);
   static objArrayOop    new_objArray(int size);
   static objArrayOop    new_objArray(GrowableArray<oop>* array);
   static smiOop         new_smi(int value)       { return as_smiOop(value); }
   static doubleOop      new_double(double value);
   static doubleOop      clone_double_to_oldspace(doubleOop value);
-  static symbolOop      new_symbol(char* name,int len);
-  static symbolOop      new_symbol(char* name);
+  static symbolOop      new_symbol(const char* name,int len);
+  static symbolOop      new_symbol(const char* name);
   static symbolOop      new_symbol(byteArrayOop b);
   static associationOop new_association(symbolOop key, oop value, bool is_constant);
   static vframeOop      new_vframe(processOop process, int index);
 };
 
+
+
+#endif // VM_MEMORY_OOPFACTORY_HPP_HPP

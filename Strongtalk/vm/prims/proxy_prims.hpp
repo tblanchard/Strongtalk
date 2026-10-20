@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_PROXY_PRIMS_HPP_HPP
+#define VM_PRIMS_PROXY_PRIMS_HPP_HPP
 
 // Primitives for proxy
 
@@ -287,3 +289,6 @@ class proxyOopPrimitives : AllStatic {
 
 
 };
+
+
+#endif // VM_PRIMS_PROXY_PRIMS_HPP_HPP

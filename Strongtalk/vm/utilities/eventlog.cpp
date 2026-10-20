@@ -21,14 +21,16 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_eventlog.cpp.incl"
+#include "eventlog.hpp"
+#include "lprintf.hpp"
+#include "allocation.hpp"
+#include "debug.hpp"
 
 EventLog* eventLog;
 
 void eventlog_init() { eventLog = new EventLog; }
 
-static char* noEvent = "no event";
+static const char* noEvent = "no event";
 
 void EventLog::init() {
   buf = next = NEW_C_HEAP_ARRAY( EL_Event, EventLogLength);
@@ -61,12 +63,12 @@ void EventLog::printPartial(int n) {
   for (int i = 0; i < n; i++, e = prevEvent(e, buf, bufEnd)) ;
   
   // skip empty entries
-  i = 0;
+  int i = 0;
   for (; e != next && e->name == noEvent; i++, e = nextEvent(e, buf, bufEnd)) ;
 
   int indent = 0;
   for (; i < n && e != next; i++, e = nextEvent(e, buf, bufEnd)) {
-    char* s;
+    const char* s;
     switch (e->status) {
      case starting: s = "[ "; break;
      case ending:   s = "] "; indent--; break;

@@ -21,9 +21,101 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_debugPrintable.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "objArrayOop.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "objectIDTable.hpp"
+#include "compUtils.hpp"
+#include "vmOperations.hpp"
+#include "debugPrintable.hpp"
+#include "vframe.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "prettyPrinter.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "scope.hpp"
+#include "oopFactory.hpp"
 // ------ helper functions for debugging go here ------------
 
 #ifndef DEBUG
@@ -45,8 +137,8 @@ class Command {
   ResourceMark rm;
  public:
   Command(char* str) {
-    std->cr();
-	std->print_cr("\"Executing %s\"", str);
+    stdOut->cr();
+	stdOut->print_cr("\"Executing %s\"", str);
   }
 
   ~Command() {
@@ -80,7 +172,7 @@ void pp(void* p) {
 }
 
 // pv: print vm-printable object
-void pv(int p)   { ((PrintableResourceObj*) p)->print(); }
+void pv(intptr_t p)   { ((PrintableResourceObj*) p)->print(); }
 
 void pp_short(void* p) {
   Command c("pp_short");
@@ -110,15 +202,15 @@ void pr(void* m) {
 
 void ps() { // print stack
   // Retrieve the frame pointer of the current frame 
-  int* fp;
-  __asm { mov fp, ebp }
+  intptr_t* fp;
+  fp = (intptr_t*) __builtin_frame_address(0);
   {
     Command c("ps");
     // Prints the stack of the current Delta process
     DeltaProcess* p = DeltaProcess::active();
-    std->print(" for process: ");
+    stdOut->print(" for process: ");
     p->print();
-    std->cr();
+    stdOut->cr();
 
     if (p->last_Delta_fp() != NULL) {
       // If the last_Delta_fp is set we are in C land and
@@ -141,15 +233,15 @@ void pss() { // print all stack
 
 void pd() { // print stack
   // Retrieve the frame pointer of the current frame 
-  int* fp;
-  __asm { mov fp, ebp }
+  intptr_t* fp;
+  fp = (intptr_t*) __builtin_frame_address(0);
   {
     Command c("pd");
     // Prints the stack of the current Delta process
     DeltaProcess* p = DeltaProcess::active();
-    std->print(" for process: ");
+    stdOut->print(" for process: ");
     p->print();
-    std->cr();
+    stdOut->cr();
 
     if (p->last_Delta_fp() != NULL) {
       // If the last_Delta_fp is set we are in C land and
@@ -170,7 +262,7 @@ void oat(int index) {
     oop obj = objectIDTable::at(index);
     obj->print();
   } else {
-    std->print_cr("index %d out of bounds", index);
+    stdOut->print_cr("index %d out of bounds", index);
   }
 }
 
@@ -222,54 +314,54 @@ void events() {
   eventLog->printPartial(50);
 }
 
-nmethod* find(int addr) {
+nmethod* find(intptr_t addr) {
   Command c("find");
   return findNMethod((void*)addr);
 }
 
-methodOop findm(int hp) { 
+methodOop findm(intptr_t hp) { 
   Command c("findm");
   return methodOopDesc::methodOop_from_hcode((u_char*)hp); 
 }
 
 // int versions of all methods to avoid having to type casts in the debugger
 
-void pp(int p) {
+void pp(intptr_t p) {
   pp((void*)p);
 }
 
-void pp_short(int p) {
+void pp_short(intptr_t p) {
   pp_short((void*)p);
 }
 
-void pk(int p) {
+void pk(intptr_t p) {
   pk((Klass*)p);
 }
 
-void ph(int hp)	{ 
+void ph(intptr_t hp)	{ 
   Command c("ph");
   findm(hp)->pretty_print(); 
 }
 
-void pm(int m) { 
+void pm(intptr_t m) { 
   Command c("pm");
   methodOop(m)->pretty_print(); 
 }
 
 void print_codes(char* class_name, char* selector) { 
   Command c("print_codes");
-  std->print_cr("Finding %s in %s.", selector, class_name);
+  stdOut->print_cr("Finding %s in %s.", selector, class_name);
   oop result = Universe::find_global(class_name);
   if (!result) {
-    std->print_cr("Could not find global %s.", class_name);
+    stdOut->print_cr("Could not find global %s.", class_name);
   } else if (!result->is_klass()) {
-    std->print_cr("Global %s is not a class.", class_name);
+    stdOut->print_cr("Global %s is not a class.", class_name);
   } else {
     symbolOop sel = oopFactory::new_symbol(selector);
     methodOop method = klassOop(result)->klass_part()->lookup(sel);
     if (!method) method = result->blueprint()->lookup(sel);
     if (!method) {
-      std->print_cr("Method %s is not in %s.", selector, class_name);
+      stdOut->print_cr("Method %s is not in %s.", selector, class_name);
     } else {
       method->pretty_print();
       method->print_codes();
@@ -281,27 +373,27 @@ void help() {
   Command c("help");
 
 
-  std->print_cr("basic");
-  std->print_cr("  pp(void* p)   - try to make sense of p");
-  std->print_cr("  pv(int p)     - ((PrintableResourceObj*) p)->print()");
-  std->print_cr("  ps()          - print current process stack");
-  std->print_cr("  pss()         - print all process stacks");
-  std->print_cr("  oat(int i)    - print object with id = i");
+  stdOut->print_cr("basic");
+  stdOut->print_cr("  pp(void* p)   - try to make sense of p");
+  stdOut->print_cr("  pv(int p)     - ((PrintableResourceObj*) p)->print()");
+  stdOut->print_cr("  ps()          - print current process stack");
+  stdOut->print_cr("  pss()         - print all process stacks");
+  stdOut->print_cr("  oat(int i)    - print object with id = i");
  
-  std->print_cr("methodOop");
-  std->print_cr("  pm(int m)     - pretty print methodOop(m)");
-  std->print_cr("  ph(int hp)    - pretty print method containing hp");
-  std->print_cr("  findm(int hp) - returns methodOop containing hp");
+  stdOut->print_cr("methodOop");
+  stdOut->print_cr("  pm(int m)     - pretty print methodOop(m)");
+  stdOut->print_cr("  ph(int hp)    - pretty print method containing hp");
+  stdOut->print_cr("  findm(int hp) - returns methodOop containing hp");
 
-  std->print_cr("misc.");
-  std->print_cr("  flush()       - flushes the log file");
-  std->print_cr("  events()      - dump last 50 event");
+  stdOut->print_cr("misc.");
+  stdOut->print_cr("  flush()       - flushes the log file");
+  stdOut->print_cr("  events()      - dump last 50 event");
 
 
-  std->print_cr("compiler debugging");
-  std->print_cr("  debug()       - to set things up for compiler debugging");
-  std->print_cr("  ndebug()      - undo debug");
-  std->print_cr("  pc()          - theCompiler->print_code(false)");
-  std->print_cr("  pscopes()     - theCompiler->topScope->printTree()");
-  std->print_cr("  urs_ps()      - print current process stack with many flags turned on");
+  stdOut->print_cr("compiler debugging");
+  stdOut->print_cr("  debug()       - to set things up for compiler debugging");
+  stdOut->print_cr("  ndebug()      - undo debug");
+  stdOut->print_cr("  pc()          - theCompiler->print_code(false)");
+  stdOut->print_cr("  pscopes()     - theCompiler->topScope->printTree()");
+  stdOut->print_cr("  urs_ps()      - print current process stack with many flags turned on");
 }

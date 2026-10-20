@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_DELTA_HPP_HPP
+#define VM_RUNTIME_DELTA_HPP_HPP
 
 // A DeltaCallCache caches methods for Delta calls.
 // They are primarily used to speed up performs.
@@ -75,3 +77,6 @@ class Delta: public AllStatic {
   static oop call(oop receiver, oop selector, oop arg1, oop arg2, oop arg3);
   static oop call(oop receiver, oop selector, objArrayOop args);
 };
+
+
+#endif // VM_RUNTIME_DELTA_HPP_HPP

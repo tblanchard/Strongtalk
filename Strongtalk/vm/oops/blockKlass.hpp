@@ -20,7 +20,14 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_BLOCKKLASS_HPP_HPP
+#define VM_OOPS_BLOCKKLASS_HPP_HPP
 
+#include "memOopKlass.hpp"
+#include "vmSymbols.hpp"
+#include "blockOop.hpp"
+void set_blockClosureKlass_vtbl(Klass* k);
+void set_contextKlass_vtbl(Klass* k);
 class blockClosureKlass: public memOopKlass {
  public:
   // testers
@@ -63,7 +70,7 @@ class blockClosureKlass: public memOopKlass {
 
   // printing operations
   void oop_print_value_on(oop obj, outputStream* st);
-  char* name() const { return "block"; }
+  const char* name() const { return "block"; }
 
   // class creation
   friend void set_blockClosureKlass_vtbl(Klass* k);
@@ -107,7 +114,7 @@ class contextKlass: public memOopKlass {
   // printing support
   void oop_print_value_on(oop obj, outputStream* st);
   void oop_print_on(oop obj, outputStream* st);
-  char* name() const { return "context"; }
+  const char* name() const { return "context"; }
 
   // class creation
   friend void set_contextKlass_vtbl(Klass* k);
@@ -115,3 +122,6 @@ class contextKlass: public memOopKlass {
 
 
 
+
+
+#endif // VM_OOPS_BLOCKKLASS_HPP_HPP

@@ -22,9 +22,23 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 */
 
 
-# include "incls/_precompiled.incl"
-# include "incls/_timer.cpp.incl"
 
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "timer.hpp"
+#include "os.hpp"
 void timer::start() { 
   os::updateTimes();
   userTime   = os::userTime();
@@ -42,7 +56,7 @@ double timer::seconds() {
 }
 
 void timer::print() {
-  std->print_cr("%3.3f", userTime);
+  stdOut->print_cr("%3.3f", userTime);
 }
 
 void elapsedTimer::start() {
@@ -60,7 +74,7 @@ double elapsedTimer::seconds() {
 }
 
 void elapsedTimer::print() {
-  std->print_cr("%3.3f", seconds());
+  stdOut->print_cr("%3.3f", seconds());
 }
 
 TimeStamp::TimeStamp() : counter(0,0) {
@@ -77,10 +91,10 @@ double TimeStamp::seconds() {
   return count/freq;
 }
 
-TraceTime::TraceTime(char* title, bool doit) {
+TraceTime::TraceTime(const char* title, bool doit) {
   active = doit;
   if (active) {
-    std->print("[%s", title);
+    stdOut->print("[%s", title);
     t.start();
   }
 }
@@ -88,7 +102,7 @@ TraceTime::TraceTime(char* title, bool doit) {
 TraceTime::~TraceTime() {
   if (active) {
     t.stop();
-    std->print_cr(", %3.3f secs]", t.seconds());
+    stdOut->print_cr(", %3.3f secs]", t.seconds());
   }
 }
 

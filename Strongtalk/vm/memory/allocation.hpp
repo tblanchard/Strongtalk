@@ -21,7 +21,15 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
+#ifndef VM_MEMORY_ALLOCATION_HPP
+#define VM_MEMORY_ALLOCATION_HPP
+
+#include "lprintf.hpp"
+#include "bits.hpp"
 # include <string.h>
+# include <stdlib.h>
+#include "error.hpp"
+#include "util.hpp"
 
 /*
   All classes in the virtual machine must be subclassed
@@ -119,8 +127,8 @@ class AllStatic {
 const int min_resource_chunk_size = 256 * K;
 const int min_resource_free_size  =  32 * K;
 
-char* AllocatePageAligned(int size, char* name);
-char* AllocateHeap(int size, char* name);
+char* AllocatePageAligned(int size, const char* name);
+char* AllocateHeap(int size, const char* name);
 void  FreeHeap(void* p);
 
 extern "C" bool PrintResourceAllocation; // to break cycle in includeDB
@@ -158,8 +166,8 @@ public:
 
   void initialize(ResourceAreaChunk* previous);
 
-  int capacity() { return top        - bottom; }
-  int used()     { return first_free - bottom; }
+  auto capacity() { return top        - bottom; }
+  auto used()     { return first_free - bottom; }
   
   bool contains(void* p) {
     if (p >= (void*) bottom && p < (void*) top) return true;
@@ -288,4 +296,6 @@ class PrintableResourceObj : public ResourceObj {
   virtual void print() = 0;
   virtual void print_short();
 };
+
+#endif // VM_MEMORY_ALLOCATION_HPP
 

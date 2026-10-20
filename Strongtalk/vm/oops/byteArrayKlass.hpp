@@ -20,7 +20,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_OOPS_BYTEARRAYKLASS_HPP_HPP
+#define VM_OOPS_BYTEARRAYKLASS_HPP_HPP
 
+void set_byteArrayKlass_vtbl(Klass* k);
 class byteArrayKlass: public memOopKlass {
  public:
   // allocation properties
@@ -49,11 +52,11 @@ class byteArrayKlass: public memOopKlass {
   Format format() { return byteArray_klass; }
 
   // Initialize the object
-  void initialize_object(byteArrayOop obj, char* value, int len);
+  void initialize_object(byteArrayOop obj, const char* value, int len);
 
   friend void set_byteArrayKlass_vtbl(Klass* k);
 
-  char* name() const { return "byteArray"; }
+  const char* name() const { return "byteArray"; }
 
  // ALL FUNCTIONS BELOW THIS POINT ARE DISPATCHED FROM AN OOP 
  public:
@@ -78,3 +81,6 @@ class byteArrayKlass: public memOopKlass {
   bool oop_is_indexable() const { return true; }
 
 };
+
+
+#endif // VM_OOPS_BYTEARRAYKLASS_HPP_HPP

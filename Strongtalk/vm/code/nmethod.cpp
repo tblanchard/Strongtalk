@@ -21,11 +21,112 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
 
+#include <algorithm>
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "inliningdb.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "klassOop.hpp"
+#include "memOopKlass.hpp"
+#include "iCache.hpp"
+#include "location.hpp"
+#include "nativeInstruction.hpp"
+#include "runtime.hpp"
+#include "compiledIC.hpp"
+#include "relocInfo.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "x86_mapping.hpp"
+#include "nameDesc.hpp"
+#include "byteArrayOop.hpp"
+#include "symbolOop.hpp"
+#include "key.hpp"
+#include "bytecodes.hpp"
+#include "methodOop.hpp"
+#include "scopeDesc.hpp"
+#include "floats.hpp"
+#include "os.hpp"
+#include "dll.hpp"
+#include "codeIterator.hpp"
+#include "ic_iterator.hpp"
+#include "ncode.hpp"
+#include "jumpTable.hpp"
+#include "codeTable.hpp"
+#include "zoneHeap.hpp"
+#include "zone.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "lookupCache.hpp"
+#include "interpretedIC.hpp"
+#include "methodIterator.hpp"
+#include "opcode.hpp"
+#include "prim.hpp"
+#include "nodeBuilder.hpp"
+#include "compileTimeClosure.hpp"
+#include "slist.hpp"
+#include "defUse.hpp"
+#include "frame.hpp"
+#include "blockOop.hpp"
+#include "blockKlass.hpp"
+#include "blockOop.inline.hpp"
+#include "scopeDescRecorder.hpp"
+#include "preg.hpp"
+#include "vmOperations.hpp"
+#include "recompile.hpp"
+#include "basicBlock.hpp"
+#include "expr.hpp"
+#include "bitVector.hpp"
+#include "registerMask.hpp"
+#include "compUtils.hpp"
+#include "inliner.hpp"
+#include "compiler.hpp"
+#include "vframe.hpp"
+#include "scope.hpp"
+#include "node.hpp"
+#include "universe.inline.hpp"
+#include "vmSymbols.hpp"
+#include "oop.inline.hpp"
+#include "locations.hpp"
+#include "pregMapping.hpp"
+#include "codeGenerator.hpp"
+#include "pcDesc.hpp"
+#include "rscope.hpp"
+#include "stubRoutines.hpp"
+#include "methodKlass.hpp"
+#include "compiledPIC.hpp"
+#include "disassembler.hpp"
 # ifdef DELTA_COMPILER
 
-# include "incls/_nmethod.cpp.incl"
 
 
 void nmFlags::clear() {
@@ -357,11 +458,11 @@ void nmethod::makeZombie(bool clearInlineCaches) {
   p[2] = char(offset);
 
   if (TraceZombieCreation) {
-    std->print_cr("%s nmethod 0x%x becomes zombie", (is_method() ? "normal" : "block"), this);
+    stdOut->print_cr("%s nmethod 0x%x becomes zombie", (is_method() ? "normal" : "block"), this);
     if (WizardMode) {
-      std->print_cr("entry code sequence:");
-      char* beg = (char*)min(int(specialHandlerCall()), int(entryPoint()), int(verifiedEntryPoint()));
-      char* end = (char*)max(int(specialHandlerCall()), int(entryPoint()), int(verifiedEntryPoint()));
+      stdOut->print_cr("entry code sequence:");
+      char* beg = std::min({(char*)specialHandlerCall(), (char*)entryPoint(), (char*)verifiedEntryPoint()});
+      char* end = std::max({(char*)specialHandlerCall(), (char*)entryPoint(), (char*)verifiedEntryPoint()});
       Disassembler::decode(beg, end + 10);
     }
   }
@@ -426,7 +527,7 @@ void nmethod::flush() {
   // completely deallocate this method
   EventMarker em("flushing nmethod %#lx %s", this, "");
   if (PrintMethodFlushing) {
-    std->print_cr("*flushing nmethod %#lx", this);
+    stdOut->print_cr("*flushing nmethod %#lx", this);
   }
   if (isZombie()) {
     clear_inline_caches();    // make sure they're cleared (may not have been done by makeZombie)
@@ -618,7 +719,7 @@ void nmethod::verify() {
 
   for (PcDesc* p = pcs(); p < pcsEnd(); p++) {
     if (! p->verify(this)) {
-      std->print_cr("\t\tin nmethod at %#lx (pcs)", this);
+      stdOut->print_cr("\t\tin nmethod at %#lx (pcs)", this);
     }
   }
   
@@ -683,23 +784,23 @@ void nmethod::PrimitiveICs_do(void f(PrimitiveIC*)) {
 void nmethod::print() {
   ResourceMark rm;
   printIndent();
-  std->print("((nmethod*)%#lx) ", this);
-  std->print(" for method %#lx ", method());
+  stdOut->print("((nmethod*)%#lx) ", this);
+  stdOut->print(" for method %#lx ", method());
   key.print();
-  std->print(" { ");
-  if (isYoung()) std->print("YOUNG ");
-  if (version()) std->print("v%d ", version());
-  if (level()) std->print("l%d ", level());
-  if (isZombie()) std->print("zombie ");
-  if (isToBeRecompiled()) std->print("TBR ");
-  if (isUncommonRecompiled()) std->print("UNCOMMON ");
-  std->print_cr("}:");
+  stdOut->print(" { ");
+  if (isYoung()) stdOut->print("YOUNG ");
+  if (version()) stdOut->print("v%d ", version());
+  if (level()) stdOut->print("l%d ", level());
+  if (isZombie()) stdOut->print("zombie ");
+  if (isToBeRecompiled()) stdOut->print("TBR ");
+  if (isUncommonRecompiled()) stdOut->print("UNCOMMON ");
+  stdOut->print_cr("}:");
   Indent ++;   
       
   printIndent();
-  std->print_cr("instructions (%ld bytes): [%#lx..%#lx]", size(), insts(), instsEnd());
+  stdOut->print_cr("instructions (%ld bytes): [%#lx..%#lx]", size(), insts(), instsEnd());
   printIndent();
-  std->print_cr("((nmethod*)%#lx)->printCode()", this);
+  stdOut->print_cr("((nmethod*)%#lx)->printCode()", this);
   // don't print code/locs/pcs by default -- too much output   -Urs 1/95
   // printCode();
   scopes()->print();
@@ -718,15 +819,15 @@ void nmethod::printCode() {
 void nmethod::printLocs() {
   ResourceMark m;	// in case methods get printed via the debugger
   printIndent();
-  std->print_cr("locations:");
+  stdOut->print_cr("locations:");
   Indent ++;
   relocIterator iter(this);
   int last_offset = 0;
   for (relocInfo* l = locs(); l < locsEnd(); l++) {
     iter.next();
     last_offset = l->print(this, last_offset);
-    if (iter.type() == relocInfo::uncommon_type && iter.wasUncommonTrapExecuted()) std->print(" (taken)");
-    std->cr();
+    if (iter.type() == relocInfo::uncommon_type && iter.wasUncommonTrapExecuted()) stdOut->print(" (taken)");
+    stdOut->cr();
   }
   Indent --;
 }
@@ -771,7 +872,7 @@ static ScopeDesc* print_scope_node(nmethodScopes* scopes, ScopeDesc* sd, int lev
 void nmethod::print_inlining(outputStream* st, bool with_debug_info) {
   // Takes advantage of the fact that the scope tree is stored in a depth first traversal order.
   ResourceMark rm;
-  if (st == NULL) st = std;
+  if (st == NULL) st = stdOut;
   st->print_cr("nmethod inlining structure");
   ScopeDesc* result = print_scope_node(scopes(), scopes()->root(), 0, st, with_debug_info);
   if (result != NULL) warning("print_inlining returned prematurely");
@@ -885,7 +986,7 @@ void nmethod::restore_from_patch(nmethod_patch* data) {
 
 
 void nmethod::print_inlining_database() {
-  print_inlining_database_on(std);
+  print_inlining_database_on(stdOut);
 }
 
 

@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_COMPILER_INLINER_HPP_HPP
+#define VM_COMPILER_INLINER_HPP_HPP
 
 # ifdef DELTA_COMPILER
 
@@ -144,3 +146,6 @@ class RecompilerInliningPolicy : public InliningPolicy {
 };
 
 # endif
+
+
+#endif // VM_COMPILER_INLINER_HPP_HPP

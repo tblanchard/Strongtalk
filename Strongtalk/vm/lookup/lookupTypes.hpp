@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_LOOKUP_LOOKUPTYPES_HPP_HPP
+#define VM_LOOKUP_LOOKUPTYPES_HPP_HPP
 
 #ifdef junk
 
@@ -76,3 +78,5 @@ extern "C" {
   char* lookupTypeName(LookupType lookupType);
 }
 #endif
+
+#endif // VM_LOOKUP_LOOKUPTYPES_HPP_HPP

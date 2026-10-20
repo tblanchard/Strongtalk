@@ -21,9 +21,54 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 */
 
-# include "incls/_precompiled.incl"
-# include "incls/_sweeper.cpp.incl"
+#include "config.hpp"
+#include "error.hpp"
+#include "oopsHierarchy.hpp"
+#include "longInt.hpp"
+#include "types.hpp"
+#include "asserts.hpp"
+#include "macros.hpp"
+#include "bits.hpp"
+#include "lprintf.hpp"
+#include "util.hpp"
+#include "allocation.hpp"
+#include "ostream.hpp"
+#include "tag.hpp"
+#include "top.hpp"
+#include "eventLog.hpp"
+#include "debug.hpp"
+#include "oop.hpp"
+#include "iterator.hpp"
+#include "growableArray.hpp"
+#include "process.hpp"
+#include "rSet.hpp"
+#include "space.hpp"
+#include "virtualspace.hpp"
+#include "generation.hpp"
+#include "generation.inline.hpp"
+#include "spaceSize.hpp"
+#include "universe.hpp"
+#include "zone.hpp"
+#include "smiOop.hpp"
+#include "markOop.hpp"
+#include "memOop.hpp"
+#include "universe.store.hpp"
+#include "klass.hpp"
+#include "byteArrayOop.hpp"
+#include "task.hpp"
+#include "associationOop.hpp"
+#include "bytecodes.hpp"
+#include "timer.hpp"
+#include "sweeper.hpp"
+#include "symbolOop.hpp"
+#include "mixinOop.hpp"
+#include "methodOop.hpp"
+#include "objArrayOop.hpp"
 # include <math.h>
+#include "scopeDesc.hpp"
+#include "nmethodScopes.hpp"
+#include "nmethod.hpp"
+#include "klassOop.hpp"
 
 // The sweeper run at real_time ticks. We only swep if the interrupted
 // Delta process is in a well-defined state (see SweeperTask).
@@ -43,7 +88,7 @@ void Sweeper::print_all() {
 bool Sweeper::register_active_frame(frame fr) {
   if (fr.is_interpreted_frame()) {
     _active_method = fr.method();
-    if (_active_method == NULL) return NULL;
+    if (_active_method == NULL) return false;
     return true;
   } else if (fr.is_compiled_frame()) {
     _active_nmethod = findNMethod(fr.pc());
@@ -87,7 +132,7 @@ void Sweeper::step() {
 }
 
 void Sweeper::print() const {
-  std->print_cr("%s", name());
+  stdOut->print_cr("%s", name());
 }
 
 void Sweeper::activate() {
@@ -118,7 +163,7 @@ inline void CodeSweeper::updateInterval() {
     fractionPerTask = 8;
     const double log2 = 0.69314718055995;   // log(2)
     decayFactor = exp(log2 * CodeSweeperInterval * fractionPerTask / CounterHalfLifeTime);
-    if (PrintCodeSweep) std->print("*method sweep: decay factor %f\n", decayFactor);
+    if (PrintCodeSweep) stdOut->print("*method sweep: decay factor %f\n", decayFactor);
   }
 }
 
@@ -184,7 +229,7 @@ void MethodSweeper::task() {
   objArrayOop array     = Universe::systemDictionaryObj();
   int          length   = array->length();
   int number_of_entries = length / fractionPerTask;
-  if (PrintCodeSweep) std->print("*method sweep: %d entries...", number_of_entries);
+  if (PrintCodeSweep) stdOut->print("*method sweep: %d entries...", number_of_entries);
   TraceTime t("MethodSweep ", PrintCodeSweep);
 
   int end = (index + number_of_entries);
@@ -198,7 +243,7 @@ void MethodSweeper::task() {
      associationOop assoc =  associationOop(array->obj_at(index));
      assert(assoc->is_association(), "just checking");
      if (assoc->is_constant() && assoc->value()->is_klass()) {
-       int result = klass_task(klassOop(assoc->value()));
+       result += klass_task(klassOop(assoc->value()));
      }
   }
   LOG_EVENT3("MethodSweeper task [%d, %d] #%d", begin, end, result);
@@ -234,7 +279,7 @@ void ZoneSweeper::task() {
   //    we need to validate next
   int total = Universe::code->numberOfNMethods();
   int todo = total / fractionPerTask;
-  if (PrintCodeSweep) std->print("*zone sweep: %d of %d entries...", todo, total);
+  if (PrintCodeSweep) stdOut->print("*zone sweep: %d of %d entries...", todo, total);
   TraceTime t("ZoneSweep ", PrintCodeSweep);
   
   for (int index = 0; index < todo; index++) {

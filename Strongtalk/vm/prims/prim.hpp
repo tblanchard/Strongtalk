@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_PRIMS_PRIM_HPP_HPP
+#define VM_PRIMS_PRIM_HPP_HPP
 
 // The file defines the interface to the internal primitives.
 
@@ -78,7 +80,7 @@ class primitive_desc {
                         // excluding {FirstArgumenthasWrongType, SecondArgumenthasWrongType ...}
  public:
   // returns the name of the primitive.
-  char* name() const { return _name; }
+  const char* name() const { return _name; }
 
   // returns the primitive entry point.
   fntype fn() const { return _fn; }
@@ -206,3 +208,6 @@ class primitives : AllStatic {
   static primitive_desc* context_allocate1() { return _context_allocate1; }
   static primitive_desc* context_allocate2() { return _context_allocate2; }
 };
+
+
+#endif // VM_PRIMS_PRIM_HPP_HPP

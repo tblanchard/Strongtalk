@@ -20,6 +20,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 
 */
+#ifndef VM_RUNTIME_EVALUATOR_HPP_HPP
+#define VM_RUNTIME_EVALUATOR_HPP_HPP
 
 // The evaluator provides a read-eval-loop for simple vm debugging
 // See print_help() for documentation.
@@ -40,5 +42,8 @@ class evaluator : AllStatic {
   static void print_status();
  public:
   static void read_eval_loop();
-  static void single_step(int* fr);
+  static void single_step(intptr_t* fr);
 };
+
+
+#endif // VM_RUNTIME_EVALUATOR_HPP_HPP
