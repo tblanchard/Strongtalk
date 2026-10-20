@@ -62,6 +62,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "key.hpp"
 #include "location.hpp"
 #include "nativeInstruction.hpp"
+#include "longInt.hpp"
+#include "os.hpp"
 #include "runtime.hpp"
 #include "compiledIC.hpp"
 #include "iCache.hpp"
@@ -433,10 +435,12 @@ void zone::verify() {
 
 
 void zone::switch_pointers(oop from, oop to) { 
+  JITWriteScope write_code;	// oops in nmethods and PICs are updated
   Unimplemented();
 }
 
 void zone::oops_do(void f(oop*)) {
+  JITWriteScope write_code;	// f may update oops in nmethods and PICs
   FOR_ALL_NMETHODS(nm) {
     nm->oops_do(f);
   }

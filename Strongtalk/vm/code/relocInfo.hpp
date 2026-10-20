@@ -70,8 +70,14 @@ class relocInfo : ValueObj {
   };
 
   // accessors
+  // arm64: relocated addresses are 4-byte aligned; offsets are stored in units of 4 bytes
+#ifdef STRONGTALK_ARM64
+  enum { offset_unit = 4 };
+#else
+  enum { offset_unit = 1 };
+#endif
   int offset() const { 
-    return get_unsigned_bitfield((int)_value, 0, reloc_offset_width);
+    return get_unsigned_bitfield((int)_value, 0, reloc_offset_width) * offset_unit;
   }
   int type() const { 
     return get_unsigned_bitfield((int)_value, reloc_offset_width, reloc_type_width);
@@ -143,7 +149,11 @@ class relocIterator : StackObj {
 
   bool is_call() const { return current->isCall(); }
 
+#ifdef STRONGTALK_ARM64
+  intptr_t* word_addr() const { return (intptr_t*) addr; }	// relocated data are 8-byte literals
+#else
   int* word_addr() const { return (int*) addr; }
+#endif
 
   oop* oop_addr() const {
     assert(type() == relocInfo::oop_type, "must be oop");

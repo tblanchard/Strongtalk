@@ -484,6 +484,12 @@ char* StubRoutines::generate_compile_block(MacroAssembler* masm) {
 }
 
 
+#ifdef STRONGTALK_ARM64
+char* StubRoutines::generate_continue_NLR(MacroAssembler* masm) {
+  Unimplemented();	// arm64 version: phase C2c
+  return NULL;
+}
+#else
 char* StubRoutines::generate_continue_NLR(MacroAssembler* masm) {
 // Entry point jumped to from compiled code. Initiates (or continues an ongoing) NLR.
 // Originally this code has been generated in nmethods, using a stub reduces code size.
@@ -502,6 +508,7 @@ char* StubRoutines::generate_continue_NLR(MacroAssembler* masm) {
   masm->jmp(ret_addr);						// do NLR
   return entry_point;
 }
+#endif // STRONGTALK_ARM64
 
 
 char* StubRoutines::generate_call_DLL(MacroAssembler* masm, bool async) {
@@ -808,6 +815,12 @@ char* StubRoutines::generate_call_inspector(MacroAssembler* masm) {
 }
 
 
+#ifdef STRONGTALK_ARM64
+char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
+  Unimplemented();	// arm64 version: phase C2c
+  return NULL;
+}
+#else
 char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
 // Called from within a PIC (polymorphic inline cache).
 // The stub interprets the methodOop section of compiled PICs.
@@ -870,6 +883,7 @@ char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
 
   return entry_point;
 }
+#endif // STRONGTALK_ARM64
 
 
 char* StubRoutines::generate_allocate(MacroAssembler* masm, int size) {

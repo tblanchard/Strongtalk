@@ -413,6 +413,9 @@ class MacroAssembler: public Assembler {
   void call_C(char* entry, Register arg1, Register arg2, Register arg3);
   void call_C(char* entry, Register arg1, Register arg2, Register arg3, Register arg4);
 
+  // DLL calls: emits a CompiledDLL_Cache (see dll.hpp) and the call of the DLL stub (entry)
+  void call_DLL_cache(char* entry, char* function, oop dll_name, oop function_name);
+
   // Stores
   void store_check(Register obj, Register tmp);
 

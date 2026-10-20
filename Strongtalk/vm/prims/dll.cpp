@@ -119,9 +119,14 @@ bool CompiledDLL_Cache::async() const {
 
 void CompiledDLL_Cache::verify() {
   // check layout
+#ifdef STRONGTALK_ARM64
+  if (*(a64::insn*) addr_at(ldr_edx_offset) != a64::ldr_literal(2, 8) ||
+      *(a64::insn*) addr_at(ldr_edx_offset + 4) != a64::b(28)) fatal("not a compiled DLL cache");
+#else
   mov_at(mov_edx_instruction_offset)->verify();
   test_at(test_1_instruction_offset)->verify();
   test_at(test_2_instruction_offset)->verify();
+#endif
   NativeCall::verify();
   // check oops
   if (!dll_name()->is_symbol()) fatal("dll name is not a symbolOop");

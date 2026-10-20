@@ -198,6 +198,11 @@ class PIC_contents {
   bool has_nmethods() const			{ return (n > 0) || (smi_nmethod != NULL); }
 
 
+#ifdef STRONGTALK_ARM64
+  int code_size() const {
+    return PIC::PIC_entries_offset + number_of_targets() * PIC::PIC_entry_size;
+  }
+#else
   int code_size() const {
     int methodOop_size = number_of_interpreted_targets() * PIC::PIC_methodOop_entry_size;
     if (has_nmethods()) {
@@ -206,6 +211,7 @@ class PIC_contents {
       return PIC::PIC_methodOop_only_offset + methodOop_size;
     }
   }
+#endif
 
 
   PIC_contents() {
@@ -245,6 +251,68 @@ void PIC_contents::append_method(klassOop klass, methodOop method) {
 
 
 // Implementation of PIC_Iterators
+
+#ifdef STRONGTALK_ARM64
+
+// arm64 PIC layout (all PICs, and MICs):
+//
+//  0	: ldr x16, #16		stub routine
+//  4	: adr x17, #24		data (for the stub routine)
+//  8	: br x16
+// 12	: nop
+// 16	: stub routine address	(PIC stub / megamorphic IC stub)
+// 24	: PIC: number of entries n; MIC: selector
+// 32	: PIC: n entries of 16 bytes: klass, target
+//
+// The target of an entry is the verified entry point of an nmethod or a methodOop (an
+// interpreted method): they are distinguished by the tag (code addresses are word aligned).
+// Smis have an entry with klass smiKlassObj. The PIC stub routine (StubRoutines::PIC_stub_entry)
+// compares the receiver's klass with the entries and jumps to the target, calls the interpreter
+// for methodOops, or calls the lookup routine.
+
+static inline bool is_methodOop_target(char* t) { return ((intptr_t) t & Tag_Mask) == Mem_Tag; }
+
+PIC_Iterator::PIC_Iterator(PIC* pic) {
+  _pic = pic;
+  _pos = pic->entry() + PIC::PIC_entries_offset;
+  if (pic->is_megamorphic()) {
+    _state = at_the_end;
+  } else {
+    _methodOop_counter = (int) *(intptr_t*) (pic->entry() + PIC::PIC_count_offset);	// remaining entries
+    computeNextState();
+  }
+}
+
+void PIC_Iterator::computeNextState() {
+  if (_methodOop_counter <= 0) {
+    _state = at_the_end;
+  } else {
+    _state = is_methodOop_target(*target_addr()) ? at_methodOop : at_nmethod;
+  }
+}
+
+void PIC_Iterator::advance() {
+  assert(_state != at_the_end, "iterator at end");
+  _pos += PIC::PIC_entry_size;
+  _methodOop_counter--;
+  computeNextState();
+}
+
+klassOop* PIC_Iterator::klass_addr() const {
+  assert(_state == at_nmethod || _state == at_methodOop, "no entry");
+  return (klassOop*) (_pos + PIC::PIC_klass_offset);
+}
+
+char** PIC_Iterator::target_addr() const {
+  return (char**) (_pos + PIC::PIC_target_offset);
+}
+
+methodOop* PIC_Iterator::methodOop_addr() const {
+  assert(_state == at_methodOop, "no methodOop entry");
+  return (methodOop*) target_addr();
+}
+
+#else // x86
 
 PIC_Iterator::PIC_Iterator(PIC* pic) {
   _pic   = pic;
@@ -354,6 +422,8 @@ methodOop* PIC_Iterator::methodOop_addr() const {
 }
 
 
+#endif // STRONGTALK_ARM64
+
 void PIC_Iterator::print() {
   lprintf("a PIC_Iterator\n");
 }
@@ -374,6 +444,68 @@ PIC* PIC::find(char* addr) {
   return NULL;
 }
 
+
+#ifdef STRONGTALK_ARM64
+
+// Accessing PIC entries
+
+klassOop PIC_Iterator::get_klass() const { 
+  return *klass_addr(); 
+}
+
+char* PIC_Iterator::get_call_addr() const { 
+  assert(is_compiled(), "not an nmethod entry");
+  return *target_addr();
+}
+
+bool PIC_Iterator::is_compiled() const {
+  switch (state()) {
+    case at_nmethod    : return true;
+    case at_methodOop  : return false;
+    default            : ShouldNotCallThis();
+  }
+  return false;
+}
+
+bool PIC_Iterator::is_interpreted() const { 
+  return !is_compiled();
+}
+
+nmethod* PIC_Iterator::compiled_method() const { 
+  if (!is_compiled()) return NULL;  
+  return findNMethod(get_call_addr() - sizeof(nmethod)); 
+}
+
+methodOop PIC_Iterator::interpreted_method() const { 
+  if (is_interpreted()) {
+    return *methodOop_addr(); 
+  } else {
+    return compiled_method()->method();
+  }
+}
+
+// Modifying PIC entries (aligned words: atomic for threads executing the PIC)
+
+void PIC_Iterator::set_klass(klassOop klass) { 
+  native_code_write_word((char*) klass_addr(), (intptr_t) klass);
+}
+
+void PIC_Iterator::set_nmethod(nmethod* nm) { 
+  assert(get_klass() == nm->key.klass(), "mismatched receiver klass");
+  assert(is_compiled(), "not an nmethod entry");
+  native_code_write_word((char*) target_addr(), (intptr_t) nm->verifiedEntryPoint());
+}
+
+void PIC_Iterator::set_methodOop(methodOop method) { 
+  native_code_write_word((char*) methodOop_addr(), (intptr_t) method);
+}
+
+symbolOop* PIC::MIC_selector_address() const {
+  assert(is_megamorphic(), "not a MIC");
+  return (symbolOop*)(entry() + MIC_selector_offset);
+}
+
+#else // x86
 
 // Accessing PIC entries
 klassOop PIC_Iterator::get_klass() const { 
@@ -443,6 +575,7 @@ symbolOop* PIC::MIC_selector_address() const {
   return (symbolOop*)(entry() + MIC_selector_offset);
 }
 
+#endif // STRONGTALK_ARM64
 
 PIC* PIC::replace(nmethod* nm) {
   // nothing to do in megamorphic case
@@ -574,6 +707,54 @@ int PIC::nof_entries(char* pic_stub) {
 }
 
 
+#ifdef STRONGTALK_ARM64
+
+// The common code of PICs and MICs: jumps to the stub routine with x17 = data (see layout above)
+static void put_PIC_header(char* entry, char* stub) {
+  assert(((intptr_t) entry & 7) == 0, "PIC entry must be 8-byte aligned");
+  a64::insn* code = (a64::insn*) entry;
+  code[0] = a64::ldr_literal(16, PIC::PIC_stub_offset);
+  code[1] = a64::adr(17, PIC::PIC_count_offset - 4);
+  code[2] = a64::br(16);
+  code[3] = a64::nop();
+  *(char**) (entry + PIC::PIC_stub_offset) = stub;
+}
+
+int PIC::code_for_methodOops_only(char* entry, PIC_contents* c) {
+  return code_for_polymorphic_case(entry, c);
+}
+
+int PIC::code_for_polymorphic_case(char* entry, PIC_contents* c) {
+  // (PICs are created after initialization; only +TestArm64Runtime creates them without stubs)
+  put_PIC_header(entry, StubRoutines::is_initialized() ? StubRoutines::PIC_stub_entry(c->number_of_targets()) : NULL);
+  *(intptr_t*) (entry + PIC_count_offset) = c->number_of_targets();
+  char* p = entry + PIC_entries_offset;
+  // smis first (as on x86), then nmethods, then methodOops
+  if (c->smi_nmethod != NULL) {
+    *(klassOop*) p = smiKlassObj; *(char**) (p + PIC_target_offset) = c->smi_nmethod;            p += PIC_entry_size;
+  }
+  if (c->smi_methodOop != NULL) {
+    *(klassOop*) p = smiKlassObj; *(char**) (p + PIC_target_offset) = (char*) c->smi_methodOop;  p += PIC_entry_size;
+  }
+  for (int i = 0; i < c->n; i++) {
+    assert(((intptr_t) c->nmethods[i] & Tag_Mask) == 0, "nmethod entry points are aligned");
+    *(klassOop*) p = c->nmethod_klasses[i]; *(char**) (p + PIC_target_offset) = c->nmethods[i];  p += PIC_entry_size;
+  }
+  for (int i = 0; i < c->m; i++) {
+    *(klassOop*) p = c->methodOop_klasses[i]; *(char**) (p + PIC_target_offset) = (char*) c->methodOops[i]; p += PIC_entry_size;
+  }
+  assert(p - entry == c->code_size(), "PIC size inconsistent");
+  return p - entry;
+}
+
+int PIC::code_for_megamorphic_case(char* entry) {
+  put_PIC_header(entry, StubRoutines::megamorphic_ic_entry());
+  *(symbolOop*) (entry + MIC_selector_offset) = selector();	// used for fast lookup
+  return MIC_code_size;
+}
+
+#else // x86
+
 int PIC::code_for_methodOops_only(char* entry, PIC_contents* c) {
   char* p = entry;
   put_byte(p, call_opcode);
@@ -665,6 +846,7 @@ int PIC::code_for_megamorphic_case(char* entry) {
   return p - entry;
 }
 
+#endif // STRONGTALK_ARM64
 
 void PIC::shrink_and_generate(PIC* pic, klassOop klass, void* method) {
   Unimplemented();
@@ -759,17 +941,21 @@ PIC* PIC::allocate(CompiledIC* ic, klassOop klass, LookupResult result) {
 
 PIC::PIC(CompiledIC* ic, PIC_contents* contents, int allocated_code_size) {
   assert(contents->number_of_targets() >= 1, "at least one entry needed for non-megamorphic case");
+  JITWriteScope write_code;	// PICs are built in the (code memory) PIC heap
   _ic			= ic;
   _number_of_targets	= contents->number_of_targets();
   _code_size		= code_for_polymorphic_case(entry(), contents);
   assert(code_size() == allocated_code_size, "Please adjust PIC_contents::code_size()");
+  flushICacheRange(entry(), entry() + code_size());
 }
 
 
 PIC::PIC(CompiledIC* ic) {
+  JITWriteScope write_code;
   _ic			= ic;
   _number_of_targets	= 0; // indicates megamorphic case
   _code_size		= code_for_megamorphic_case(entry());
+  flushICacheRange(entry(), entry() + code_size());
   assert(code_size() == MIC_code_size, "Please adjust PIC_contents::code_size()");
 }
 
@@ -786,6 +972,19 @@ GrowableArray<klassOop>* PIC::klasses() const {
 
 
 void PIC::oops_do(void f(oop*)) {
+  JITWriteScope write_code;	// f may update the oops
+#ifdef STRONGTALK_ARM64
+  // all entries have a klass (also smis)
+  if (!is_megamorphic()) {
+    PIC_Iterator it(this);
+    while (!it.at_end()) {
+      f((oop*) it.klass_addr());
+      if (it.state() == PIC_Iterator::at_methodOop) f((oop*) it.methodOop_addr());
+      it.advance();
+    }
+    return;
+  }
+#endif
   if (is_megamorphic()) {
     // cannot use PIC_Iterator (0 entries) -> deal with MIC directly
     f((oop*)MIC_selector_address());
@@ -949,5 +1148,78 @@ nmethod* CompiledIC_Iterator::compiled_method() const {
 void CompiledIC_Iterator::print() {
   lprintf("CompiledIC_Iterator for ((CompiledIC*)%#x) (%s)\n", _ic, selector()->as_string());
 }
+
+#ifdef STRONGTALK_ARM64
+
+class FirstMethods : public ObjectClosure {
+ public:
+  methodOop methods[3];
+  int n;
+  FirstMethods() : n(0) {}
+  void do_object(memOop obj) { if (n < 3 && obj->is_method()) methods[n++] = methodOop(obj); }
+};
+
+static int pic_test_oops;
+static void count_pic_oop(oop* p) { pic_test_oops++; }
+
+bool PIC_arm64_test() {
+  ResourceMark rm;
+  int failures = 0;
+#define PIC_CHECK(cond, what) if (!(cond)) { failures++; lprintf("  FAILED %s\n", what); }
+  klassOop k1 = Universe::nilObj()->klass(), k2 = Universe::trueObj()->klass(), k3 = Universe::falseObj()->klass(), k4 = doubleKlassObj;
+  FirstMethods fm;
+  Universe::object_iterate(&fm);
+  if (fm.n < 3) { lprintf("  FAILED: no methods in the heap\n"); return false; }
+  methodOop m1 = fm.methods[0], m2 = fm.methods[1], m3 = fm.methods[2];
+  char* n0 = (char*) 0x10000, *n1 = (char*) 0x20000, *n2 = (char*) 0x30000;
+  PIC_contents c;
+  c.append_nmethod_entry(smiKlassObj, n0);
+  c.append_nmethod_entry(k1, n1);
+  c.append_nmethod_entry(k2, n2);
+  c.append_method(k3, m1);
+  c.append_method(k4, m2);
+  int size = c.code_size();
+  PIC_CHECK(size == PIC::PIC_entries_offset + 5 * PIC::PIC_entry_size, "PIC code size");
+  PIC* pic = new (size) PIC((CompiledIC*) NULL, &c, size);
+  PIC_CHECK(((intptr_t) pic->entry() & 7) == 0, "PIC entry alignment");
+  PIC_CHECK(pic->number_of_targets() == 5 && pic->is_polymorphic(), "PIC targets");
+  a64::insn* code = (a64::insn*) pic->entry();
+  PIC_CHECK(code[0] == a64::ldr_literal(16, 16) && code[1] == a64::adr(17, 20) && code[2] == a64::br(16), "PIC header");
+  if (StubRoutines::is_initialized()) PIC_CHECK(*(char**) (pic->entry() + PIC::PIC_stub_offset) == StubRoutines::PIC_stub_entry(5), "PIC stub");
+  // iteration: smis, nmethods, methodOops
+  klassOop  klasses[] = { smiKlassObj, k1, k2, k3, k4 };
+  bool      compiled[] = { true, true, true, false, false };
+  char*     targets[] = { n0, n1, n2, (char*) m1, (char*) m2 };
+  PIC_Iterator it(pic);
+  for (int i = 0; i < 5; i++) {
+    PIC_CHECK(!it.at_end(), "PIC iterator ends early");
+    if (it.at_end()) break;
+    PIC_CHECK(it.get_klass() == klasses[i], "PIC entry klass");
+    PIC_CHECK(it.is_compiled() == compiled[i], "PIC entry kind");
+    if (compiled[i]) { PIC_CHECK(it.get_call_addr() == targets[i], "PIC nmethod target"); }
+    else             { PIC_CHECK((char*) it.interpreted_method() == targets[i], "PIC methodOop target"); }
+    it.advance();
+  }
+  PIC_CHECK(it.at_end(), "PIC iterator end");
+  // modifying entries
+  { PIC_Iterator m(pic);
+    m.advance(); m.advance(); m.advance();	// the first methodOop entry
+    m.set_methodOop(m3);
+    m.set_klass(k1);
+    PIC_Iterator r(pic);
+    r.advance(); r.advance(); r.advance();
+    PIC_CHECK(r.interpreted_method() == m3 && r.get_klass() == k1, "PIC entry update");
+  }
+  pic_test_oops = 0;
+  pic->oops_do(&count_pic_oop);
+  PIC_CHECK(pic_test_oops == 7, "PIC oops_do visits 5 klasses and 2 methodOops");
+  PIC_CHECK(PIC::find(pic->entry() + 40) == pic, "PIC::find");
+  delete pic;
+  lprintf("PIC arm64 test: %d failures\n", failures);
+  return failures == 0;
+#undef PIC_CHECK
+}
+
+#endif // STRONGTALK_ARM64
 
 #endif

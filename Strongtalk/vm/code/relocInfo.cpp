@@ -91,7 +91,9 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 relocInfo::relocInfo(int t, int off) {
   assert(0 <= t && t < (1 << reloc_type_width), "wrong type");
-  assert(off <= nthMask(reloc_offset_width), "offset out off bounds");
+  assert(off % offset_unit == 0, "relocated address misaligned");
+  off /= offset_unit;
+  if (off > nthMask(reloc_offset_width)) fatal("relocation offset out of bounds (code too long between relocations)");
   _value =  (t << reloc_offset_width) | off;
 }
 
@@ -106,7 +108,11 @@ int relocInfo::print(nmethod* m, int last_offset) {
     (*(oop*) addr)->print_value();
   } else {
     assert(isCall(), "must be a call");
+#ifdef STRONGTALK_ARM64
+    char* target = *(char**) addr;					// the call literal
+#else
     char* target = (char*) addr + sizeof(int32_t) + *(int32_t*) addr;	// INTEL-SPECIFIC: rel32 call displacement
+#endif
     if (isIC()) {
       stdOut->print("inline cache   @0x%lx", addr);
     } else if (isPrimitive()) {
@@ -140,6 +146,11 @@ bool relocIterator::wasUncommonTrapExecuted() const {
 }
 
 bool relocIterator::is_position_dependent() const {
+#ifdef STRONGTALK_ARM64
+  // arm64 code refers to other code by absolute addresses (literals); only the
+  // addresses within the code itself change when it is moved
+  return type() == relocInfo::internal_word_type;
+#endif
   switch (type()) {
     case relocInfo::ic_type:
     case relocInfo::prim_type:

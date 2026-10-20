@@ -36,6 +36,18 @@ class PIC {
  public:
   enum Consts {
     max_nof_entries		=  4,			// the maximal number of PIC entries
+#ifdef STRONGTALK_ARM64
+    // arm64 layout constants (see compiledPIC.cpp)
+    PIC_header_size		= 24,			// ldr x16, stub; adr x17, data; br x16; nop; stub address
+    PIC_stub_offset		= 16,
+    PIC_count_offset		= 24,			// number of entries
+    PIC_entries_offset		= 32,
+    PIC_entry_size		= 16,			// klass, target (nmethod entry point or methodOop)
+    PIC_klass_offset		=  0,
+    PIC_target_offset		=  8,
+    MIC_selector_offset		= 24,
+    MIC_code_size		= 32,
+#else
 
     // PIC layout constants
     PIC_methodOop_only_offset	=  5,
@@ -54,6 +66,7 @@ class PIC {
     // MIC layout constants
     MIC_selector_offset		=  5,
     MIC_code_size		=  9,
+#endif
   };
 
  private:
@@ -129,7 +142,14 @@ class PIC {
   void verify();
 
   friend class PIC_Iterator;
+#ifdef STRONGTALK_ARM64
+  friend bool PIC_arm64_test();
+#endif
 };
+
+#ifdef STRONGTALK_ARM64
+bool PIC_arm64_test();		// +TestArm64Runtime: PIC layout and iteration (needs the code zone)
+#endif
 
 
 // A PIC_Iterator is used get information out of a PIC. It is used to
@@ -151,7 +171,11 @@ class PIC_Iterator: public PrintableResourceObj {
   enum State	_state;				// current iterator state
   int		_methodOop_counter;		// remaining no. of methodOop entries
 
+#ifdef STRONGTALK_ARM64
+  char**	target_addr() const;		// valid if state() in {at_nmethod, at_methodOop}
+#else
   int*		nmethod_disp_addr() const;	// valid if state() in {at_smi_nmethod, at_nmethod}
+#endif
   void		computeNextState();
 
  public:

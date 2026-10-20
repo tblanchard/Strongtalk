@@ -56,6 +56,47 @@ class InterpretedDLL_Cache: public ValueObj {
 // call sync_DLL/async_DLL	<- call
 // ...				<- this
 
+#ifdef STRONGTALK_ARM64
+
+// Layout of CompiledDLL_Caches on arm64 (MacroAssembler::call_DLL_cache); C is the call (8-byte aligned):
+//
+// C-32: ldr x2, #8		edx := entry point
+// C-28: b C
+// C-24: entry point		(8 bytes, patched by the DLL lookup)
+// C-16: dll_name		(oop)
+// C-8 : function_name		(oop)
+// C   : call sync_DLL/async_DLL	(Delta call, 24 bytes)
+// C+24: <- this (the return address)
+
+class CompiledDLL_Cache: public NativeCall {
+ private:
+  enum Layout_constants {
+    entry_point_offset		= NativeCall::instruction_offset - 24,
+    dll_name_offset		= NativeCall::instruction_offset - 16,
+    function_name_offset	= NativeCall::instruction_offset - 8,
+    ldr_edx_offset		= NativeCall::instruction_offset - 32,
+  };
+
+ public:
+  symbolOop dll_name()				{ return *(symbolOop*) addr_at(dll_name_offset); }
+  symbolOop function_name()			{ return *(symbolOop*) addr_at(function_name_offset); }
+  dll_func  entry_point()			{ return *(dll_func*) addr_at(entry_point_offset); }
+  bool      async() const;
+  void	    set_entry_point(dll_func f)		{ native_code_write_word(addr_at(entry_point_offset), (intptr_t) f); }
+
+  // Debugging
+  void      verify();
+  void      print();
+
+  // Creation
+  friend CompiledDLL_Cache* compiledDLL_Cache_from_return_address(char* return_address);
+
+  friend CompiledDLL_Cache* compiledDLL_Cache_from_relocInfo(char* displacement_address);
+
+};
+
+#else // x86
+
 class CompiledDLL_Cache: public NativeCall {
  private:
   enum Layout_constants {
@@ -84,6 +125,8 @@ class CompiledDLL_Cache: public NativeCall {
   friend CompiledDLL_Cache* compiledDLL_Cache_from_relocInfo(char* displacement_address);
 
 };
+
+#endif // STRONGTALK_ARM64
 
 inline CompiledDLL_Cache* compiledDLL_Cache_from_return_address(char* return_address)
 {

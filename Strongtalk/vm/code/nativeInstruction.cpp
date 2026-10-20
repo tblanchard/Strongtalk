@@ -36,6 +36,49 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "allocation.hpp"
 #include "nativeInstruction.hpp"
 #include "ostream.hpp"
+#ifdef STRONGTALK_ARM64
+
+#include "os.hpp"
+
+void native_code_write_word(char* addr, intptr_t value) {
+  assert(((intptr_t) addr & 7) == 0, "unaligned code word");
+  JITWriteScope write_code;
+  *(intptr_t*) addr = value;		// atomic for threads executing the code
+}
+
+void native_code_write_insn(char* addr, a64::insn i) {
+  { JITWriteScope write_code;
+    *(a64::insn*) addr = i;
+  }
+  os::flush_icache(addr, sizeof(a64::insn));
+}
+
+void NativeCall::verify() {
+  // adr x17, ret; str x17, [x28, #-8]!; ldr x16, #8; br x16
+  a64::insn* p = (a64::insn*) instruction_address();
+  if (p[0] != a64::adr(17, instruction_size) || p[1] != a64::ldst_pre(a64::STR, 3, 17, 28, -8) ||
+      p[2] != a64::ldr_literal(16, 8) || p[3] != a64::br(16)) {
+    fatal1("not a Delta call at %p", instruction_address());
+  }
+}
+
+void NativeCall::print() {
+  stdOut->print_cr("%p: call %p", instruction_address(), destination());
+}
+
+void NativeTest::verify() {
+  a64::insn lo = *(a64::insn*) addr_at(0), hi = *(a64::insn*) addr_at(4);
+  if ((lo & 0xFFE0001F) != a64::movz(a64::zr, 0, 0) || (hi & 0xFFE0001F) != a64::movk(a64::zr, 0, 1)) {
+    fatal1("not an IC info at %p", instruction_address());
+  }
+}
+
+void NativeTest::print() {
+  stdOut->print_cr("%p: info 0x%x", instruction_address(), data());
+}
+
+#else // x86
+
 // Implementation of NativeCall
 
 void NativeCall::verify() {
@@ -70,3 +113,4 @@ void NativeTest::print() {
   stdOut->print_cr("0x%x: test eax, 0x%x", instruction_address(), data());
 }
 
+#endif // STRONGTALK_ARM64

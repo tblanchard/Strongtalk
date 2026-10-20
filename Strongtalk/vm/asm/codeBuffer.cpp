@@ -148,8 +148,12 @@ void CodeBuffer::decode_all() {
 
 
 void CodeBuffer::copyTo(nmethod* nm) {
+#ifdef STRONGTALK_ARM64
+  while (code_size()  % oopSize != 0) { *(a64::insn*) instsEnd = a64::nop(); instsEnd += sizeof(a64::insn); }	// align code
+#else
   const char hlt = '\xF4';
   while (code_size()  % oopSize != 0) *instsEnd++ = hlt;			// align code
+#endif
   while (reloc_size() % oopSize != 0) *locsEnd++  = relocInfo(false, 0);	// align relocation info
 
   copy_oops((oop*)instsStart, (oop*)nm->insts(), code_size() /oopSize);

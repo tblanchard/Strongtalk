@@ -680,6 +680,7 @@ bool nmethod::switch_pointers(oop from, oop to,
 
 
 void nmethod::oops_do(void f(oop*)) {
+  JITWriteScope write_code;	// f may update the oops (nmethods are in code memory)
   // LookupKey
   key.oops_do(f);
 

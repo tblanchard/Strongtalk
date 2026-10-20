@@ -50,6 +50,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "rSet.hpp"
 #include "longInt.hpp"
 #include "os.hpp"
+#include "dll.hpp"
 #include "assemblerTest_arm64.hpp"
 #include <sys/mman.h>
 #include <pthread.h>
@@ -675,6 +676,73 @@ static void test_code_memory() {
 }
 
 
+// Code patterns read and patched by the runtime (nativeInstruction.hpp, dll.hpp, relocInfo.hpp)
+static void test_native_instructions() {
+  // Delta call stubs (return eax + 1 and eax + 2)
+  CodeBuffer* sb = new CodeBuffer(1024, 256);
+  MacroAssembler* sm = new MacroAssembler(sb);
+  sm->incl(eax); sm->ret(0);
+  int second = sm->offset(); sm->addl(eax, 2); sm->ret(0);
+  char* stubs = install(sb->code_begin(), sb->code_size());
+  char* stub1 = stubs, *stub2 = stubs + second;
+
+  // a call with IC info (as a compiled send), copied to code memory; the offsets are those of the copy
+  for (int pad = 0; pad < 2; pad++) {
+    TestCode t;
+    if (pad) t.m->nop();				// changes the alignment: the call may get a leading nop
+    int call_start = t.m->offset();
+    Label nlr;
+    t.m->call(stub1, relocInfo::ic_type);
+    int ret = t.m->offset();
+    t.m->ic_info(nlr, 0x5A);
+    t.m->bind(nlr);
+    TestFn f = t.finish();
+    char* code = (char*) f;
+    NativeCall* c = nativeCall_from_return_address(code + ret);
+    check_eq("NativeCall destination", (intptr_t) c->destination(), (intptr_t) stub1);
+    check_eq("nativeCall_at", (intptr_t) nativeCall_at(code + call_start), (intptr_t) c);
+    check_eq("nativeCall_from_relocInfo", (intptr_t) nativeCall_from_relocInfo(code + ret - 8), (intptr_t) c);
+    IC_Info* info = ic_info_at(c->next_instruction_address());
+    check_eq("IC_Info flags", info->flags(), 0x5A);
+    check_eq("IC_Info NLR target", (intptr_t) info->NLR_target(), (intptr_t) code + ret + 8);
+    info->set_flags(0x13);
+    check_eq("IC_Info set_flags", info->flags(), 0x13);
+    check_eq("IC_Info set_flags keeps NLR target", (intptr_t) info->NLR_target(), (intptr_t) code + ret + 8);
+    check_eq("patched code: call before", run(f, 10), 11);
+    c->set_destination(stub2);
+    check_eq("NativeCall set_destination", (intptr_t) c->destination(), (intptr_t) stub2);
+    check_eq("patched code: call after", run(f, 10), 12);
+  }
+
+  // compiled DLL cache: the DLL stub sees the entry point in edx
+  { CodeBuffer* db = new CodeBuffer(1024, 256);
+    MacroAssembler* dm = new MacroAssembler(db);
+    dm->movl(eax, edx); dm->ret(0);
+    char* dll_stub = install(db->code_begin(), db->code_size());
+    TestCode t;
+    t.m->call_DLL_cache(dll_stub, (char*) 0x1234560, oop(0x2001), oop(0x3001));
+    int ret = t.m->offset();
+    TestFn f = t.finish();
+    CompiledDLL_Cache* d = (CompiledDLL_Cache*) nativeCall_from_return_address((char*) f + ret);
+    check_eq("DLL cache entry point", (intptr_t) d->entry_point(), 0x1234560);
+    check_eq("DLL cache dll name", (intptr_t) d->dll_name(), 0x2001);
+    check_eq("DLL cache function name", (intptr_t) d->function_name(), 0x3001);
+    check_eq("DLL cache destination", (intptr_t) d->destination(), (intptr_t) dll_stub);
+    check_eq("DLL cache: edx = entry point", run(f, 0), 0x1234560);
+    d->set_entry_point((dll_func) 0x7654320);
+    check_eq("DLL cache set_entry_point", run(f, 0), 0x7654320);
+  }
+
+  // relocation offsets (4-byte units on arm64)
+  int offsets[] = { 4, 8, 400, 8188, 32764 };
+  for (int i = 0; i < 5; i++) {
+    relocInfo r(relocInfo::ic_type, offsets[i]);
+    check_eq("relocInfo offset", r.offset(), offsets[i]);
+    check_eq("relocInfo type", r.type(), relocInfo::ic_type);
+  }
+}
+
+
 bool arm64_assembler_test() {
   ResourceMark rm;
   lprintf("arm64 assembler test\n");
@@ -688,6 +756,7 @@ bool arm64_assembler_test() {
   test_labels_and_calls();lprintf("  labels/calls: %d checks\n", checks);
   test_c_calls();         lprintf("  C calls: %d checks\n", checks);
   test_fpu();             lprintf("  fpu: %d checks\n", checks);
+  test_native_instructions(); lprintf("  native instructions: %d checks\n", checks);
   lprintf("arm64 assembler test: %d checks, %d failures\n", checks, failures);
   return failures == 0;
 }

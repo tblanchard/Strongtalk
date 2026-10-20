@@ -113,6 +113,7 @@ class StubRoutines: AllStatic {
   static char* zombie_nmethod_entry()		{ return _zombie_nmethod_entry; }
   static char* zombie_block_nmethod_entry()     { return _zombie_block_nmethod_entry; }
   static char* megamorphic_ic_entry()		{ return _megamorphic_ic_entry; }
+  static bool  is_initialized()			{ return _is_initialized; }
   static char* compile_block_entry() 		{ return _compile_block_entry; }
   static char* continue_NLR_entry()		{ return _continue_NLR_entry; }
   static char* call_DLL_entry(bool async)	{ return async ? _call_async_DLL_entry   : _call_sync_DLL_entry; }

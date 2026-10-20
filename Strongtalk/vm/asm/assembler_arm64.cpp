@@ -1388,6 +1388,21 @@ void MacroAssembler::call_C(char* entry, Register arg1, Register arg2, Register 
 }
 
 
+void MacroAssembler::call_DLL_cache(char* entry, char* function, oop dll_name, oop function_name) {
+  // [ldr x2, #8] [b call] [entry point] [dll_name] [function_name] call:  (call 8-byte aligned)
+  while ((offset() & 7) != 0) nop();
+  int start = offset();
+  emit(ldr_literal(arm(edx), 8));
+  emit(b(28));
+  emit_word64((intptr_t) function, relocInfo::none);
+  emit_word64((intptr_t) dll_name, relocInfo::oop_type);
+  emit_word64((intptr_t) function_name, relocInfo::oop_type);
+  assert(offset() - start == 32 && (offset() & 7) == 0, "DLL cache layout");
+  call(entry, relocInfo::runtime_call_type);	// no alignment padding: the call is 8-byte aligned
+  assert(offset() - start == 32 + sizeOfCall, "DLL cache layout");
+}
+
+
 void MacroAssembler::store_check(Register obj, Register tmp) {
   // Does a store check for the oop in register obj. The content of
   // register obj is destroyed afterwards.

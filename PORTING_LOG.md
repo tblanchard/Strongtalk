@@ -301,6 +301,23 @@ Phases:
         this also fixes a 64-bit bug: the x86 layout wrote an 8-byte char* into a 4-byte field (overwrote the
         state and the next entry; the last entry overran its allocation).
         Note: under lldb, writes outside scopes stop the debugger (EXC_BAD_ACCESS) before the VM handler runs.
+  - [x] C2b code patterns read/patched by the runtime (arm64 versions under STRONGTALK_ARM64):
+        - NativeCall (addressed by return address): literal at -8 holds the destination; set_destination is an
+          aligned 8-byte store; nativeCall_at skips an alignment nop; verify checks adr/str/ldr/br.
+        - NativeTest/IC_Info: 32-bit data in movz/movk xzr immediates (NLR offset << 8 | flags).
+        - native_code_write_word/insn: patching within JITWriteScopes (+ icache flush for instructions).
+        - CompiledDLL_Cache: fixed layout before an 8-aligned call (ldr x2 entry; b; entry; dll_name; function_name);
+          emitted by MacroAssembler::call_DLL_cache (DLLNode::gen must use it in C3).
+        - Relocations: only internal_word is position dependent (64-bit words); offsets stored in 4-byte units
+          (32KB between relocations; overflow is fatal); CodeBuffer::copyTo pads with nop; relocInfo::print.
+        - PICs/MICs: header ldr x16, stub / adr x17, data / br x16 / nop / stub address; PIC data: count, then
+          (klass, target) pairs (target = nmethod verified entry point or methodOop, by tag; smis have klass
+          smiKlassObj); MIC data: selector. PIC_Iterator rewritten (no at_smi_nmethod state on arm64); entry updates
+          are atomic word stores; PIC construction and oops_do in write scopes. The PIC stub routine (C2c) scans
+          the pairs. Write scopes also for zone::oops_do/switch_pointers and nmethod::oops_do (GC updates oops).
+        - generate_continue_NLR / generate_PIC_stub are Unimplemented on arm64 until C2c.
+        Tests: +TestArm64Assembler (89131 checks; patched calls executed, IC info, DLL cache incl. edx, reloc
+        offsets); +TestArm64Runtime (after the image is loaded): PIC layout, iteration, updates, oops_do, find.
 - [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
 - [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).

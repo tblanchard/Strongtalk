@@ -54,6 +54,13 @@ int main(int argc, char* argv[]) {
     bootstrapping = false; 
   }
 
+#ifdef STRONGTALK_ARM64
+  if (TestArm64Runtime) {		// needs the code zone and the image
+    extern bool PIC_arm64_test();	// compiledPIC.cpp
+    exit(PIC_arm64_test() ? 0 : 1);
+  }
+#endif
+
   if (UseInliningDatabase) 
     InliningDatabase::load_index_file();
 
