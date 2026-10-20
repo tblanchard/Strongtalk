@@ -55,9 +55,18 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 # define CODE_GENERATION_INIT_DO(template)
 #endif
 
+// +TestArm64Assembler: runs the assembler tests (they need the fault handlers of os_init) and exits
+#ifdef STRONGTALK_ARM64
+# define ARM64_TEST_INIT_DO(template) template(arm64_test_init)
+void arm64_test_init() { if (TestArm64Assembler) exit(arm64_assembler_test() ? 0 : 1); }
+#else
+# define ARM64_TEST_INIT_DO(template)
+#endif
+
 # define INIT_DO(template)		\
   template(ostream_init)		\
   template(os_init)		    	\
+  ARM64_TEST_INIT_DO(template)		\
   template(prim_init)			\
   template(eventlog_init)		\
   template(integerOps_init)		\
@@ -97,9 +106,6 @@ EXIT_DO(DEFINE_TEMPLATE)
 
 void init_globals() {
   ResourceMark rm;
-#ifdef STRONGTALK_ARM64
-  if (TestArm64Assembler) exit(arm64_assembler_test() ? 0 : 1);
-#endif
   INIT_DO(CALL_TEMPLATE)
 #ifdef DELTA_COMPILER
   COMPILER_INIT_DO(CALL_TEMPLATE)

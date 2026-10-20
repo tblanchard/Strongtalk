@@ -38,9 +38,14 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 class StubRoutines: AllStatic {
  private:
+#ifdef STRONGTALK_ARM64
+  enum { _code_size = 64 * 1024 };		// arm64 code is less dense; allocated as code memory
+  static char* _code;				// the code buffer for the stub routines
+#else
   enum { _code_size = 2000 };			// simply increase if too small (assembler will crash if too small)
-  static bool _is_initialized;			// true if StubRoutines has been initialized
   static char _code[_code_size];		// the code buffer for the stub routines
+#endif
+  static bool _is_initialized;			// true if StubRoutines has been initialized
 
   // add entry points here
   static char* _ic_normal_lookup_entry;

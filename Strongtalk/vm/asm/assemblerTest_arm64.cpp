@@ -48,6 +48,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "process.hpp"
 #include "smiOop.hpp"
 #include "rSet.hpp"
+#include "longInt.hpp"
+#include "os.hpp"
 #include "assemblerTest_arm64.hpp"
 #include <sys/mman.h>
 #include <pthread.h>
@@ -66,16 +68,16 @@ const  int   jit_size   = 1 << 20;
 const  int   scratch_size = 64 * 1024;	// the first part of the memory is reused for each test function
 
 static void copy_to_jit(char* p, char* code, int size) {
-  pthread_jit_write_protect_np(0);
-  memcpy(p, code, size);
-  pthread_jit_write_protect_np(1);
-  sys_icache_invalidate(p, size);
+  { JITWriteScope write_code;
+    memcpy(p, code, size);
+  }
+  os::flush_icache(p, size);
 }
 
 static void init_jit_memory() {
   if (jit_memory == NULL) {
-    jit_memory = (char*) mmap(NULL, jit_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
-    if (jit_memory == (char*) MAP_FAILED) fatal("cannot allocate JIT memory");
+    jit_memory = os::allocate_code_memory(jit_size);
+    if (jit_memory == NULL) fatal("cannot allocate JIT memory");
     jit_used = scratch_size;
   }
 }
@@ -645,9 +647,38 @@ static void test_fpu() {
 }
 
 
+// Code memory: writes in a JITWriteScope, and writes/executions outside of one that are
+// handled by the fault handler switching the thread's mode.
+typedef intptr_t (*Fn0)();
+
+static void test_code_memory() {
+  init_jit_memory();
+  char* p = install(NULL, 0);	// a fresh slot
+  p = (char*) (((intptr_t) p + 15) & ~15);
+  insn ret7[] = { movz(0, 7, 0), a64::ret() };
+  insn ret9[] = { movz(0, 9, 0), a64::ret() };
+  { JITWriteScope w; memcpy(p, ret7, sizeof ret7); }
+  os::flush_icache(p, sizeof ret7);
+  check_eq("code memory: written in scope, executed", ((Fn0) p)(), 7);
+  int faults = os::jit_mode_faults();
+  memcpy(p, ret9, sizeof ret9);		// outside a scope: write fault switches to writing
+  os::flush_icache(p, sizeof ret9);
+  check_eq("code memory: written without scope, executed", ((Fn0) p)(), 9);	// fetch fault switches back
+  check_eq("code memory: mode faults", os::jit_mode_faults() - faults, 2);
+  // a nested scope keeps the thread writing until the outermost scope ends
+  { JITWriteScope a; { JITWriteScope b; memcpy(p, ret7, sizeof ret7); } p[64] = 1; }
+  os::flush_icache(p, sizeof ret7);
+  check_eq("code memory: nested scopes", ((Fn0) p)(), 7);
+  check_eq("code memory: no faults with scopes", os::jit_mode_faults() - faults, 2);
+  check_eq("code memory: is_code_memory", os::is_code_memory(p), 1);
+  check_eq("code memory: heap is not code memory", os::is_code_memory(&failures), 0);
+}
+
+
 bool arm64_assembler_test() {
   ResourceMark rm;
   lprintf("arm64 assembler test\n");
+  test_code_memory();     lprintf("  code memory: %d checks\n", checks);
   test_immediates();      lprintf("  immediates: %d checks\n", checks);
   test_arithmetic();      lprintf("  arithmetic: %d checks\n", checks);
   test_shifts();          lprintf("  shifts: %d checks\n", checks);

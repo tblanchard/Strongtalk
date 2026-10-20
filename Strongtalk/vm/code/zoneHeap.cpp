@@ -321,7 +321,12 @@ Heap::Heap(int s, int bs) {
   log2BS = 0;
   while (bs > 1) { bs >>= 1; log2BS++; }
   nfree = 30;
+#ifdef STRONGTALK_ARM64
+  _base = os::allocate_code_memory(size + blockSize);	// nmethods and PICs are executed in place
+  if (_base == NULL) fatal("cannot allocate code memory for the zone");
+#else
   _base = AllocateHeap(size + blockSize, "zone");
+#endif
   base = (char*)(((long)_base + blockSize - 1) / blockSize * blockSize);
   assert((long)base % blockSize == 0, "base not aligned to blockSize");
   heapKlass = (ChunkKlass*)(AllocateHeap(mapSize() + 2, "zone free map") + 1);
@@ -333,6 +338,7 @@ Heap::Heap(int s, int bs) {
 }
 
 void Heap::clear() {
+  JITWriteScope write_code;	// the free lists live in the (code memory) heap
   // initialize the statistics
   bytesUsed = 0;
   total     = 0;
@@ -431,6 +437,7 @@ void* Heap::allocFromLists(int wantedBytes) {
 }
 
 void* Heap::allocate(int wantedBytes) {
+  JITWriteScope write_code;	// the free lists live in the (code memory) heap
   assert(wantedBytes > 0, "Heap::allocate: size <= 0");
   int rounded = ((wantedBytes + blockSize - 1) >> log2BS) << log2BS;
   
@@ -448,6 +455,7 @@ void* Heap::allocate(int wantedBytes) {
 
 
 void Heap::deallocate(void* p, int bytes) {
+  JITWriteScope write_code;	// the free lists live in the (code memory) heap
   ChunkKlass* m = mapAddr(p);
   int myChunkSize = m->size();
   int blockedBytes = myChunkSize << log2BS;
@@ -466,6 +474,7 @@ void Heap::deallocate(void* p, int bytes) {
 # define INC(p, n)   p = asChunkKlass(p->asByte() + n)
 
 char* Heap::compact(void move(char* from, char* to, int nbytes)) {
+  JITWriteScope write_code;	// the free lists live in the (code memory) heap
   if (usedBytes() == capacity()) return NULL;
   
   ChunkKlass* m = heapKlass;
@@ -543,6 +552,7 @@ int Heap::combine(HeapChunk*& c) {
 
 // Try to combine adjacent free chunks; return size of biggest chunk (in blks).
 int Heap::combineAll() {
+  JITWriteScope write_code;	// the free lists live in the (code memory) heap
   int biggest = 0;
   for (int i = 0; i < nfree; i++) {
     HeapChunk* f = freeList[i].anchor();

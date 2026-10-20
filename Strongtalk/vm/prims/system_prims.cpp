@@ -373,6 +373,7 @@ PRIM_DECL_0(systemPrimitives::smalltalk_array) {
 
 PRIM_DECL_0(systemPrimitives::quit) {
   PROLOGUE_0("quit");
+  if (PrintJITModeFaults) lprintf("code memory mode switches by faults: %d\n", os::jit_mode_faults());
   if (VerifyFileOut) methodOopDesc::verify_fileout_all();
   exit(0);
   return badOop;

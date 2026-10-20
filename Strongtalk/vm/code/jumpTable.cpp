@@ -96,7 +96,13 @@ static const char jump_instruction = '\xE9';
 
 
 char* jumpTable::allocate_jump_entries(int size) {
+#ifdef STRONGTALK_ARM64
+  char* entries = os::allocate_code_memory(size * jumpTableEntry::size());	// entries are executed
+  if (entries == NULL) fatal("cannot allocate code memory for the jump table");
+  return entries;
+#else
   return AllocateHeap(size * jumpTableEntry::size(), "jump table");
+#endif
 }
 
 jumpTableEntry* jumpTable::jump_entry_for_at(char* entries, int index) {
@@ -227,6 +233,40 @@ inline jumpTableEntry* jumpTableEntry::previous_stub() const {
 inline jumpTableEntry* jumpTableEntry::next_stub() const {
   return (jumpTableEntry*) (((char*) this) + size());
 }
+#ifdef STRONGTALK_ARM64
+
+// arm64: the entry is code (ldr x16, destination; br x16) followed by an absolute destination
+static const a64::insn arm64_jump_insns[2] = { a64::ldr_literal(16, jumpTableEntry::arm64_destination_offset), a64::br(16) };
+static const a64::insn arm64_halt_insns[2] = { a64::brk(0xF000), a64::brk(0xF000) };
+
+void jumpTableEntry::fill_entry(char instr, char* dest, char state) {
+  JITWriteScope write_code;
+  const a64::insn* insns = instr == jump_instruction ? arm64_jump_insns : arm64_halt_insns;
+  ((a64::insn*) jump_inst_addr())[0] = insns[0];
+  ((a64::insn*) jump_inst_addr())[1] = insns[1];
+  *destination_addr() = dest;
+  *state_addr()       = state;
+  os::flush_icache(jump_inst_addr(), 2 * sizeof(a64::insn));
+}
+
+void jumpTableEntry::initialize_as_unused(int index) {
+  fill_entry(halt_instruction, (char*) (intptr_t) index, unused_entry);
+}
+
+void jumpTableEntry::initialize_as_link(char* link) {
+  fill_entry(halt_instruction, link, link_entry);
+}
+
+void jumpTableEntry::initialize_nmethod_stub(char* dest) {
+  fill_entry(jump_instruction, dest, nmethod_entry);
+}
+
+void jumpTableEntry::initialize_block_closure_stub() {
+  fill_entry(jump_instruction, StubRoutines::compile_block_entry(), block_closure_entry);
+}
+
+#else
+
 void jumpTableEntry::fill_entry(char instr, char* dest, char state) {
   *jump_inst_addr()   = instr;
   *destination_addr() = dest;
@@ -251,6 +291,8 @@ void jumpTableEntry::initialize_block_closure_stub() {
              block_closure_entry);
 }
 
+#endif // STRONGTALK_ARM64
+
 bool jumpTableEntry::is_nmethod_stub() const { 
   return state() == nmethod_entry;
 }
@@ -271,6 +313,28 @@ char* jumpTableEntry::link() const {
   return *destination_addr();
 }
 
+#ifdef STRONGTALK_ARM64
+
+char** jumpTableEntry::destination_addr() const { 
+  return (char**) (((char*) this) + arm64_destination_offset);
+}
+
+char* jumpTableEntry::destination() const {
+  return *destination_addr();
+}
+
+void jumpTableEntry::set_destination(char* dest) {
+  JITWriteScope write_code;
+  *destination_addr() = dest;		// an aligned word: atomic for threads running the entry
+}
+
+int jumpTableEntry::next_free() const {
+  assert(is_unused(), "must be a unused entry");
+  return (int) (intptr_t) *destination_addr();
+}
+
+#else
+
 char** jumpTableEntry::destination_addr() const { 
   return (char**) (((char*) this) + sizeof(char));
 }
@@ -287,6 +351,8 @@ int jumpTableEntry::next_free() const {
   assert(is_unused(), "must be a unused entry");
   return x86_imm32(*destination_addr());
 }
+
+#endif // STRONGTALK_ARM64
 
 nmethod* jumpTableEntry::method() const {
   assert(is_nmethod_stub(), "must be a nmethod_stub");

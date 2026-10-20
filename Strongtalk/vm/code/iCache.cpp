@@ -37,14 +37,20 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "tag.hpp"
 #include "top.hpp"
 #include "iCache.hpp"
+#include "os.hpp"
 # ifdef DELTA_COMPILER
 
 
 // On the x86, the I cache is consistent after the next branch or call,
 // so don't need to do any flushing.
 
+#ifdef STRONGTALK_ARM64
+// arm64: instruction caches are not coherent with data writes
+  void flushICacheWord(void* addr) { os::flush_icache(addr, 4); }
+  void flushICacheRange(void* start, void* end) { os::flush_icache(start, (char*) end - (char*) start); }
+#else
   void flushICacheWord(void* addr) { }
-
   void flushICacheRange(void* start, void* end) { }
+#endif
 
 # endif

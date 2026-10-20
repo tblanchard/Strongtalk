@@ -45,6 +45,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include <sys/resource.h>
 #include <mach/mach.h>
 #include <mach/mach_time.h>
+#include <libkern/OSCacheControl.h>
 
 // ---------------------------------------------------------------------------
 // Threads and events
@@ -449,8 +450,88 @@ static const char* signal_name(int sig) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Code memory (MAP_JIT): per thread, code memory is either writable or executable.
+
+static const int max_code_areas = 32;
+static char* code_area_start[max_code_areas];
+static char* code_area_end[max_code_areas];
+static int   nof_code_areas = 0;
+static volatile int jit_faults = 0;
+static thread_local int jit_write_depth = 0;
+
+char* os::allocate_code_memory(int size) {
+  ThreadCritical tc;
+  if (nof_code_areas == max_code_areas) fatal("too many code areas");
+  void* p = mmap(NULL, (size_t) size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
+  if (p == MAP_FAILED) return NULL;
+  code_area_start[nof_code_areas] = (char*) p;
+  code_area_end[nof_code_areas]   = (char*) p + size;
+  nof_code_areas++;
+  return (char*) p;
+}
+
+bool os::is_code_memory(const void* addr) {
+  for (int i = 0; i < nof_code_areas; i++) {
+    if (code_area_start[i] <= (char*) addr && (char*) addr < code_area_end[i]) return true;
+  }
+  return false;
+}
+
+void os::jit_write_begin() {
+  if (jit_write_depth++ == 0) pthread_jit_write_protect_np(0);
+}
+
+void os::jit_write_end() {
+  if (--jit_write_depth == 0) pthread_jit_write_protect_np(1);
+}
+
+int os::jit_mode_faults() {
+  return jit_faults;
+}
+
+void os::flush_icache(void* start, int size) {
+  sys_icache_invalidate(start, (size_t) size);
+}
+
+// Switches the thread between writing and executing code memory if the fault is
+// caused by the current mode; returns false for other faults.
+static bool handle_jit_mode_fault(siginfo_t* info, void* context) {
+#if defined(__arm64__) || defined(__aarch64__)
+  static thread_local char* last_addr = NULL;
+  static thread_local char* last_pc   = NULL;
+  char* addr = (char*) info->si_addr;
+  if (!os::is_code_memory(addr)) return false;
+  ucontext_t* uc = (ucontext_t*) context;
+  char* pc = (char*) arm_thread_state64_get_pc(uc->uc_mcontext->__ss);
+  if (addr == last_addr && pc == last_pc) {	// switching did not help: a real fault
+    last_addr = last_pc = NULL;
+    return false;
+  }
+  last_addr = addr;
+  last_pc   = pc;
+  jit_faults++;
+  pthread_jit_write_protect_np(pc == addr ? 1 : 0);	// fetch: execute; data access: write
+  return true;
+#else
+  return false;
+#endif
+}
+
 static void fault_handler(int sig, siginfo_t* info, void* context) {
+  if ((sig == SIGBUS || sig == SIGSEGV) && handle_jit_mode_fault(info, context)) return;
   lprintf("Exception caught \"%s\" at address %p.\n", signal_name(sig), info->si_addr);
+#if defined(__arm64__) || defined(__aarch64__)
+  { void* pc = (void*) arm_thread_state64_get_pc(((ucontext_t*) context)->uc_mcontext->__ss);
+    Dl_info di;
+    if (dladdr(pc, &di) && di.dli_sname != NULL) {
+      lprintf("  pc = %p (%s + %ld)%s\n", pc, di.dli_sname, (long) ((char*) pc - (char*) di.dli_saddr),
+              os::is_code_memory(info->si_addr) ? ", address is in code memory" : "");
+    } else {
+      lprintf("  pc = %p%s\n", pc, os::is_code_memory(info->si_addr) ? ", address is in code memory" : "");
+    }
+  }
+#endif
   report_vm_state();
 
   if (os::message_box("Exception caught", "Do you want a stack trace?")) {

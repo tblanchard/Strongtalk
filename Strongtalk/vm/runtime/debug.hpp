@@ -134,6 +134,7 @@ class debugFlags {
   develop(TraceBytecodes                     , false, "Trace byte code execution"                                                   ) \
   develop(TraceAllocation                    , false, "Trace allocation"                                                            ) \
   develop(TraceBootstrap                     , false, "Trace the bootstrap readin"                                                  ) \
+  develop(PrintJITModeFaults                 , false, "Print the number of code memory mode switches by faults at exit"          ) \
   develop(TestArm64Assembler                 , false, "Run the arm64 assembler tests at startup and exit"                         ) \
   develop(VerifyFileOut                      , false, "Verify the file out form of all methods when quitting"                      ) \
   develop(TraceMethodPrims                   , false, "Trace method prims"                                                          ) \

@@ -287,7 +287,21 @@ Phases:
       - Notes for C2/C3: movl to 32-bit int fields must use 32-bit stores (all movl are 64-bit); call(entry, rtype)
         is the Delta convention - calls of C functions (primitives, DLLs) must use call_C / call_native; idivl
         expects edx = sign extension of eax (64-bit cdq); x86_imm32() callers must pass full words.
-- [ ] C2 runtime glue: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
+- [ ] C2 runtime glue (sub-steps, one commit each):
+  - [x] C2a code memory. macOS arm64 has no RWX memory: MAP_JIT memory is, per thread, either writable or
+        executable (pthread_jit_write_protect_np), probed in /tmp/jitt. os::allocate_code_memory (MAP_JIT),
+        JITWriteScope (nestable per thread), os::flush_icache (sys_icache_invalidate; flushICacheWord/Range).
+        Safety net: the fault handler switches the thread's mode on a write fault / instruction fetch fault in
+        code memory (state survives sigreturn; ~4us per round trip vs 38ns explicit); a fault repeating at the
+        same pc/address is reported as a real fault. +PrintJITModeFaults reports the count at exit (0 in the
+        benchmarks). Crash reports now show the pc as symbol + offset.
+        Code memory: zone heap (nmethods, PICs), jump table, stub routines (64KB on arm64). Write scopes: nmethod
+        creation, zone heap operations (free lists live in the heap), jump table entries, stub generation.
+        Jump table entries on arm64: [ldr x16,#8][br x16][destination 8][state] = 24 bytes (unused/link: brk);
+        this also fixes a 64-bit bug: the x86 layout wrote an 8-byte char* into a 4-byte field (overwrote the
+        state and the next entry; the last entry overran its allocation).
+        Note: under lldb, writes outside scopes stop the debugger (EXC_BAD_ACCESS) before the VM handler runs.
+- [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
 - [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).
 - [ ] C4 enable recompilation; deoptimization; benchmarks + interpreter-vs-compiled result comparison.

@@ -898,7 +898,11 @@ char* StubRoutines::allocate_entry(int size) {
 // Initialization
 
 bool StubRoutines::_is_initialized = false;
+#ifdef STRONGTALK_ARM64
+char* StubRoutines::_code = NULL;
+#else
 char StubRoutines::_code[StubRoutines::_code_size];
+#endif
 
 char* StubRoutines::generate(MacroAssembler* masm, char* title, char* gen(MacroAssembler*)) {
   char* old_pc = masm->pc();
@@ -932,6 +936,11 @@ void StubRoutines::init() {
   if (_is_initialized) return;
 
   ResourceMark rm;
+#ifdef STRONGTALK_ARM64
+  if (_code == NULL) _code = os::allocate_code_memory(_code_size);
+  if (_code == NULL) fatal("cannot allocate code memory for the stub routines");
+  JITWriteScope write_code;	// the stubs are generated in place
+#endif
   CodeBuffer* code = new CodeBuffer(_code, _code_size);
   MacroAssembler* masm = new MacroAssembler(code);
 
@@ -963,6 +972,9 @@ void StubRoutines::init() {
   }
 
   masm->finalize();
+#ifdef STRONGTALK_ARM64
+  os::flush_icache(_code, masm->offset());
+#endif
   _is_initialized = true;
   if (!Disclaimer::is_product() && PrintStubRoutines) {
     stdOut->print("%d bytes generated for stub routines\n", masm->offset());

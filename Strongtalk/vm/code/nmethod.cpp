@@ -148,6 +148,7 @@ nmethod* new_nmethod(Compiler* c) {
   location_length       = roundTo(c->code()->reloc_size(),        oopSize);
   scope_length          = roundTo(c->scopeDescRecorder()->size(), oopSize);
   nof_noninlined_blocks = c->number_of_noninlined_blocks();
+  JITWriteScope write_code;	// the nmethod is built in code memory
   nmethod* nm = new nmethod(c);
   if (c->is_method_compile()) {
     Universe::code->addToCodeTable(nm);

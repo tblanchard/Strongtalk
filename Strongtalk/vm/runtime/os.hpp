@@ -67,6 +67,17 @@ class os {
 
   // OS interface to Virtual Memory
   static int   vm_page_size() { return _vm_page_size; }
+  // Executable memory for generated code. On Apple Silicon a thread can either write
+  // or execute code memory (MAP_JIT): use JITWriteScope around writes; writes outside
+  // a scope (and the execution that follows them) are handled by the fault handler,
+  // which switches the thread's mode (slow, counted in jit_mode_faults()).
+  static char* allocate_code_memory(int size);
+  static bool  is_code_memory(const void* addr);
+  static void  jit_write_begin();		// nestable, per thread
+  static void  jit_write_end();
+  static int   jit_mode_faults();
+  static void  flush_icache(void* start, int size);
+
   static char* reserve_memory(int size);
   static bool  commit_memory(char* addr, int size);
   static bool  uncommit_memory(char* addr, int size);
@@ -109,6 +120,13 @@ class os {
   static dll_func dll_lookup(const char* name, DLL* library);
   static DLL*     dll_load(const char* name);
   static bool     dll_unload(DLL* library);
+};
+
+// Makes code memory writable (and not executable) for the current thread during its lifetime.
+class JITWriteScope {
+ public:
+  JITWriteScope()  { os::jit_write_begin(); }
+  ~JITWriteScope() { os::jit_write_end(); }
 };
 
 // A critial region for controling thread transfer at
