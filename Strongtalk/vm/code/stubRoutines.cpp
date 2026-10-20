@@ -349,7 +349,7 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   Label is_smi, probe_primary_cache, probe_secondary_cache, call_method, is_methodOop, do_lookup;
 
   masm->bind(is_smi);				// smi case (assumed to be infrequent)
-  masm->movl(ecx, Address(x86_imm32(&smiKlassObj), relocInfo::external_word_type));
+  masm->movl(ecx, Address(asm_word(&smiKlassObj), relocInfo::external_word_type));
   masm->jmp(probe_primary_cache);
 
   // eax    : receiver
@@ -394,7 +394,7 @@ char* StubRoutines::generate_megamorphic_ic(MacroAssembler* masm) {
   // call methodOop - setup registers
   masm->bind(is_methodOop);
   masm->xorl(ebx, ebx);				// clear ebx for interpreter
-  masm->movl(edx, Address((x86_imm32(&method_entry_point)), relocInfo::external_word_type));
+  masm->movl(edx, Address((asm_word(&method_entry_point)), relocInfo::external_word_type));
   // (Note: cannot use value in method_entry_point directly since interpreter is generated afterwards)
   //
   // eax: receiver
@@ -486,8 +486,18 @@ char* StubRoutines::generate_compile_block(MacroAssembler* masm) {
 
 #ifdef STRONGTALK_ARM64
 char* StubRoutines::generate_continue_NLR(MacroAssembler* masm) {
-  Unimplemented();	// arm64 version: phase C2c
-  return NULL;
+// Entry point jumped to from compiled code. Initiates (or continues an ongoing) NLR:
+// returns to the NLR target given by the IC info at the return address.
+  Register ret_addr = temp1;
+  Register offset   = temp2;
+
+  char* entry_point = masm->pc();
+  masm->leave();						// remove stack frame
+  masm->popl(ret_addr);						// get (local) return address (points to the IC info)
+  masm->load_ic_info_nlr_offset(offset, ret_addr);
+  masm->leal(ret_addr, Address(ret_addr, offset, Address::times_1));	// compute non-local return address
+  masm->jmp(ret_addr);						// do NLR
+  return entry_point;
 }
 #else
 char* StubRoutines::generate_continue_NLR(MacroAssembler* masm) {
@@ -817,8 +827,58 @@ char* StubRoutines::generate_call_inspector(MacroAssembler* masm) {
 
 #ifdef STRONGTALK_ARM64
 char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
-  Unimplemented();	// arm64 version: phase C2c
-  return NULL;
+// Jumped to from a PIC (see the arm64 layout in compiledPIC.cpp) with x17 = PIC data:
+// the number of entries, followed by (klass, target) pairs. The target is the verified
+// entry point of an nmethod, or a methodOop which is called through the interpreter.
+// The stub is the same for all PIC sizes (pic_size is unused).
+//
+// eax: receiver
+// x17: PIC data
+// tos: return address of polymorphic send in compiled code
+//
+// Note: Don't use this for polymorphic super sends!
+  Label found, loop, have_klass, miss, interpreted;
+
+  char* entry_point = masm->pc();
+  masm->emit(a64::mov_reg(19, 17));		// ebx := PIC data
+  masm->movl(edx, Address(asm_word(&smiKlassObj), relocInfo::external_word_type));
+  masm->test(eax, Mem_Tag);			// check if smi
+  masm->jcc(Assembler::zero, have_klass);
+  masm->movl(edx, Address(eax, memOopDesc::klass_byte_offset()));	// otherwise, load receiver class
+  masm->bind(have_klass);
+  masm->movl(ecx, Address(ebx, PIC::PIC_count_offset - PIC::PIC_count_offset));	// number of entries
+  masm->addl(ebx, PIC::PIC_entries_offset - PIC::PIC_count_offset);
+
+  // eax: receiver, ebx: current entry, ecx: remaining entries, edx: receiver klass
+  masm->bind(loop);
+  masm->testl(ecx, ecx);
+  masm->jcc(Assembler::zero, miss);
+  masm->cmpl(edx, Address(ebx, PIC::PIC_klass_offset));
+  masm->jcc(Assembler::equal, found);
+  masm->addl(ebx, PIC::PIC_entry_size);
+  masm->decl(ecx);
+  masm->jmp(loop);
+
+  // found: nmethod entry point or methodOop
+  masm->bind(found);
+  masm->movl(ecx, Address(ebx, PIC::PIC_target_offset));
+  masm->test(ecx, Mem_Tag);
+  masm->jcc(Assembler::notZero, interpreted);
+  masm->jmp(ecx);				// compiled: jump to the verified entry point
+
+  // eax: receiver
+  // ebx: 000000xx
+  // ecx: methodOop
+  masm->bind(interpreted);
+  masm->movl(edx, Address(asm_word(&method_entry_point), relocInfo::external_word_type));
+  masm->xorl(ebx, ebx);
+  masm->jmp(edx);
+
+  masm->bind(miss);
+  assert(ic_normal_lookup_entry() != NULL, "ic_normal_lookup_entry must be generated before");
+  masm->jmp(ic_normal_lookup_entry(), relocInfo::runtime_call_type);
+
+  return entry_point;
 }
 #else
 char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
@@ -848,7 +908,7 @@ char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
   // edx: receiver klass
   // tos: return address of polymorphic send in compiled code
   masm->bind(found);
-  masm->movl(edx, Address(x86_imm32(&method_entry_point), relocInfo::external_word_type));
+  masm->movl(edx, Address(asm_word(&method_entry_point), relocInfo::external_word_type));
   // (Note: cannot use value in method_entry_point directly since interpreter is generated afterwards)
   masm->xorl(ebx, ebx);
   // eax: receiver
@@ -862,7 +922,7 @@ char* StubRoutines::generate_PIC_stub(MacroAssembler* masm, int pic_size) {
   // tos + 8: last argument/receiver
   char* entry_point = masm->pc();
   masm->popl(ebx);				// get return address (PIC table pointer)
-  masm->movl(edx, Address(x86_imm32(&smiKlassObj), relocInfo::external_word_type));
+  masm->movl(edx, Address(asm_word(&smiKlassObj), relocInfo::external_word_type));
   masm->test(eax, Mem_Tag);			// check if smi
   masm->jcc(Assembler::zero, loop);		// if so, class is already in ecx
   masm->movl(edx, Address(eax, memOopDesc::klass_byte_offset()));	// otherwise, load receiver class
@@ -996,6 +1056,56 @@ void StubRoutines::init() {
   }
 };
 
+
+#ifdef STRONGTALK_ARM64
+
+// +TestArm64Runtime: executes stub routines that do not need compiled code.
+bool StubRoutines_arm64_test() {
+  ResourceMark rm;
+  int failures = 0;
+  char* code = os::allocate_code_memory(4096);
+  {
+    JITWriteScope write_code;
+    // f(eax, delta_stack): calls a callee that does an NLR via continue_NLR; the NLR target
+    // returns eax + 1000 and esp (relative to the Delta stack) in the test's result
+    CodeBuffer cb(code, 4096);
+    MacroAssembler m(&cb);
+    Label callee, nlr_target, done;
+    m.emit(a64::sub_imm(a64::sp, a64::sp, 64));
+    int saved[] = { 19, 20, 21, 28, 29, 30 };
+    for (int i = 0; i < 6; i++) m.emit(a64::ldst_uimm(a64::STR, 3, saved[i], a64::sp, 8 * i));
+    m.emit(a64::mov_reg(28, 1));		// esp := the Delta stack
+    m.emit(a64::mov_reg(29, 1));
+    m.call(callee);
+    m.ic_info(nlr_target, 0);
+    m.movl(eax, -1);				// normal return: not taken
+    m.jmp(done);
+    m.bind(nlr_target);
+    m.addl(eax, 1000);
+    m.bind(done);
+    m.movl(ecx, esp);
+    m.subl(ecx, ebp);				// 0 if the Delta stack is balanced (esp back at its start)
+    m.addl(eax, ecx);
+    for (int i = 0; i < 6; i++) m.emit(a64::ldst_uimm(a64::LDR, 3, saved[i], a64::sp, 8 * i));
+    m.emit(a64::add_imm(a64::sp, a64::sp, 64));
+    m.emit(a64::ret());
+    // the callee: a compiled frame that starts an NLR
+    m.bind(callee);
+    m.enter();
+    m.pushl(eax);				// some frame contents
+    m.jmp(StubRoutines::continue_NLR_entry(), relocInfo::runtime_call_type);
+    m.finalize();
+  }
+  os::flush_icache(code, 4096);
+  typedef intptr_t (*F)(intptr_t eax, oop* stack);
+  static oop stack[64];
+  intptr_t r = ((F) code)(5, &stack[48]);
+  if (r != 1005) { failures++; lprintf("  FAILED continue_NLR: got %ld, expected 1005\n", (long) r); }
+  lprintf("StubRoutines arm64 test: %d failures\n", failures);
+  return failures == 0;
+}
+
+#endif // STRONGTALK_ARM64
 
 void stubRoutines_init() {
   StubRoutines::init();

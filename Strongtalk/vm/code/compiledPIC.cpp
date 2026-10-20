@@ -78,6 +78,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "nmethodScopes.hpp"
 #include "nmethod.hpp"
 #include "os.hpp"
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
 #include "dll.hpp"
 #include "stubRoutines.hpp"
 #include "klassOop.hpp"
@@ -1170,28 +1172,27 @@ bool PIC_arm64_test() {
   FirstMethods fm;
   Universe::object_iterate(&fm);
   if (fm.n < 3) { lprintf("  FAILED: no methods in the heap\n"); return false; }
-  methodOop m1 = fm.methods[0], m2 = fm.methods[1], m3 = fm.methods[2];
+  methodOop m1 = fm.methods[0], m3 = fm.methods[2];
   char* n0 = (char*) 0x10000, *n1 = (char*) 0x20000, *n2 = (char*) 0x30000;
   PIC_contents c;
   c.append_nmethod_entry(smiKlassObj, n0);
   c.append_nmethod_entry(k1, n1);
   c.append_nmethod_entry(k2, n2);
-  c.append_method(k3, m1);
-  c.append_method(k4, m2);
+  c.append_method(k3, m1);		// 4 entries (PIC::max_nof_entries)
   int size = c.code_size();
-  PIC_CHECK(size == PIC::PIC_entries_offset + 5 * PIC::PIC_entry_size, "PIC code size");
+  PIC_CHECK(size == PIC::PIC_entries_offset + 4 * PIC::PIC_entry_size, "PIC code size");
   PIC* pic = new (size) PIC((CompiledIC*) NULL, &c, size);
   PIC_CHECK(((intptr_t) pic->entry() & 7) == 0, "PIC entry alignment");
-  PIC_CHECK(pic->number_of_targets() == 5 && pic->is_polymorphic(), "PIC targets");
+  PIC_CHECK(pic->number_of_targets() == 4 && pic->is_polymorphic(), "PIC targets");
   a64::insn* code = (a64::insn*) pic->entry();
   PIC_CHECK(code[0] == a64::ldr_literal(16, 16) && code[1] == a64::adr(17, 20) && code[2] == a64::br(16), "PIC header");
-  if (StubRoutines::is_initialized()) PIC_CHECK(*(char**) (pic->entry() + PIC::PIC_stub_offset) == StubRoutines::PIC_stub_entry(5), "PIC stub");
+  if (StubRoutines::is_initialized()) PIC_CHECK(*(char**) (pic->entry() + PIC::PIC_stub_offset) == StubRoutines::PIC_stub_entry(4), "PIC stub");
   // iteration: smis, nmethods, methodOops
-  klassOop  klasses[] = { smiKlassObj, k1, k2, k3, k4 };
-  bool      compiled[] = { true, true, true, false, false };
-  char*     targets[] = { n0, n1, n2, (char*) m1, (char*) m2 };
+  klassOop  klasses[] = { smiKlassObj, k1, k2, k3 };
+  bool      compiled[] = { true, true, true, false };
+  char*     targets[] = { n0, n1, n2, (char*) m1 };
   PIC_Iterator it(pic);
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 4; i++) {
     PIC_CHECK(!it.at_end(), "PIC iterator ends early");
     if (it.at_end()) break;
     PIC_CHECK(it.get_klass() == klasses[i], "PIC entry klass");
@@ -1212,9 +1213,60 @@ bool PIC_arm64_test() {
   }
   pic_test_oops = 0;
   pic->oops_do(&count_pic_oop);
-  PIC_CHECK(pic_test_oops == 7, "PIC oops_do visits 5 klasses and 2 methodOops");
+  PIC_CHECK(pic_test_oops == 5, "PIC oops_do visits 4 klasses and 1 methodOop");
   PIC_CHECK(PIC::find(pic->entry() + 40) == pic, "PIC::find");
   delete pic;
+
+  // dispatch through the PIC stub routine: the targets are code returning 100 + their index
+  if (StubRoutines::is_initialized()) {
+    char* code = os::allocate_code_memory(16 * 1024);
+    char* targets[4];
+    PIC* dpic;
+    { JITWriteScope write_code;
+    for (int i = 0; i < 4; i++) {
+      CodeBuffer cb(code + i * 64, 64);
+      MacroAssembler m(&cb);
+      m.movl(eax, 100 + i);
+      m.ret(0);
+      targets[i] = code + i * 64;
+    }
+    PIC_contents d;
+    d.append_nmethod_entry(smiKlassObj, targets[0]);
+    d.append_nmethod_entry(k1, targets[1]);
+    d.append_nmethod_entry(k2, targets[2]);
+    d.append_nmethod_entry(k3, targets[3]);
+    int dsize = d.code_size();
+    dpic = new (dsize) PIC((CompiledIC*) NULL, &d, dsize);
+    // a C callable function: f(receiver, delta_stack) calls the PIC as a compiled send would
+    CodeBuffer cb(code + 1024, 1024);
+    MacroAssembler m(&cb);
+    m.emit(a64::sub_imm(a64::sp, a64::sp, 64));
+    int saved[] = { 19, 20, 21, 28, 29, 30 };
+    for (int i = 0; i < 6; i++) m.emit(a64::ldst_uimm(a64::STR, 3, saved[i], a64::sp, 8 * i));
+    m.emit(a64::mov_reg(28, 1));			// esp := the Delta stack
+    m.call(dpic->entry(), relocInfo::runtime_call_type);	// (this code buffer has no relocation information)
+    for (int i = 0; i < 6; i++) m.emit(a64::ldst_uimm(a64::LDR, 3, saved[i], a64::sp, 8 * i));
+    m.emit(a64::add_imm(a64::sp, a64::sp, 64));
+    m.emit(a64::ret());
+    }
+    os::flush_icache(code, 2048);
+    typedef intptr_t (*Caller)(oop receiver, oop* stack);
+    Caller f = (Caller) (code + 1024);
+    static oop stack[64];
+    PIC_CHECK(f(as_smiOop(17), &stack[48]) == 100, "PIC dispatch: smi");
+    PIC_CHECK(f(Universe::nilObj(), &stack[48]) == 101, "PIC dispatch: nil");
+    PIC_CHECK(f(Universe::trueObj(), &stack[48]) == 102, "PIC dispatch: true");
+    PIC_CHECK(f(Universe::falseObj(), &stack[48]) == 103, "PIC dispatch: false");
+    PIC_CHECK(*(char**) (dpic->entry() + PIC::PIC_stub_offset) == StubRoutines::PIC_stub_entry(4), "PIC stub address");
+    // retargeting an entry in place
+    { PIC_Iterator it(dpic);
+      it.advance();				// nil's entry
+      native_code_write_word((char*) (dpic->entry() + PIC::PIC_entries_offset + PIC::PIC_entry_size + PIC::PIC_target_offset), (intptr_t) targets[3]);
+    }
+    PIC_CHECK(f(Universe::nilObj(), &stack[48]) == 103, "PIC dispatch after retargeting");
+    delete dpic;
+    lprintf("PIC arm64 dispatch: executed\n");
+  }
   lprintf("PIC arm64 test: %d failures\n", failures);
   return failures == 0;
 #undef PIC_CHECK

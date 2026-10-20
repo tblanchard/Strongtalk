@@ -1388,6 +1388,18 @@ void MacroAssembler::call_C(char* entry, Register arg1, Register arg2, Register 
 }
 
 
+void MacroAssembler::load_ic_info_nlr_offset(Register dst, Register info) {
+  // info: movz xzr, #lo16; movk xzr, #hi16, lsl #16 -> data = hi16:lo16 = offset << number_of_flags | flags
+  emit(ldst_uimm(LDR, 2, S0, arm(info), 0));
+  emit(ldst_uimm(LDR, 2, S1, arm(info), 4));
+  emit(ubfm(S0, S0, 5, 20));			// lo16
+  emit(ubfm(S1, S1, 5, 20));			// hi16
+  emit(orr_reg(S0, S0, S1, LSL, 16));
+  emit(sxtw(S0, S0));				// the data is a signed 32-bit value
+  emit(asr_imm(arm(dst), S0, IC_Info::number_of_flags));
+}
+
+
 void MacroAssembler::call_DLL_cache(char* entry, char* function, oop dll_name, oop function_name) {
   // [ldr x2, #8] [b call] [entry point] [dll_name] [function_name] call:  (call 8-byte aligned)
   while ((offset() & 7) != 0) nop();

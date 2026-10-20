@@ -61,4 +61,15 @@ inline int32_t x86_imm32(const volatile void* p) { return x86_imm32((intptr_t) p
 template<class R, class... A> inline int32_t x86_imm32(R (*f)(A...))      { return x86_imm32((intptr_t) f); }
 template<class R, class... A> inline int32_t x86_imm32(R (*f)(A..., ...)) { return x86_imm32((intptr_t) f); }
 
+// A word (address, oop, ...) as an assembler operand: full words for the arm64 assembler,
+// checked 32-bit immediates for the x86 assembler.
+#ifdef STRONGTALK_ARM64
+inline intptr_t asm_word(intptr_t value) { return value; }
+#else
+inline intptr_t asm_word(intptr_t value) { return x86_imm32(value); }
+#endif
+inline intptr_t asm_word(const volatile void* p) { return asm_word((intptr_t) p); }
+template<class R, class... A> inline intptr_t asm_word(R (*f)(A...))      { return asm_word((intptr_t) f); }
+template<class R, class... A> inline intptr_t asm_word(R (*f)(A..., ...)) { return asm_word((intptr_t) f); }
+
 #endif // VM_TOPINCLUDES_PLATFORM_HPP

@@ -413,6 +413,9 @@ class MacroAssembler: public Assembler {
   void call_C(char* entry, Register arg1, Register arg2, Register arg3);
   void call_C(char* entry, Register arg1, Register arg2, Register arg3, Register arg4);
 
+  // dst := the NLR offset of the IC info at the address in info (see ic_info; dst may be info)
+  void load_ic_info_nlr_offset(Register dst, Register info);
+
   // DLL calls: emits a CompiledDLL_Cache (see dll.hpp) and the call of the DLL stub (entry)
   void call_DLL_cache(char* entry, char* function, oop dll_name, oop function_name);
 

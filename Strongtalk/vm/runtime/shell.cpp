@@ -56,8 +56,11 @@ int main(int argc, char* argv[]) {
 
 #ifdef STRONGTALK_ARM64
   if (TestArm64Runtime) {		// needs the code zone and the image
-    extern bool PIC_arm64_test();	// compiledPIC.cpp
-    exit(PIC_arm64_test() ? 0 : 1);
+    extern bool PIC_arm64_test();		// compiledPIC.cpp
+    extern bool StubRoutines_arm64_test();	// stubRoutines.cpp
+    bool ok = PIC_arm64_test();
+    ok = StubRoutines_arm64_test() && ok;
+    exit(ok ? 0 : 1);
   }
 #endif
 

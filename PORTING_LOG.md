@@ -315,9 +315,18 @@ Phases:
           smiKlassObj); MIC data: selector. PIC_Iterator rewritten (no at_smi_nmethod state on arm64); entry updates
           are atomic word stores; PIC construction and oops_do in write scopes. The PIC stub routine (C2c) scans
           the pairs. Write scopes also for zone::oops_do/switch_pointers and nmethod::oops_do (GC updates oops).
-        - generate_continue_NLR / generate_PIC_stub are Unimplemented on arm64 until C2c.
+        - [x] generate_continue_NLR (arm64): leave, pop the return address, NLR offset from its IC info
+              (MacroAssembler::load_ic_info_nlr_offset), jump. generate_PIC_stub (arm64, one stub for all sizes):
+              x17 = PIC data; receiver klass (smiKlassObj for smis); scan (klass, target); nmethod target: jump;
+              methodOop target: jump via method_entry_point with ecx = methodOop, ebx = 0 (x86 protocol; the
+              portable interpreter's entry is C2d); miss: ic_normal_lookup_entry.
+        - [x] stubRoutines_init runs on arm64 (all stubs generate: 3120 bytes); asm_word() replaces x86_imm32() in
+              stubRoutines.cpp (full words on arm64). Only the two stubs above are verified so far; the others are
+              the x86 generators run through the arm64 assembler and are reviewed in C2c.
         Tests: +TestArm64Assembler (89131 checks; patched calls executed, IC info, DLL cache incl. edx, reloc
-        offsets); +TestArm64Runtime (after the image is loaded): PIC layout, iteration, updates, oops_do, find.
+        offsets); +TestArm64Runtime (after the image is loaded): PIC layout, iteration, updates, oops_do, find,
+        PIC dispatch executed through the PIC stub (smi/nil/true/false, retargeting), continue_NLR executed
+        (reaches the NLR target with the Delta stack balanced).
 - [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
 - [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).

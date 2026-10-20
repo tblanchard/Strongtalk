@@ -51,6 +51,9 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 # define CODE_GENERATION_INIT_DO(template) \
   template(stubRoutines_init)		\
   template(interpreter_init)
+#elif defined(STRONGTALK_ARM64)
+# define CODE_GENERATION_INIT_DO(template) \
+  template(stubRoutines_init)		// the interpreter is portable C++ (portableInterpreter.cpp)
 #else
 # define CODE_GENERATION_INIT_DO(template)
 #endif
