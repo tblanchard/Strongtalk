@@ -141,6 +141,37 @@ static int scope_length;
 static int nof_noninlined_blocks;
 
 
+#ifdef STRONGTALK_ARM64
+// Counter cells: words in C heap memory, reused when nmethods are flushed.
+static int* free_counter_cells = NULL;		// linked through the cells (as int**)
+static int* pending_counter_cell = NULL;	// the cell of the current compilation
+
+static int* allocate_counter_cell() {
+  if (free_counter_cells == NULL) {
+    const int n = 1024;
+    intptr_t* block = NEW_C_HEAP_ARRAY(intptr_t, n);	// cells of one word (so they can hold the link)
+    for (int i = 0; i < n; i++) {
+      block[i] = (intptr_t) free_counter_cells;
+      free_counter_cells = (int*) &block[i];
+    }
+  }
+  int* cell = free_counter_cells;
+  free_counter_cells = (int*) *(intptr_t*) cell;
+  *(intptr_t*) cell = 0;
+  return cell;
+}
+
+static void release_counter_cell(int* cell) {
+  *(intptr_t*) cell = (intptr_t) free_counter_cells;
+  free_counter_cells = cell;
+}
+
+int* nmethod::counter_cell_for_compilation() {
+  if (pending_counter_cell == NULL) pending_counter_cell = allocate_counter_cell();
+  return pending_counter_cell;
+}
+#endif
+
 nmethod* new_nmethod(Compiler* c) {
   // This grossness is brought to you by the great way in which C++
   // handles non-standard allocation...
@@ -185,7 +216,11 @@ nmethod::nmethod(Compiler* c) : key(c->key->klass(), c->key->selector_or_method(
 
   _number_of_noninlined_blocks = nof_noninlined_blocks;
 
-  _invocation_count		= 0;
+#ifdef STRONGTALK_ARM64
+  _counter_cell			= counter_cell_for_compilation();
+  pending_counter_cell		= NULL;		// taken by this nmethod
+#endif
+  set_invocation_count(0);
   _uncommon_trap_counter	= 0;
   _number_of_links		= 0;
 
@@ -536,6 +571,9 @@ jumpTableEntry* nmethod::noninlined_block_jumpEntry_at(int noninlined_block_inde
 
 void nmethod::flush() {
   // completely deallocate this method
+#ifdef STRONGTALK_ARM64
+  release_counter_cell(_counter_cell);
+#endif
   EventMarker em("flushing nmethod %#lx %s", this, "");
   if (PrintMethodFlushing) {
     stdOut->print_cr("*flushing nmethod %#lx", this);

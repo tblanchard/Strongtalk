@@ -69,7 +69,13 @@ class nmethod : public OopNCode {
   uint16 _float_section_size;		// size of float section in words
   uint16 _float_section_start_offset;	// offset of float section relative to frame pointer (in oops)
 
+#ifdef STRONGTALK_ARM64
+  // The invocation counter is updated by the compiled code itself: on arm64 it is kept in ordinary
+  // memory (code memory is not writable while code executes, see os::allocate_code_memory).
+  int*	 _counter_cell;
+#else
   int	 _invocation_count;		// incremented for each nmethod invocation if CountExecution == true
+#endif
   int	 _uncommon_trap_counter;	// # of times uncommon traps have been executed
   nmFlags flags;			// various flags to keep track of nmethod state
 
@@ -290,8 +296,15 @@ class nmethod : public OopNCode {
 
  public:
   // Counting & Timing
+#ifdef STRONGTALK_ARM64
+  int invocation_count() const		{ return *_counter_cell; }
+  void set_invocation_count(int c)	{ *_counter_cell = c; }
+  // The counter cell of the nmethod being compiled (its address is in the generated code)
+  static int* counter_cell_for_compilation();
+#else
   int invocation_count() const		{ return _invocation_count; }
   void set_invocation_count(int c)	{ _invocation_count = c; }
+#endif
 
   // Perform a sweeper task
   void sweeper_step(double decay_factor);
@@ -299,7 +312,9 @@ class nmethod : public OopNCode {
   inline void decay_invocation_count(double decay_factor);
 
  public: 
+#ifndef STRONGTALK_ARM64
   static int invocationCountOffset()	{ return (long)&((nmethod*)0)->_invocation_count; }
+#endif
 
    // Support for preemption:
 

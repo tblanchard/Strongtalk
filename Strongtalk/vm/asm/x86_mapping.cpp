@@ -188,7 +188,7 @@ Location Mapping::floatTemporary(int scope_id, int i) {
   // base - 2: filler word - undefined
   // base - 3: (global) float 0 hi word
   // base - 4: (global) float 0 lo word
-  assert(floatSize == 2*oopSize, "check this code");
+  assert(floatSize % oopSize == 0, "check this code");	// x86: 2 words per float, 64-bit: 1
   Location loc = Location::stackLocation(first_float_offset - (scope->firstFloatIndex() + i)*(floatSize/oopSize));
   assert((loc.offset() * oopSize) % floatSize == 0, "offset is not correctly aligned");
   return loc;

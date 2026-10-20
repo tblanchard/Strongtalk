@@ -431,8 +431,15 @@ char* CodeGenerator::nmethodAddress() const {
 
 void CodeGenerator::incrementInvocationCounter() {
   // Generates code to increment the nmethod execution counter
+#ifdef STRONGTALK_ARM64
+  Address cell(asm_word(nmethod::counter_cell_for_compilation()), relocInfo::external_word_type);
+  _masm->movl32(temp1, cell);
+  _masm->incl(temp1);
+  _masm->movl32(cell, temp1);
+#else
   char* addr = nmethodAddress() + nmethod::invocationCountOffset();
   _masm->incl(Address(x86_imm32(addr), relocInfo::internal_word_type));
+#endif
 }
 
 
@@ -986,11 +993,19 @@ void CodeGenerator::aPrologueNode(PrologueNode* node) {
   // increment invocation counter & check for overflow (trigger recompilation)
   Label recompile_stub_call;
   if (RecompilationPolicy::needRecompileCounter(theCompiler)) {
+#ifdef STRONGTALK_ARM64
+    Address cell(asm_word(nmethod::counter_cell_for_compilation()), relocInfo::external_word_type);
+    _masm->movl32(temp1, cell);
+    _masm->incl(temp1);
+    _masm->cmpl(temp1, theCompiler->get_invocation_counter_limit());
+    _masm->movl32(cell, temp1);
+#else
     char* addr = nmethodAddress() + nmethod::invocationCountOffset();
     _masm->movl(temp1, Address(x86_imm32(addr), relocInfo::internal_word_type));
     _masm->incl(temp1);
     _masm->cmpl(temp1, theCompiler->get_invocation_counter_limit());
     _masm->movl(Address(x86_imm32(addr), relocInfo::internal_word_type), temp1);
+#endif
     _masm->jcc(Assembler::greaterEqual, recompile_stub_call);
     //
     // need to fix this:

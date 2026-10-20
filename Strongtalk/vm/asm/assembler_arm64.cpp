@@ -507,6 +507,8 @@ void Assembler::movl(Address dst, Register src) {
 }
 
 
+void Assembler::movl32(Register dst, Address src) { load(2, true, arm(dst), src); }
+void Assembler::movl32(Address dst, Register src) { store(2, arm(src), dst); }
 void Assembler::movsxb(Register dst, Address src) { load(0, true, arm(dst), src); }
 void Assembler::movsxb(Register dst, Register src) { emit(sxtb(arm(dst), arm(src))); }
 void Assembler::movsxw(Register dst, Address src) { load(1, true, arm(dst), src); }
@@ -576,7 +578,12 @@ void Assembler::addl(Address dst, int imm32) {
 
 
 void Assembler::addl(Register dst, int imm32) {
-  arith_imm(false, arm(dst), arm(dst), imm32, true);
+  addl(dst, (intptr_t) imm32);
+}
+
+
+void Assembler::addl(Register dst, intptr_t imm) {
+  arith_imm(false, arm(dst), arm(dst), imm, true);
 }
 
 
@@ -587,7 +594,12 @@ void Assembler::addl(Register dst, Register src) {
 
 
 void Assembler::andl(Register dst, int imm32) {
-  mov_imm(S0, imm32);
+  andl(dst, (intptr_t) imm32);
+}
+
+
+void Assembler::andl(Register dst, intptr_t imm) {
+  mov_imm(S0, imm);
   logical(0, arm(dst), arm(dst), S0);
 }
 
@@ -681,6 +693,11 @@ void Assembler::imull(Register dst, Register src) {
 
 
 void Assembler::imull(Register dst, Register src, int value) {
+  imull(dst, src, (intptr_t) value);
+}
+
+
+void Assembler::imull(Register dst, Register src, intptr_t value) {
   int d = arm(dst), s = arm(src);
   mov_imm(T0, value);
   emit(smulh(S0, s, T0));
@@ -735,7 +752,12 @@ void Assembler::notl(Register dst) {
 
 
 void Assembler::orl(Register dst, int imm32) {
-  mov_imm(S0, imm32);
+  orl(dst, (intptr_t) imm32);
+}
+
+
+void Assembler::orl(Register dst, intptr_t imm) {
+  mov_imm(S0, imm);
   logical(1, arm(dst), arm(dst), S0);
 }
 
@@ -834,7 +856,12 @@ void Assembler::shrl(Register dst) {
 
 
 void Assembler::subl(Register dst, int imm32) {
-  arith_imm(true, arm(dst), arm(dst), imm32, true);
+  subl(dst, (intptr_t) imm32);
+}
+
+
+void Assembler::subl(Register dst, intptr_t imm) {
+  arith_imm(true, arm(dst), arm(dst), imm, true);
 }
 
 
@@ -854,7 +881,12 @@ void Assembler::testb(Register dst, int imm8) {
 
 
 void Assembler::testl(Register dst, int imm32) {
-  mov_imm(S0, imm32);
+  testl(dst, (intptr_t) imm32);
+}
+
+
+void Assembler::testl(Register dst, intptr_t imm) {
+  mov_imm(S0, imm);
   emit(tst_reg(arm(dst), S0));
   set_flags(flags_logical);
 }
@@ -867,7 +899,12 @@ void Assembler::testl(Register dst, Register src) {
 
 
 void Assembler::xorl(Register dst, int imm32) {
-  mov_imm(S0, imm32);
+  xorl(dst, (intptr_t) imm32);
+}
+
+
+void Assembler::xorl(Register dst, intptr_t imm) {
+  mov_imm(S0, imm);
   logical(2, arm(dst), arm(dst), S0);
 }
 
@@ -1300,9 +1337,10 @@ void MacroAssembler::call_C(Label& L, Label& nlrTestPoint) {
 // C function would see them. As for an x86 call, the return address is stored below esp,
 // so the last Delta frame ends with a return address. C preserves ebx, esi, edi, esp, ebp
 // (x19, x20, x21, x28, x29) and clobbers eax, ecx, edx; the result is in eax (x0).
-void MacroAssembler::call_C_sequence(char* entry, int entry_reg, int nof_stack_args, Label* nlrTestPoint) {
+void MacroAssembler::call_C_sequence(char* entry, int entry_reg, int nof_stack_args, Label* nlrTestPoint,
+                                     relocInfo::relocType rtype, bool delta_frame) {
   assert(0 <= nof_stack_args && nof_stack_args <= 8, "too many C arguments");
-  set_last_Delta_frame_before_call();
+  if (delta_frame) set_last_Delta_frame_before_call();
   if (entry_reg >= 0 && entry_reg < nof_stack_args) {	// would be overwritten by an argument
     emit(mov_reg(S0, entry_reg));
     entry_reg = S0;
@@ -1314,14 +1352,21 @@ void MacroAssembler::call_C_sequence(char* entry, int entry_reg, int nof_stack_a
   link(ret, fixup_adr, adr(S1, 0));
   emit(ldst_simm9(STR, 3, S1, arm(esp), -oopSize));	// return address (esp is not changed)
   if (entry_reg < 0) {
-    mov_imm(S0, (intptr_t) entry);
-    entry_reg = S0;
+    // [ldr x16, #12] [blr x16] [b #12] [literal] ret: - the return address (as seen by the
+    // runtime) is the end of the sequence and the destination is the literal before it,
+    // as for Delta calls (NativeCall, PrimitiveIC); C returns to the b over the literal
+    align_for_literal_at(12);
+    emit(ldr_literal(S0, 12));
+    emit(blr(S0));
+    emit(b(12));
+    emit_word64((intptr_t) entry, rtype);
+  } else {
+    emit(blr(entry_reg));
   }
-  emit(blr(entry_reg));
   bind(ret);
   if (nlrTestPoint != NULL) Assembler::ic_info(*nlrTestPoint, 0);
-  reset_last_Delta_frame();
-  {
+  if (delta_frame) reset_last_Delta_frame();
+  if (delta_frame) {
     // Deoptimization during the call patches the return address of this frame (at esp[-1],
     // see above) to unpack_unoptimized_frames; on x86 the C function would return there. C
     // returns through lr on arm64, so follow a patched return address explicitly (with a
@@ -1367,33 +1412,27 @@ void MacroAssembler::call_C_sequence(char* entry, int entry_reg, int nof_stack_a
 
 void Assembler::call_native(char* entry, int nof_args) {
   // a C call without last Delta frame (for C code that does not walk the stack)
-  assert(0 <= nof_args && nof_args <= 8, "too many C arguments");
-  for (int i = 0; i < nof_args; i++) {
-    emit(ldst_uimm(LDR, 3, i, arm(esp), i * oopSize));
-  }
-  mov_imm(S0, (intptr_t) entry);
-  emit(blr(S0));
-  set_flags(flags_unknown);
+  ((MacroAssembler*) this)->call_C_sequence(entry, -1, nof_args, NULL, relocInfo::none, false);
 }
 
 
 void MacroAssembler::call_C(char* entry, relocInfo::relocType rtype) {
-  call_C_sequence(entry, -1, 8, NULL);
+  call_C_sequence(entry, -1, 8, NULL, rtype, true);
 }
 
 
 void MacroAssembler::call_C(char* entry, relocInfo::relocType rtype, Label& nlrTestPoint) {
-  call_C_sequence(entry, -1, 8, &nlrTestPoint);
+  call_C_sequence(entry, -1, 8, &nlrTestPoint, rtype, true);
 }
 
 
 void MacroAssembler::call_C(Register entry) {
-  call_C_sequence(NULL, arm(entry), 8, NULL);
+  call_C_sequence(NULL, arm(entry), 8, NULL, relocInfo::none, true);
 }
 
 
 void MacroAssembler::call_C(Register entry, Label& nlrTestPoint) {
-  call_C_sequence(NULL, arm(entry), 8, &nlrTestPoint);
+  call_C_sequence(NULL, arm(entry), 8, &nlrTestPoint, relocInfo::none, true);
 }
 
 
@@ -1408,28 +1447,28 @@ void MacroAssembler::move_C_arguments(Register* args, int n) {
 void MacroAssembler::call_C(char* entry, Register arg1) {
   Register args[] = { arg1 };
   move_C_arguments(args, 1);
-  call_C_sequence(entry, -1, 0, NULL);
+  call_C_sequence(entry, -1, 0, NULL, relocInfo::runtime_call_type, true);
 }
 
 
 void MacroAssembler::call_C(char* entry, Register arg1, Register arg2) {
   Register args[] = { arg1, arg2 };
   move_C_arguments(args, 2);
-  call_C_sequence(entry, -1, 0, NULL);
+  call_C_sequence(entry, -1, 0, NULL, relocInfo::runtime_call_type, true);
 }
 
 
 void MacroAssembler::call_C(char* entry, Register arg1, Register arg2, Register arg3) {
   Register args[] = { arg1, arg2, arg3 };
   move_C_arguments(args, 3);
-  call_C_sequence(entry, -1, 0, NULL);
+  call_C_sequence(entry, -1, 0, NULL, relocInfo::runtime_call_type, true);
 }
 
 
 void MacroAssembler::call_C(char* entry, Register arg1, Register arg2, Register arg3, Register arg4) {
   Register args[] = { arg1, arg2, arg3, arg4 };
   move_C_arguments(args, 4);
-  call_C_sequence(entry, -1, 0, NULL);
+  call_C_sequence(entry, -1, 0, NULL, relocInfo::runtime_call_type, true);
 }
 
 
@@ -1481,6 +1520,12 @@ void MacroAssembler::fpu_mask_and_cond_for(Condition cc, int& mask, Condition& c
     case greaterEqual	: mask = 0x0100; cond = zero;		break;
     default		: Unimplemented();
   };
+}
+
+
+void MacroAssembler::fpop_to_C_double_argument() {
+  emit(fmov(0, st(0)));
+  fpu_pop();
 }
 
 

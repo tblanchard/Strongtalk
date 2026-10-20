@@ -234,6 +234,21 @@ static void inlineCache(Label& nlrTestPoint, SendInfo* info, bool super) {
 // When leaving C land, last_Delta_fp has to be reset to 0. This is required to
 // allow proper stack traversal.
 
+#ifdef STRONGTALK_ARM64
+
+// arm64: C functions take their arguments in registers and return through lr; the arguments
+// pushed by the caller (as for x86 C functions) are passed in x0..x7 (see call_C_sequence)
+static void call_C(char* dest, relocInfo::relocType relocType, bool needsDeltaFPCode) {
+  theMacroAssm->call_C_sequence(dest, -1, 8, NULL, relocType, needsDeltaFPCode);
+}
+
+
+static void call_C(char* dest, relocInfo::relocType relocType, bool needsDeltaFPCode, Label& nlrTestPoint) {
+  theMacroAssm->call_C_sequence(dest, -1, 8, &nlrTestPoint, relocType, needsDeltaFPCode);
+}
+
+#else
+
 static void call_C(char* dest, relocInfo::relocType relocType, bool needsDeltaFPCode) {
   if (needsDeltaFPCode) theMacroAssm->set_last_Delta_frame_before_call();
   theMacroAssm->call(dest, relocType);
@@ -247,6 +262,8 @@ static void call_C(char* dest, relocInfo::relocType relocType, bool needsDeltaFP
   inlineCache(nlrTestPoint, NULL, false);
   if (needsDeltaFPCode) theMacroAssm->reset_last_Delta_frame();
 }
+
+#endif
 
 
 // Routines for debugging
@@ -449,7 +466,7 @@ static void verifyObjCode(Register reg) {
 }
 
 
-extern "C" void verifyArguments(oop recv, int ebp, int nofArgs) {
+extern "C" void verifyArguments(oop recv, intptr_t ebp, int nofArgs) {
   ResourceMark rm;
   numberOfCalls++;
   if (TraceCalls) { 
@@ -659,8 +676,16 @@ static char* nmethodAddr() {
 
 static void incCounter() {
   // Generates code to increment the nmethod execution counter
+#ifdef STRONGTALK_ARM64
+  // the counter is a 32-bit word in the nmethod's counter cell (ordinary memory)
+  Address cell(asm_word(nmethod::counter_cell_for_compilation()), relocInfo::external_word_type);
+  theMacroAssm->movl32(temp1, cell);
+  theMacroAssm->incl(temp1);
+  theMacroAssm->movl32(cell, temp1);
+#else
   char* addr = nmethodAddr() + nmethod::invocationCountOffset();
-  theMacroAssm->incl(Address(x86_imm32(addr), relocInfo::internal_word_type));
+  theMacroAssm->incl(Address(asm_word(addr), relocInfo::internal_word_type));
+#endif
 }
 
 
@@ -718,12 +743,21 @@ void BasicNode::gen() {
 static void checkRecompilation(Label& recompile_stub_call, Register t) {
   if (RecompilationPolicy::needRecompileCounter(theCompiler)) {
     // increment the nmethod execution counter and check limit
-    char* addr = nmethodAddr() + nmethod::invocationCountOffset();
-    theMacroAssm->movl(t, Address(x86_imm32(addr), relocInfo::internal_word_type));
+#ifdef STRONGTALK_ARM64
+    Address cell(asm_word(nmethod::counter_cell_for_compilation()), relocInfo::external_word_type);
+    theMacroAssm->movl32(t, cell);		// 32-bit counter (sign extended)
     theMacroAssm->incl(t);
     theMacroAssm->cmpl(t, theCompiler->get_invocation_counter_limit());
-    theMacroAssm->movl(Address(x86_imm32(addr), relocInfo::internal_word_type), t);
+    theMacroAssm->movl32(cell, t);		// (does not change the flags)
     theMacroAssm->jcc(Assembler::greaterEqual, recompile_stub_call);
+#else
+    char* addr = nmethodAddr() + nmethod::invocationCountOffset();
+    theMacroAssm->movl(t, Address(asm_word(addr), relocInfo::internal_word_type));
+    theMacroAssm->incl(t);
+    theMacroAssm->cmpl(t, theCompiler->get_invocation_counter_limit());
+    theMacroAssm->movl(Address(asm_word(addr), relocInfo::internal_word_type), t);
+    theMacroAssm->jcc(Assembler::greaterEqual, recompile_stub_call);
+#endif
   }
 }
 
@@ -747,7 +781,7 @@ static void verify_context_chain(Register closure, int chain_length, Register te
     theMacroAssm->orl(sum, Address(context, memOopDesc::mark_byte_offset()));
   }
   // check if there was any context that has been deoptimized
-  theMacroAssm->testl(sum, markOopDesc::context_forward_bit_mask());
+  theMacroAssm->testl(sum, (intptr_t) markOopDesc::context_forward_bit_mask());
   theMacroAssm->jcc(Assembler::notZero, StubRoutines::deoptimize_block_entry(), relocInfo::runtime_call_type);
   // otherwise continue
 }
@@ -810,7 +844,7 @@ void PrologueNode::gen() {
   // allocate float temporaries
   int nofFloats = theCompiler->totalNofFloatTemporaries();
   if (nofFloats > 0) {
-    assert(floatSize == oopSize*2, "check this code");
+    assert(floatSize % oopSize == 0, "check this code");	// x86: 2 words per float, 64-bit: 1
     assert(first_float_offset == -4, "check this code");
     int float_section_size = nofFloats*(floatSize/oopSize) + 2;	// 2 additional words for filler & float alignment
     frame_size += 1 + float_section_size;			// magic word & floats
@@ -958,10 +992,14 @@ void DLLNode::gen() {
   // CompiledDLL_Cache
   // This code pattern must correspond to the CompiledDLL_Cache layout
   // (make sure assembler is not optimizing mov reg, 0 into xor reg, reg!)
-  theMacroAssm->movl(edx, x86_imm32(function()));	// part of CompiledDLL_Cache
+#ifdef STRONGTALK_ARM64
+  theMacroAssm->call_DLL_cache(entry, (char*) function(), dll_name(), function_name());	// sets edx (see dll.hpp)
+#else
+  theMacroAssm->movl(edx, asm_word(function()));	// part of CompiledDLL_Cache
   theMacroAssm->inline_oop(dll_name());		// part of CompiledDLL_Cache
   theMacroAssm->inline_oop(function_name());	// part of CompiledDLL_Cache
   theMacroAssm->call(entry, relocInfo::runtime_call_type);
+#endif
   // Note: should also pop arguments in case of a NLR, could become a problem
   //       if DLL is called within a loop - fix this at some point.
   inlineCache(scope()->nlrTestPoint()->label, NULL, false);
@@ -1056,7 +1094,7 @@ static void arithRROp(ArithOpCode op, Register x, Register y) {
 }
 
 
-static void arithRCOp(ArithOpCode op, Register x, int y) {
+static void arithRCOp(ArithOpCode op, Register x, intptr_t y) {	// y: word sized (smis are words on 64-bit hosts)
   assert(Int_Tag == 0, "check this code");
   switch (op) {
     case TestArithOp  : theMacroAssm->testl(x, y);	break;
@@ -1064,7 +1102,7 @@ static void arithRCOp(ArithOpCode op, Register x, int y) {
     case  AddArithOp  : theMacroAssm->addl(x, y);	break;
     case tSubArithOp  : // fall through
     case  SubArithOp  : theMacroAssm->subl(x, y);	break;
-    case tMulArithOp  : y = arithmetic_shift_right(y, Tag_Size);
+    case tMulArithOp  : y = y >> Tag_Size;		// (arithmetic shift)
     case  MulArithOp  : theMacroAssm->imull(x, x, y);	break;
     case tDivArithOp  : // fall through
     case  DivArithOp  : Unimplemented();		break;
@@ -1079,12 +1117,12 @@ static void arithRCOp(ArithOpCode op, Register x, int y) {
     case tShiftArithOp:
       if (y < 0) {
         // shift right
-        int shift_count = ((-y) >> Tag_Size) % 32;
+        int shift_count = (int) (((-y) >> Tag_Size) % BitsPerWord);
         theMacroAssm->sarl(x, shift_count);
-        theMacroAssm->andl(x, -1 << Tag_Size);		// clear Tag bits
+        theMacroAssm->andl(x, (intptr_t) -1 << Tag_Size);	// clear Tag bits
       } else if (y > 0) {
         // shift left
-        int shift_count = ((+y) >> Tag_Size) % 32;
+        int shift_count = (int) (((+y) >> Tag_Size) % BitsPerWord);
         theMacroAssm->shll(x, shift_count);
       }
       break;
@@ -1121,7 +1159,7 @@ void TArithRRNode::gen() {
         theMacroAssm->test(x, Mem_Tag);
         theMacroAssm->jcc(Assembler::notZero, next(1)->label);
       }
-      arithRCOp(_op, x, x86_imm32(y));			// y is smiOop -> needs no relocation info
+      arithRCOp(_op, x, asm_word(y));			// y is smiOop -> needs no relocation info
       if (result) store(x, _dest, temp2, temp3);
     } else {
       // operation fails always
@@ -1174,7 +1212,7 @@ void ArithRRNode::gen() {
     Register x;
     bool result = setupRegister(_dest, arg1, _op, x, temp1);
     if (y->is_smi()) {
-      arithRCOp(_op, x, x86_imm32(y));		// y is smiOop -> needs no relocation info
+      arithRCOp(_op, x, asm_word(y));		// y is smiOop -> needs no relocation info
     } else {
       arithROOp(_op, x, y);
     }
@@ -1244,9 +1282,17 @@ void FloatArithRRNode::gen() {
 
 
 static Address doubleKlass_addr() {
-  return Address(x86_imm32(&doubleKlassObj), relocInfo::external_word_type);
+  return Address(asm_word(&doubleKlassObj), relocInfo::external_word_type);
 }
 
+
+#ifdef STRONGTALK_ARM64
+// arm64: the value is passed as a C double argument (the x87 stack is emulated, see assembler_arm64.hpp)
+static oop oopify_double(double x) {
+  BlockScavenge bs;						// because all registers are saved on the stack
+  return oopFactory::new_double(x);				// box the FloatValue
+}
+#endif
 
 static oop oopify_float() {
   double x;
@@ -1271,7 +1317,12 @@ static void floatArithROp(ArithOpCode op, Register reg, Register temp) {
     case f2OopArithOp  :
       { theMacroAssm->pushl(reg);				// reserve space for the result
         theMacroAssm->pushad();					// make sure no register is destroyed (no scavenge)
+#ifdef STRONGTALK_ARM64
+        theMacroAssm->fpop_to_C_double_argument();		// ST(0) -> d0, pop (as fstp in oopify_float)
+        theMacroAssm->call_native((char*)oopify_double, 0);
+#else
         theMacroAssm->call((char*)oopify_float, relocInfo::runtime_call_type);
+#endif
 	theMacroAssm->movl(Address(esp, nofRegisters * oopSize), eax);	// store result at reserved stack location
 	theMacroAssm->popad();					// restore register contents
 	theMacroAssm->popl(reg);				// get result
@@ -1290,7 +1341,11 @@ static void floatArithROp(ArithOpCode op, Register reg, Register temp) {
 	theMacroAssm->bind(is_smi);
 	theMacroAssm->sarl(reg, Tag_Size);			// convert smi into int
 	theMacroAssm->movl(Address(esp, -oopSize), reg);	// store it at end of stack
+#ifdef STRONGTALK_ARM64
+	theMacroAssm->fild_d(Address(esp, -oopSize));		// load & convert into FloatValue (64-bit integer)
+#else
 	theMacroAssm->fild_s(Address(esp, -oopSize));		// load & convert into FloatValue
+#endif
 	theMacroAssm->jmp(done);
 
         // unbox doubleOop
@@ -1360,7 +1415,7 @@ void ContextCreateNode::gen() {
     case 1:  primitiveCall(scope(), primitives::context_allocate1()); break;
     case 2:  primitiveCall(scope(), primitives::context_allocate2()); break;
     default: assert(_pdesc == primitives::context_allocate(), "bad context create prim");
-	     theMacroAssm->pushl(x86_imm32(as_smiOop(_contextSize)));
+	     theMacroAssm->pushl(asm_word(as_smiOop(_contextSize)));
 	     primitiveCall(scope(), _pdesc);
 	     theMacroAssm->addl(esp, oopSize);	// pop argument, this is not a Pascal call - should fix this
   }
@@ -1840,7 +1895,7 @@ void BlockCreateNode::materialize() {
     case 1:   primitiveCall(scope(), primitives::block_allocate1()); break;
     case 2:   primitiveCall(scope(), primitives::block_allocate2()); break;
     default:  assert(_pdesc == primitives::block_allocate(), "bad block clone prim");
-	      theMacroAssm->pushl(x86_imm32(as_smiOop(nofArgs)));
+	      theMacroAssm->pushl(asm_word(as_smiOop(nofArgs)));
 	      primitiveCall(scope(), _pdesc);
 	      theMacroAssm->addl(esp, oopSize); // pop argument, this is not a Pascal call - should fix this
   }
@@ -1872,7 +1927,7 @@ void BlockCreateNode::materialize() {
   theMacroAssm->Store(contextReg, closureReg, blockClosureOopDesc::context_byte_offset());
   // assert(theCompiler->jumpTableID == closure->parent_id(), "nmethod id must be the same");
   // fix this: RELOCATION INFORMATION IS NEEDED WHEN MOVING THE JUMPTABLE (Snapshot reading etc.)
-  theMacroAssm->movl(Address(closureReg, blockClosureOopDesc::method_or_entry_byte_offset()), x86_imm32(closure->jump_table_entry()));
+  theMacroAssm->movl(Address(closureReg, blockClosureOopDesc::method_or_entry_byte_offset()), asm_word(closure->jump_table_entry()));
   if (VerifyCode) verifyBlockCode(closureReg);
   theMacroAssm->store_check(closureReg, temp1);
 }
@@ -2050,6 +2105,12 @@ void LoopHeaderNode::generateArrayLoopTests(Label& prev, Label& failure) {
 }
 
 
+// Scales for indexing word arrays: a smi index (value << Tag_Size) is the byte offset of 4-byte
+// words (x86) and half the byte offset of 8-byte words (64-bit hosts); untagged indices are
+// scaled by the word size.
+static const Address::ScaleFactor smi_to_word_scale = oopSize == 8 ? Address::times_2 : Address::times_1;
+static const Address::ScaleFactor word_scale        = oopSize == 8 ? Address::times_8 : Address::times_4;
+
 static void jcc_error(Node* node, Assembler::Condition cond, Label& label) {
 // Used in code pattern generators that also generate code to setup error messages.
 // If an uncommon trap is issued in the error situation anyway, the error message
@@ -2073,7 +2134,7 @@ void ArrayAtNode::gen() {
   Register index = temp2; load(_arg, index);	// index is modified -> load always into register
   Register array = movePRegToReg(_src, temp1);	// array is read_only
   // first element is at index 1 => subtract smi(1) (doesn't change smi/oop property)
-  theMacroAssm->subl(index, x86_imm32(smiOop_one));
+  theMacroAssm->subl(index, asm_word(smiOop_one));
   // preload size for bounds check if necessary
   if (_needBoundsCheck) {
     theMacroAssm->movl(size, Address(array, byteOffset(_sizeOffset)));
@@ -2117,12 +2178,12 @@ void ArrayAtNode::gen() {
         jcc_error(this, Assembler::aboveEqual, indexOutOfBounds);
 	// get character out of chars array
         theMacroAssm->movl(temp1, chars);
-        theMacroAssm->movl(t, Address(temp1, t, Address::times_4, byteOffset(chars->klass()->klass_part()->non_indexable_size() + 1)));
+        theMacroAssm->movl(t, Address(temp1, t, word_scale, byteOffset(chars->klass()->klass_part()->non_indexable_size() + 1)));
       }
       break;
     case object_at:
-      // smi index is already shifted the right way => no index adjustment necessary
-      theMacroAssm->movl(t, Address(array, index, Address::times_1, byteOffset(_dataOffset)));
+      // smi index: x86 - already the byte offset; 64-bit - half of it (see smi_to_word_scale)
+      theMacroAssm->movl(t, Address(array, index, smi_to_word_scale, byteOffset(_dataOffset)));
       break;
     default:
       ShouldNotReachHere();
@@ -2159,7 +2220,7 @@ void ArrayAtPutNode::gen() {
   Register index = temp2; load(_arg, index);	// index is modified -> load always into register
   Register array = temp1; load(_src, array);	// array may be modified -> load always into register
   // first element is at index 1 => subtract smi(1) (doesn't change smi/oop property)
-  theMacroAssm->subl(index, x86_imm32(smiOop_one));
+  theMacroAssm->subl(index, asm_word(smiOop_one));
   // preload size for bounds check if necessary
   if (_needBoundsCheck) {
     theMacroAssm->movl(size, Address(array, byteOffset(_sizeOffset)));
@@ -2220,11 +2281,11 @@ void ArrayAtPutNode::gen() {
     case object_at_put:
       // smi index is already shifted the right way => no index adjustment necessary
       if (_needs_store_check) {
-        theMacroAssm->leal(array, Address(array, index, Address::times_1, byteOffset(_dataOffset)));
+        theMacroAssm->leal(array, Address(array, index, smi_to_word_scale, byteOffset(_dataOffset)));
         theMacroAssm->movl(Address(array), element);
         theMacroAssm->store_check(array, temp3);
       } else {
-        theMacroAssm->movl(Address(array, index, Address::times_1, byteOffset(_dataOffset)), element);
+        theMacroAssm->movl(Address(array, index, smi_to_word_scale, byteOffset(_dataOffset)), element);
       }
       break;
     default:

@@ -161,7 +161,7 @@ class Assembler: public ResourceObj {
   enum Constants {
     sizeOfCall		= 24,		// a patchable Delta call (call(entry, rtype)): adr, str, ldr, br, literal
     sizeOfJump		= 16,		// a patchable jump (jmp(entry, rtype)): ldr, br, literal
-    sizeOfCallC		= 20		// a C call (call_native): movz/movk x16 (4), blr
+    sizeOfCallC		= 20		// the end of a C call (call_C, call_native) after its literal: ldr, blr, b, literal
   };
 
   Assembler(CodeBuffer* code);
@@ -213,6 +213,10 @@ class Assembler: public ResourceObj {
   void movl(Address dst, oop obj);
   void movl(Address dst, Register src);
 
+  // 32-bit memory accesses (int fields): the load sign extends
+  void movl32(Register dst, Address src);
+  void movl32(Address dst, Register src);
+
   void movsxb(Register dst, Address src);
   void movsxb(Register dst, Register src);
 
@@ -231,15 +235,20 @@ class Assembler: public ResourceObj {
 
   void addl(Address dst, int imm32);
   void addl(Register dst, int imm32);
+  void addl(Register dst, intptr_t imm);
+  void addl(Register dst, unsigned int imm32)	{ addl(dst, (intptr_t) imm32); }	// zero extended
   void addl(Register dst, Register src);
 
   void andl(Register dst, int imm32);
+  void andl(Register dst, intptr_t imm);
+  void andl(Register dst, unsigned int imm32)	{ andl(dst, (intptr_t) imm32); }	// zero extended
   void andl(Register dst, Register src);
 
   void cmpl(Address dst, int imm32);
   void cmpl(Address dst, oop obj);
   void cmpl(Register dst, int imm32);
   void cmpl(Register dst, intptr_t imm);
+  void cmpl(Register dst, unsigned int imm32)	{ cmpl(dst, (intptr_t) imm32); }	// zero extended
   void cmpl(Register dst, oop obj);
   void cmpl(Register dst, Register src);
   void cmpl(Register dst, Address src);
@@ -251,6 +260,7 @@ class Assembler: public ResourceObj {
 
   void imull(Register dst, Register src);
   void imull(Register dst, Register src, int value);
+  void imull(Register dst, Register src, intptr_t value);
 
   void incl(Register dst);
   void incl(Address dst);
@@ -264,6 +274,8 @@ class Assembler: public ResourceObj {
   void notl(Register dst);
 
   void orl(Register dst, int imm32);
+  void orl(Register dst, intptr_t imm);
+  void orl(Register dst, unsigned int imm32)	{ orl(dst, (intptr_t) imm32); }	// zero extended
   void orl(Register dst, Register src);
   void orl(Register dst, Address src);
 
@@ -286,13 +298,19 @@ class Assembler: public ResourceObj {
   void shrl(Register dst);
 
   void subl(Register dst, int imm32);
+  void subl(Register dst, intptr_t imm);
+  void subl(Register dst, unsigned int imm32)	{ subl(dst, (intptr_t) imm32); }	// zero extended
   void subl(Register dst, Register src);
 
   void testb(Register dst, int imm8);
   void testl(Register dst, int imm32);
+  void testl(Register dst, intptr_t imm);
+  void testl(Register dst, unsigned int imm32)	{ testl(dst, (intptr_t) imm32); }	// zero extended
   void testl(Register dst, Register src);
 
   void xorl(Register dst, int imm32);
+  void xorl(Register dst, intptr_t imm);
+  void xorl(Register dst, unsigned int imm32)	{ xorl(dst, (intptr_t) imm32); }	// zero extended
   void xorl(Register dst, Register src);
 
   // Miscellaneous
@@ -407,6 +425,14 @@ class MacroAssembler: public Assembler {
   void call_C(Register entry);
   void call_C(Register entry, Label& nlrTestPoint);
 
+  // A C call: the first nof_stack_args words on the Delta stack are the arguments (as for x86 C
+  // functions). With delta_frame the last Delta frame is set (the C code may walk the stack), a
+  // return address patched by deoptimization is followed and NLRs through C are continued at
+  // nlrTestPoint. With an entry (not entry_reg), the destination is a literal ending the sequence
+  // (relocated with rtype), as for Delta calls.
+  void call_C_sequence(char* entry, int entry_reg, int nof_stack_args, Label* nlrTestPoint,
+                       relocInfo::relocType rtype, bool delta_frame);
+
   // C calls to run-time routines with arguments (args are not preserved)
   void call_C(char* entry, Register arg1);
   void call_C(char* entry, Register arg1, Register arg2);
@@ -428,13 +454,16 @@ class MacroAssembler: public Assembler {
   // Pop ST (ffree & fincstp combined)
   void fpop();
 
+  // Moves ST(0) into d0 (the first C double argument) and pops it
+  void fpop_to_C_double_argument();
+
   // debugging
   static void print_reg(const char* name, oop obj);
   static void inspector(oop edi, oop esi, oop ebp, oop esp, oop ebx, oop edx, oop ecx, oop eax, char* eip);
   void inspect(char* title = NULL);
 
  private:
-  void call_C_sequence(char* entry, int entry_reg, int nof_stack_args, Label* nlrTestPoint);
+
   void move_C_arguments(Register* args, int n);
 };
 

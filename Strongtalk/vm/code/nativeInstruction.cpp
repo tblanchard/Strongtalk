@@ -54,12 +54,14 @@ void native_code_write_insn(char* addr, a64::insn i) {
 }
 
 void NativeCall::verify() {
-  // adr x17, ret; str x17, [x28, #-8]!; ldr x16, #8; br x16
+  // a Delta call: adr x17, ret; str x17, [x28, #-8]!; ldr x16, #8; br x16; literal
   a64::insn* p = (a64::insn*) instruction_address();
-  if (p[0] != a64::adr(17, instruction_size) || p[1] != a64::ldst_pre(a64::STR, 3, 17, 28, -8) ||
-      p[2] != a64::ldr_literal(16, 8) || p[3] != a64::br(16)) {
-    fatal1("not a Delta call at %p", instruction_address());
-  }
+  if (p[0] == a64::adr(17, instruction_size) && p[1] == a64::ldst_pre(a64::STR, 3, 17, 28, -8) &&
+      p[2] == a64::ldr_literal(16, 8) && p[3] == a64::br(16)) return;
+  // a C call (MacroAssembler::call_C_sequence, e.g. primitives): ldr x16, #12; blr x16; b #12; literal
+  a64::insn* c = (a64::insn*) addr_at(-20);
+  if (c[0] == a64::ldr_literal(16, 12) && c[1] == a64::blr(16) && c[2] == a64::b(12)) return;
+  fatal1("not a call at %p", return_address());
 }
 
 void NativeCall::print() {

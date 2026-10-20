@@ -676,6 +676,8 @@ static void test_code_memory() {
 }
 
 
+static intptr_t c_sum(intptr_t a, intptr_t b, intptr_t c, intptr_t d);
+
 // Code patterns read and patched by the runtime (nativeInstruction.hpp, dll.hpp, relocInfo.hpp)
 static void test_native_instructions() {
   // Delta call stubs (return eax + 1 and eax + 2)
@@ -731,6 +733,27 @@ static void test_native_instructions() {
     check_eq("DLL cache: edx = entry point", run(f, 0), 0x1234560);
     d->set_entry_point((dll_func) 0x7654320);
     check_eq("DLL cache set_entry_point", run(f, 0), 0x7654320);
+  }
+
+  // a C call (as for primitives) is a NativeCall too: destination literal before the return address
+  for (int pad = 0; pad < 2; pad++) {
+    TestCode t;
+    if (pad) t.m->nop();
+    t.m->movl(ebx, 4);
+    t.m->pushl(ebx); t.m->pushl(ebx); t.m->pushl(ebx); t.m->pushl(ebx);
+    int before = t.m->offset();
+    t.m->call_C((char*) &c_sum, relocInfo::prim_type);
+    // the return address is the end of the destination literal (code after it checks for deoptimization)
+    int ret = -1;
+    for (int p = before; p + 8 <= t.m->offset(); p += 4) {
+      if (*(intptr_t*) (t.cb->code_begin() + p) == (intptr_t) &c_sum) { ret = p + 8; break; }
+    }
+    check(ret > 0 && (ret & 7) == 0, "C call: aligned destination literal", ret, 0);
+    t.m->addl(esp, 4 * oopSize);
+    TestFn f = t.finish();
+    NativeCall* c = nativeCall_from_return_address((char*) f + ret);
+    check_eq("C call: NativeCall destination", (intptr_t) c->destination(), (intptr_t) &c_sum);
+    check_eq("C call: result", run(f, 0), 4 + 8 + 12 + 16);
   }
 
   // relocation offsets (4-byte units on arm64)
