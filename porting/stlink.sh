@@ -17,6 +17,11 @@ for f in */*.cpp; do
   if (( jobs_running >= 8 )); then wait; jobs_running=0; fi
 done
 wait
+for f in */*.S(N); do			# assembly sources (arm64 transitions)
+  o=/tmp/stobj/${${f//\//_}%.S}_S.o
+  if [[ $o -nt $f ]]; then continue; fi
+  clang -arch arm64 -c $f -o $o 2>>/tmp/stobj/compile_errors.txt
+done
 
 clang++ -arch arm64 /tmp/stobj/*.o -o /tmp/stobj/strongtalk 2>/tmp/stobj/link.txt
 grep -E '^  "' /tmp/stobj/link.txt | sed -E 's/^  "([^"]*)".*/\1/' | sort -u > /tmp/stobj/undefined.txt

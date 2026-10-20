@@ -70,6 +70,9 @@ class InterpretedIC: ValueObj {
   oop*    first_word_addr() const		{ return (oop*)addr_at(first_word_offset); }
   oop*    second_word_addr() const		{ return (oop*)addr_at(second_word_offset); }
   void    set(Bytecodes::Code send_code, oop first_word, oop second_word);
+#ifdef STRONGTALK_ARM64
+  friend bool transitions_arm64_test();	// +TestArm64Runtime (portableInterpreter.cpp)
+#endif
 
  public:
   // Raw inline cache access

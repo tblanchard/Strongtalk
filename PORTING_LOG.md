@@ -348,6 +348,28 @@ Phases:
         esp), inline register saving read back via SavedRegisters::fetch, megamorphic IC for nil printString
         through lookup-cache miss (C lookup) and hit (hash), plus the PIC/NLR tests. Stubs that need real
         nmethods/ICs (IC lookup, zombie, compile block, recompile, uncommon trap, deopt) are exercised in C4.
+  - [x] C2d interpreter <-> compiled code transitions (interpreter/portableInterpreter_arm64.S + portableInterpreter.cpp):
+        - Interpreter return points are code: 8 slots of 16 bytes [IC info: NLR target +12][b normal][b nlr]
+          (return_pc(p) = base + 16p; the interpreter range is the slot table). return_from_Delta (entry frame
+          marker) is the same kind of slot, so compiled code can return into entry frames.
+        - delta_call_compiled(entry, recv, sp, fp, return_pc, out): saves the C callee-saved registers in a save
+          area addressed by x27 (compiled code never uses x22-x27; nesting needs no TLS), runs compiled code on
+          the Delta stack (esp/ebp = interpreter sp/fp, eax = receiver); the return point slots store eax/esp/ebp
+          (and edi/esi for NLRs) in out (CompiledReturn) and restore C.
+        - Interpreter -> compiled: send() accepts jump table entries (monomorphic compiled sends, interpreter PICs,
+          megamorphic lookups) and calls call_compiled (callee pops the arguments; NLRs continue in nlr_unwind).
+          call_delta from C with a jump table entry: call_compiled_from_C (entry frame as call_delta_entry).
+        - Compiled -> interpreted: method_entry_point = compiled_to_interpreted (eax = receiver, ecx = methodOop):
+          interpret_from_compiled runs the method with the compiled return address as its frame's return pc;
+          continue_caller / nlr_unwind leave the activation when the caller is compiled code (normal return:
+          continuation = return address, callee popped its arguments; NLR: continuation = NLR target of the IC
+          info at the return address, frame and return address removed as continue_NLR does).
+        - NLR home ids: compiled >= 0 (scope id), interpreted homes ~nof_args (same as the x86 interpreter).
+        Tests (+TestArm64Runtime, hand-assembled compiled methods): C -> compiled, compiled -> interpreted
+        (Object>>yourself, a 1-argument method; esp balanced), NLR compiled -> C, interpreted -> compiled through
+        a patched inline cache (normal return through the return point slot, and NLR to the interpreted home),
+        1000 nested round trips. Not covered yet: compiled blocks (primitiveValue / restart_primitiveValue),
+        deoptimization (unpack frames), NLRs that start in the interpreter and pass compiled frames (C2e/C4).
 - [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
 - [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).

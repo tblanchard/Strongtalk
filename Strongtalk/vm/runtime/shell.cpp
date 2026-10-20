@@ -58,8 +58,10 @@ int main(int argc, char* argv[]) {
   if (TestArm64Runtime) {		// needs the code zone and the image
     extern bool PIC_arm64_test();		// compiledPIC.cpp
     extern bool StubRoutines_arm64_test();	// stubRoutines.cpp
+    extern bool transitions_arm64_test();	// portableInterpreter.cpp
     bool ok = PIC_arm64_test();
     ok = StubRoutines_arm64_test() && ok;
+    ok = transitions_arm64_test() && ok;
     exit(ok ? 0 : 1);
   }
 #endif

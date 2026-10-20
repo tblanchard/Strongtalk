@@ -173,18 +173,50 @@ enum ReturnPoint {
   number_of_return_points
 };
 
-static char interpreter_return_points[number_of_return_points + 1];
+// The return points are code (portableInterpreter_arm64.S): compiled code called by the
+// interpreter returns to them. Each is 16 bytes; it starts with an IC info for NLRs.
+extern "C" char portable_interpreter_return_points[];
+extern "C" char portable_interpreter_return_points_end[];
+const int return_point_size = 16;
 
 extern "C" {
-  char* interpreter_begin_addr = &interpreter_return_points[0];
-  char* interpreter_end_addr   = &interpreter_return_points[number_of_return_points + 1];
+  char* interpreter_begin_addr = portable_interpreter_return_points;
+  char* interpreter_end_addr   = portable_interpreter_return_points_end;
 }
 
-static inline char* return_pc(ReturnPoint p) { return &interpreter_return_points[p]; }
+static inline char* return_pc(ReturnPoint p) { return portable_interpreter_return_points + p * return_point_size; }
+static inline ReturnPoint return_point_of(char* pc) { return ReturnPoint((pc - interpreter_begin_addr) / return_point_size); }
 
-// Marks entry frames; never called.
-extern "C" void return_from_Delta() {
-  fatal("return_from_Delta must not be called");
+// Marks entry frames (and is the return point of compiled code called from C), see the .S file.
+extern "C" void return_from_Delta();
+
+// ---------------------------------------------------------------------------
+// Compiled code (see portableInterpreter_arm64.S)
+//
+// The interpreter calls compiled code with delta_call_compiled: the compiled method runs on
+// the Delta stack with esp/ebp = the interpreter's sp/fp and returns to the interpreter's
+// return point (or return_from_Delta for calls from C), normally or with an NLR.
+// Compiled code calls interpreted methods through compiled_to_interpreted (method_entry_point),
+// which runs interpret_from_compiled; the interpreted frame keeps the compiled return address,
+// and returning to it (or doing an NLR into compiled code) leaves the interpreter again.
+
+struct CompiledReturn {
+  oop       result;			// eax
+  oop*      sp;				// esp
+  intptr_t* fp;				// ebp
+  intptr_t  kind;			// normal return or NLR
+  intptr_t  home;			// NLR: edi (home frame pointer)
+  intptr_t  home_id;			// NLR: esi (home scope id; ~nof_args for interpreted homes)
+  char*     continuation;		// interpret_from_compiled: where compiled code continues
+};
+enum { returned_normally = 0, returned_with_nlr = 1 };
+
+extern "C" void delta_call_compiled(char* entry, oop receiver, oop* sp, intptr_t* fp, char* return_pc, CompiledReturn* out);
+extern "C" void compiled_to_interpreted();
+extern "C" char* method_entry_point;		// called by the PIC / megamorphic IC stubs (stubRoutines.cpp)
+
+static inline bool is_compiled_code_return(char* pc) {
+  return !Interpreter::contains(pc) && pc != (char*) &return_from_Delta;
 }
 
 // Interpreter properties (see Interpreter::is_optimized() etc.)
@@ -244,6 +276,8 @@ class PortableInterpreter {
   u_char*   hp;
   oop       _result;		// result when returning to C
   DeltaStack* _stack;
+  intptr_t  _to_compiled;	// -1, or how the activation leaves to compiled code (returned_normally/returned_with_nlr)
+  char*     _continuation;	// where compiled code continues
 
   // frame access
   oop&     receiver()          { return ((oop*) fp)[frame_receiver_offset]; }
@@ -327,9 +361,15 @@ class PortableInterpreter {
   bool run();
   oop  result() const { return _result; }
 
-  PortableInterpreter(intptr_t* f, oop* s, DeltaStack* st) : fp(f), sp(s), hp(NULL), _result(NULL), _stack(st) {}
+  PortableInterpreter(intptr_t* f, oop* s, DeltaStack* st) : fp(f), sp(s), hp(NULL), _result(NULL), _stack(st), _to_compiled(-1), _continuation(NULL) {}
+
+  // compiled code
+  bool call_compiled(char* entry, oop recv, ReturnPoint rp);	// false if returning to C
+  void activate_from_compiled(methodOop m, oop recv, oop temp0);
 
   friend oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is_block);
+  friend oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args);
+  friend void interpret_from_compiled_activation(methodOop m, oop receiver, oop* sp, intptr_t* fp, CompiledReturn* out);
 };
 
 // ---------------------------------------------------------------------------
@@ -361,6 +401,34 @@ void PortableInterpreter::activate_from_entry(methodOop m, oop recv, oop temp0) 
   if (count < methodOopDesc::_invocation_count_max) m->set_invocation_count(count + 1);
 }
 
+// Calls compiled code (eax = recv; the arguments are on the stack, the callee pops them).
+// The return pc of the callee is the return point rp; saved_hp() must be set.
+bool PortableInterpreter::call_compiled(char* entry, oop recv, ReturnPoint rp) {
+  check_stack(8);
+  CompiledReturn r;
+  delta_call_compiled(entry, recv, sp, fp, return_pc(rp), &r);
+  assert(r.fp == fp, "compiled code returned to another frame");
+  if (r.kind == returned_with_nlr) {
+    // the NLR continues in this frame (the callee's arguments are still on the stack)
+    return nlr_unwind(r.result, r.home, (int) r.home_id);
+  }
+  sp = r.sp;						// the callee popped its arguments
+  return continue_caller(return_pc(rp), r.result);
+}
+
+// The frame of a method called from compiled code: the return address is already on the stack.
+void PortableInterpreter::activate_from_compiled(methodOop m, oop recv, oop temp0) {
+  check_stack(8);
+  push((oop) fp);
+  fp = (intptr_t*) sp;
+  push(recv);
+  push((oop) m->codes());
+  push(temp0);
+  hp = m->codes();
+  int count = m->invocation_count();
+  if (count < methodOopDesc::_invocation_count_max) m->set_invocation_count(count + 1);
+}
+
 // Removes the current frame and nof_args arguments; continues the caller.
 bool PortableInterpreter::return_from_frame(oop result, int nof_args) {
   char* ret_pc = frame_return_pc();
@@ -376,9 +444,15 @@ bool PortableInterpreter::continue_caller(char* ret_pc, oop result) {
     _result = result;
     return false;
   }
-  assert(Interpreter::contains(ret_pc), "return into non-interpreted code");
+  if (is_compiled_code_return(ret_pc)) {
+    // the frame was called by compiled code (interpret_from_compiled): continue there
+    _to_compiled   = returned_normally;
+    _continuation  = ret_pc;
+    _result        = result;
+    return false;
+  }
   hp = saved_hp();
-  switch (ReturnPoint(ret_pc - interpreter_begin_addr)) {
+  switch (return_point_of(ret_pc)) {
     case rp_send_with_receiver:		sp++; push(result); break;
     case rp_send_with_receiver_pop:	sp++;               break;
     case rp_send_without_receiver:	push(result);       break;
@@ -414,7 +488,10 @@ bool PortableInterpreter::send(Bytecodes::Code code) {
   oop recv  = with_receiver ? sp[nof_args] : receiver();
   klassOop klass = recv->klass();
 
+  // the target: an interpreted method (m) or compiled code (a jump table entry point,
+  // stored in inline caches as a smi-looking word)
   methodOop m = NULL;
+  char* compiled_entry = NULL;
   switch (Bytecodes::send_type(code)) {
     case Bytecodes::polymorphic_send: {
       objArrayOop pic = objArrayOop(ic[1]);
@@ -422,6 +499,7 @@ bool PortableInterpreter::send(Bytecodes::Code code) {
         if (pic->obj_at(2 * i) == klass) {
           oop entry = pic->obj_at(2 * i - 1);
           if (entry->is_mem() && entry->is_method()) m = methodOop(entry);
+          else if (entry->is_smi())                    compiled_entry = (char*) entry;
           break;
         }
       }
@@ -433,6 +511,7 @@ bool PortableInterpreter::send(Bytecodes::Code code) {
         LookupResult r = interpreter_normal_lookup(klass, symbolOop(ic[0]));
         leave_C();
         if (!r.is_empty() && r.is_method()) m = r.method();
+        if (!r.is_empty() && r.is_entry())  compiled_entry = r.entry()->entry_point();
         // hp is the next instruction now; reload (a GC may have moved objects)
         next = hp;
         ic   = (oop*) (next - 2 * oopSize);
@@ -442,8 +521,19 @@ bool PortableInterpreter::send(Bytecodes::Code code) {
       // super sends use the inline cache (fall through)
     default:
       // interpreted, primitive, accessor, predicted and compiled sends: monomorphic inline cache
-      if (ic[1] == klass && ic[0]->is_mem() && ic[0]->is_method()) m = methodOop(ic[0]);
+      if (ic[1] == klass) {
+        if (ic[0]->is_mem() && ic[0]->is_method())                                    m = methodOop(ic[0]);
+        else if (ic[0]->is_smi() && Bytecodes::send_type(code) == Bytecodes::compiled_send) compiled_entry = (char*) ic[0];
+      }
       break;
+  }
+
+  if (compiled_entry != NULL) {
+    saved_hp() = next;
+    bool pop = Bytecodes::pop_tos(code);
+    ReturnPoint rp = with_receiver ? (pop ? rp_send_with_receiver_pop    : rp_send_with_receiver)
+                                   : (pop ? rp_send_without_receiver_pop : rp_send_without_receiver);
+    return call_compiled(compiled_entry, recv, rp);
   }
 
   if (m == NULL) {
@@ -773,6 +863,19 @@ bool PortableInterpreter::nlr_unwind(oop result, intptr_t home_fp, int home_id) 
     }
     char* ret_pc = frame_return_pc();
     intptr_t* link = frame_link();
+    if (is_compiled_code_return(ret_pc)) {
+      // the caller is compiled code: continue the NLR at the NLR target of its send
+      // (as continue_NLR: the frame and the return address are removed, the arguments not)
+      _to_compiled  = returned_with_nlr;
+      _continuation = ic_info_at(ret_pc)->NLR_target();
+      nlr_result  = result;
+      nlr_home    = home_fp;
+      nlr_home_id = home_id;
+      sp = (oop*) (fp + frame_sender_sp_offset);
+      fp = link;
+      _result = result;
+      return false;
+    }
     if (ret_pc == (char*) &return_from_Delta) {
       // leaving this interpreter activation (back to C): continue the NLR there
       have_nlr_through_C = true;
@@ -1285,11 +1388,91 @@ oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is
   return nlr_result;
 }
 
+// Calls compiled code from C (call_delta with a jump table entry): as call_delta_entry, but
+// the callee is compiled; it returns to return_from_Delta.
+oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args) {
+  DeltaStack* stack = delta_stack();
+  intptr_t* saved_fp = last_Delta_fp;
+  oop*      saved_sp = last_Delta_sp;
+  oop* sp = saved_fp != NULL ? saved_sp - 2 : stack->high;
+  if (sp - delta_stack_slack < stack->low) fatal("Delta stack overflow");
+
+  *--sp = NULL;					// return address of the entry frame (C)
+  *--sp = NULL;					// link
+  intptr_t* entry_fp = (intptr_t*) sp;
+  *--sp = (oop) saved_fp;			// fp[-1]: next_Delta_fp
+  *--sp = (oop) saved_sp;			// fp[-2]: next_Delta_sp
+  last_Delta_fp = NULL;
+  for (int i = 0; i < nof_args; i++) *--sp = args[i];
+
+  CompiledReturn r;
+  delta_call_compiled(entry, receiver, sp, entry_fp, (char*) &return_from_Delta, &r);
+
+  last_Delta_fp = saved_fp;
+  last_Delta_sp = saved_sp;
+  if (r.kind == returned_with_nlr) {
+    // the NLR leaves the Delta code called from C
+    have_nlr_through_C = true;
+    nlr_result  = r.result;
+    nlr_home    = r.home;
+    nlr_home_id = (int) r.home_id;
+    return nlr_result;
+  }
+  have_nlr_through_C = false;
+  return r.result;
+}
+
+// Runs an interpreted method called from compiled code (see compiled_to_interpreted): sp points
+// to the return address into compiled code, fp is the compiled caller's frame.
+void interpret_from_compiled_activation(methodOop m, oop receiver, oop* sp, intptr_t* fp, CompiledReturn* out) {
+  intptr_t* saved_fp = last_Delta_fp;
+  oop*      saved_sp = last_Delta_sp;
+  last_Delta_fp = NULL;
+
+  PortableInterpreter in(fp, sp, delta_stack());
+  in.activate_from_compiled(m, receiver, nilObj);
+
+  Activation act;
+  act.previous = current_activation;
+  act.entry_fp = (intptr_t*) sp;		// the frames of this activation are below the return address
+  current_activation = &act;
+  if (setjmp(act.buf) != 0) {
+    in.fp = act.resume_fp;
+    in.sp = act.resume_sp;
+    last_Delta_fp = NULL;
+    if (in.nlr_unwind(nlr_result, nlr_home, nlr_home_id)) in.run();
+  } else {
+    in.run();
+  }
+  current_activation = act.previous;
+  last_Delta_fp = saved_fp;
+  last_Delta_sp = saved_sp;
+
+  if (in._to_compiled < 0) fatal("interpreted method called from compiled code does not return to it");
+  out->result       = in._result;
+  out->sp           = in.sp;
+  out->fp           = in.fp;
+  out->kind         = in._to_compiled;
+  out->continuation = in._continuation;
+  out->home         = nlr_home;
+  out->home_id      = nlr_home_id;
+}
+
+extern "C" void interpret_from_compiled(methodOop m, oop receiver, oop* sp, intptr_t* fp, CompiledReturn* out) {
+  interpret_from_compiled_activation(m, receiver, sp, fp, out);
+}
+
 extern "C" oop call_delta(void* method, oop receiver, int nofArgs, oop* args) {
   oop m = (oop) method;
-  if (!m->is_mem() || !m->is_method()) fatal("call_delta: compiled code is not supported by the portable interpreter");
-  return call_delta_entry(methodOop(m), receiver, nofArgs, args, false);
+  if (m->is_mem() && m->is_method()) return call_delta_entry(methodOop(m), receiver, nofArgs, args, false);
+  // a jump table entry (compiled code)
+  return call_compiled_from_C((char*) method, receiver, nofArgs, args);
 }
+
+// The method entry for compiled code (the PIC and megamorphic IC stubs jump to it)
+static struct MethodEntryInit {
+  MethodEntryInit() { method_entry_point = (char*) &compiled_to_interpreted; }
+} method_entry_init;
 
 // Unwinds the C frames above the Delta frame (fp, sp) and starts/continues the NLR
 // described by nlr_result/nlr_home/nlr_home_id in that frame.
@@ -1328,5 +1511,174 @@ PRIMITIVE_VALUE(6, (oop a6, oop a5, oop a4, oop a3, oop a2, oop a1, oop block), 
 PRIMITIVE_VALUE(7, (oop a7, oop a6, oop a5, oop a4, oop a3, oop a2, oop a1, oop block), block, a1, a2, a3, a4, a5, a6, a7)
 PRIMITIVE_VALUE(8, (oop a8, oop a7, oop a6, oop a5, oop a4, oop a3, oop a2, oop a1, oop block), block, a1, a2, a3, a4, a5, a6, a7, a8)
 PRIMITIVE_VALUE(9, (oop a9, oop a8, oop a7, oop a6, oop a5, oop a4, oop a3, oop a2, oop a1, oop block), block, a1, a2, a3, a4, a5, a6, a7, a8, a9)
+
+// +TestArm64Runtime: transitions between C, the interpreter and (hand-assembled) compiled code.
+#include "codeBuffer.hpp"
+#include "assembler.hpp"
+#include "stubRoutines.hpp"
+#include "oopFactory.hpp"
+#include "os.hpp"
+
+// finds a one-argument method that returns its argument (push_arg_1, return_tos_pop_1)
+class ReturnsArgumentFinder : public ObjectClosure {
+ public:
+  methodOop found;
+  ReturnsArgumentFinder() : found(NULL) {}
+  void do_object(memOop obj) {
+    if (found == NULL && obj->is_method()) {
+      methodOop m = methodOop(obj);
+      if (m->nofArgs() == 1 && !m->is_blockMethod() &&
+          m->codes()[0] == Bytecodes::push_arg_1 && m->codes()[1] == Bytecodes::return_tos_pop_1) found = m;
+    }
+  }
+};
+
+// finds a method whose body is a unary send to self or its argument (push_self/push_arg_1, interpreted_send_0, return_tos_pop_n;
+// the send has an explicit receiver, so its argument count is in the byte code)
+class SelfSendFinder : public ObjectClosure {
+ public:
+  methodOop found;
+  SelfSendFinder() : found(NULL) {}
+  static u_char* after_ic(methodOop m) { return (u_char*) roundTo((uintptr_t) (m->codes() + 2), (uintptr_t) oopSize) + 2 * oopSize; }
+  void do_object(memOop obj) {
+    if (found == NULL && obj->is_method()) {
+      methodOop m = methodOop(obj);
+      u_char* c = m->codes();
+      if (m->is_blockMethod() || c[1] != Bytecodes::interpreted_send_0) return;
+      if ((m->nofArgs() == 0 && c[0] == Bytecodes::push_self  && *after_ic(m) == Bytecodes::return_tos_pop_0) ||
+          (m->nofArgs() == 1 && c[0] == Bytecodes::push_arg_1 && *after_ic(m) == Bytecodes::return_tos_pop_1)) found = m;
+    }
+  }
+};
+
+static intptr_t test_home_id;
+
+bool transitions_arm64_test() {
+  ResourceMark rm;
+  int failures = 0;
+#define T_CHECK(cond, what) if (!(cond)) { failures++; lprintf("  FAILED %s\n", what); }
+  char* code = os::allocate_code_memory(16 * 1024);
+  methodOop yourself = interpreter_normal_lookup(Universe::nilObj()->klass(), oopFactory::new_symbol("yourself")).method();
+  ReturnsArgumentFinder finder;
+  Universe::object_iterate(&finder);
+  methodOop plus     = finder.found;		// returns its argument (no primitive: needs no process)
+  T_CHECK(yourself != NULL && plus != NULL, "methods found");
+  if (plus == NULL) return false;
+  lprintf("  using %s for an interpreted method with an argument\n", plus->selector()->as_string());
+  char *add, *call_yourself, *call_plus, *nlr;
+  { JITWriteScope write_code;
+    // compiled method: receiver + argument (smis), pops its argument
+    { CodeBuffer cb(code, 1024); MacroAssembler m(&cb);
+      add = m.pc();
+      m.enter();
+      m.movl(ecx, Address(ebp, 2 * oopSize));	// the argument
+      m.addl(eax, ecx);
+      m.leave();
+      m.ret(1 * oopSize);
+    }
+    // compiled method calling the interpreted method yourself (as the PIC stub does)
+    { CodeBuffer cb(code + 1024, 1024); MacroAssembler m(&cb);
+      call_yourself = m.pc();
+      m.enter();
+      m.movl(ecx, (intptr_t) yourself);
+      m.call(method_entry_point, relocInfo::runtime_call_type);
+      m.leave();
+      m.ret(0);
+    }
+    // compiled method calling the interpreted method (returns its argument) with its argument + 1
+    { CodeBuffer cb(code + 2048, 1024); MacroAssembler m(&cb);
+      call_plus = m.pc();
+      m.enter();
+      m.movl(edx, Address(ebp, 2 * oopSize));
+      m.addl(edx, (int) (intptr_t) as_smiOop(1));
+      m.pushl(edx);				// argument (popped by the callee)
+      m.movl(ecx, (intptr_t) plus);
+      m.call(method_entry_point, relocInfo::runtime_call_type);
+      m.movl(ecx, esp);
+      m.subl(ecx, ebp);				// esp must be back at ebp (callee popped the argument)
+      m.addl(eax, ecx);
+      m.leave();
+      m.ret(1 * oopSize);
+    }
+    // compiled method doing an NLR to a home outside (eax = receiver, edi = home, esi = id)
+    { CodeBuffer cb(code + 3072, 1024); MacroAssembler m(&cb);
+      nlr = m.pc();
+      m.enter();
+      m.movl(edi, 0x5550);
+      m.movl(esi, 7);
+      m.jmp(StubRoutines::continue_NLR_entry(), relocInfo::runtime_call_type);
+    }
+  }
+  os::flush_icache(code, 4096);
+
+  oop args[1];
+  args[0] = as_smiOop(4);
+  oop r = call_delta(add, as_smiOop(3), 1, args);
+  T_CHECK(r == as_smiOop(7) && !have_nlr_through_C, "C -> compiled");
+
+  r = call_delta(call_yourself, Universe::trueObj(), 0, NULL);
+  T_CHECK(r == Universe::trueObj(), "compiled -> interpreted (yourself)");
+
+  args[0] = as_smiOop(41);
+  r = call_delta(call_plus, as_smiOop(100), 1, args);
+  T_CHECK(r == as_smiOop(42), "compiled -> interpreted with argument, esp balanced");
+
+  r = call_delta(nlr, Universe::falseObj(), 0, NULL);
+  T_CHECK(have_nlr_through_C && nlr_result == Universe::falseObj() && nlr_home == 0x5550 && nlr_home_id == 7, "NLR from compiled code to C");
+  have_nlr_through_C = false;
+
+  // interpreted -> compiled: a self send whose inline cache is patched to call compiled code
+  { SelfSendFinder sf;
+    Universe::object_iterate(&sf);
+    T_CHECK(sf.found != NULL, "self send method found");
+    if (sf.found != NULL) {
+      methodOop m = sf.found;
+      InterpretedIC* ic = as_InterpretedIC((char*) SelfSendFinder::after_ic(m));
+      oop first = ic->first_word(), second = ic->second_word();
+      Bytecodes::Code send_code = ic->send_code();
+      char *constant, *nlr_home;
+      { JITWriteScope write_code;
+        { CodeBuffer cb(code + 4096, 1024); MacroAssembler mm(&cb);	// returns 1234 (smi)
+          constant = mm.pc();
+          mm.enter();
+          mm.movl(eax, (intptr_t) as_smiOop(1234));
+          mm.leave();
+          mm.ret(0);
+        }
+        { CodeBuffer cb(code + 5120, 1024); MacroAssembler mm(&cb);	// NLR to the interpreted caller
+          nlr_home = mm.pc();
+          mm.enter();
+          mm.movl(edi, Address(ebp));		// home: the caller's frame (interpreted)
+          mm.movl(edi, Address(ebp));		// (home set above)
+          mm.movl(esi, Address(asm_word(&test_home_id), relocInfo::external_word_type));	// ~(number of arguments the home pops)
+          mm.movl(eax, (intptr_t) as_smiOop(5678));
+          mm.jmp(StubRoutines::continue_NLR_entry(), relocInfo::runtime_call_type);
+        }
+      }
+      os::flush_icache(code + 4096, 2048);
+      klassOop k = Universe::nilObj()->klass();
+      test_home_id = ~m->nofArgs();
+      ic->set(Bytecodes::compiled_send_code_for(send_code), oop(constant), k);
+      oop a1[1] = { Universe::nilObj() };	// the receiver of the send is nil (self or the argument)
+      int n = m->nofArgs();
+      r = call_delta(m, Universe::nilObj(), n, a1);
+      T_CHECK(r == as_smiOop(1234) && !have_nlr_through_C, "interpreted -> compiled (send through the return point)");
+      ic->set(Bytecodes::compiled_send_code_for(send_code), oop(nlr_home), k);
+      r = call_delta(m, Universe::nilObj(), n, a1);
+      T_CHECK(r == as_smiOop(5678) && !have_nlr_through_C, "NLR from compiled code to its interpreted home");
+      ic->set(send_code, first, second);	// restore the method
+      lprintf("  self send method: %s\n", m->selector()->as_string());
+    }
+  }
+
+  // nested: C -> compiled -> interpreted -> ... and back, several times (the save areas nest)
+  for (int i = 0; i < 1000; i++) {
+    args[0] = as_smiOop(i);
+    if (call_delta(call_plus, as_smiOop(1), 1, args) != as_smiOop(i + 1)) { failures++; lprintf("  FAILED repeated calls (%d)\n", i); break; }
+  }
+  lprintf("transitions arm64 test: %d failures\n", failures);
+  return failures == 0;
+#undef T_CHECK
+}
 
 #endif // STRONGTALK_X86_BACKEND
