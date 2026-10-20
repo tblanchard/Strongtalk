@@ -139,6 +139,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "abort.hpp"
 #include "blockOop.hpp"
 #include "doubleOop.hpp"
+#include "stackChunk.hpp"
 #include "vmOperations.hpp"
 #include "recompile.hpp"
 #include <setjmp.h>
@@ -214,6 +215,7 @@ struct CompiledReturn {
 enum { returned_normally = 0, returned_with_nlr = 1 };
 
 extern "C" void delta_call_compiled(char* entry, oop receiver, oop* sp, intptr_t* fp, char* return_pc, CompiledReturn* out);
+extern "C" void resume_deoptimized_frames(oop result, intptr_t kind, intptr_t home, intptr_t home_id, intptr_t* deoptimized_fp, CompiledReturn* out);
 extern "C" void compiled_to_interpreted();
 extern "C" char* method_entry_point;		// called by the PIC / megamorphic IC stubs (stubRoutines.cpp)
 
@@ -280,6 +282,7 @@ class PortableInterpreter {
   DeltaStack* _stack;
   intptr_t  _to_compiled;	// -1, or how the activation leaves to compiled code (returned_normally/returned_with_nlr)
   char*     _continuation;	// where compiled code continues
+  intptr_t* _base_fp;		// if not NULL: leaving this frame leaves the activation (to its return pc, which is code)
 
   // frame access
   oop&     receiver()          { return ((oop*) fp)[frame_receiver_offset]; }
@@ -363,7 +366,7 @@ class PortableInterpreter {
   bool run();
   oop  result() const { return _result; }
 
-  PortableInterpreter(intptr_t* f, oop* s, DeltaStack* st) : fp(f), sp(s), hp(NULL), _result(NULL), _stack(st), _to_compiled(-1), _continuation(NULL) {}
+  PortableInterpreter(intptr_t* f, oop* s, DeltaStack* st) : fp(f), sp(s), hp(NULL), _result(NULL), _stack(st), _to_compiled(-1), _continuation(NULL), _base_fp(NULL) {}
 
   // compiled code
   bool call_compiled(char* entry, oop recv, ReturnPoint rp);	// false if returning to C
@@ -372,6 +375,7 @@ class PortableInterpreter {
 
   friend oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is_block);
   friend oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, bool is_block);
+  friend void resume_deoptimized_frames(oop result, intptr_t kind, intptr_t home, intptr_t home_id, intptr_t* deoptimized_fp, CompiledReturn* out);
   friend void interpret_from_compiled_activation(methodOop m, oop receiver, oop temp0, oop* sp, intptr_t* fp, CompiledReturn* out);
 };
 
@@ -447,8 +451,16 @@ void PortableInterpreter::count_invocation(methodOop m) {
 bool PortableInterpreter::return_from_frame(oop result, int nof_args) {
   char* ret_pc = frame_return_pc();
   intptr_t* link = frame_link();
+  bool leaving_base = fp == _base_fp;
   sp = (oop*) (fp + frame_sender_sp_offset) + nof_args;
   fp = link;
+  if (leaving_base) {
+    // the oldest frame of the activation (e.g. unpacked deoptimized frames) returns to code
+    _to_compiled  = returned_normally;
+    _continuation = ret_pc;
+    _result       = result;
+    return false;
+  }
   return continue_caller(ret_pc, result);
 }
 
@@ -881,8 +893,9 @@ bool PortableInterpreter::nlr_unwind(oop result, intptr_t home_fp, int home_id) 
     }
     char* ret_pc = frame_return_pc();
     intptr_t* link = frame_link();
-    if (is_compiled_code_return(ret_pc)) {
-      // the caller is compiled code: continue the NLR at the NLR target of its send
+    if (is_compiled_code_return(ret_pc) || fp == _base_fp) {
+      // the caller is compiled code (or code outside this activation): continue the NLR at the
+      // NLR target of its send (all return pcs of Delta frames have an IC info)
       // (as continue_NLR: the frame and the return address are removed, the arguments not)
       _to_compiled  = returned_with_nlr;
       _continuation = ic_info_at(ret_pc)->NLR_target();
@@ -1459,6 +1472,7 @@ void interpret_from_compiled_activation(methodOop m, oop receiver, oop temp0, oo
   Activation act;
   act.previous = current_activation;
   act.entry_fp = (intptr_t*) sp;		// the frames of this activation are below the return address
+  in._base_fp = in.fp;
   current_activation = &act;
   if (setjmp(act.buf) != 0) {
     in.fp = act.resume_fp;
@@ -1491,6 +1505,154 @@ extern "C" void interpret_from_compiled(methodOop m, oop receiver, oop* sp, intp
 extern "C" void interpret_block_from_compiled(blockClosureOop blk, oop* sp, intptr_t* fp, CompiledReturn* out) {
   contextOop ctx = blk->lexical_scope();
   interpret_from_compiled_activation(blk->method(), ctx, ctx, sp, fp, out);
+}
+
+// ---------------------------------------------------------------------------
+// Deoptimization (cf. unpack_frame_array in process.cpp, the x86 version)
+//
+// A deoptimized compiled frame (DeltaProcess::deoptimize_stretch) is entered through
+// unpack_unoptimized_frames (portableInterpreter_arm64.S) when its callee returns into it
+// (or an NLR passes it). Its frame array is unpacked into interpreter frames in place and
+// the interpreter resumes the most recent one: after the send with the callee's result,
+// redoing the send (uncommon traps), or continuing the NLR. Leaving the oldest unpacked
+// frame continues at its return pc (the deoptimized frame's caller; compiled code, an
+// interpreter return point or return_from_Delta - all of them are code).
+
+extern "C" oop* setup_deoptimization_and_return_new_sp(oop* old_sp, intptr_t* old_fp, objArrayOop frame_array, intptr_t* current_frame);
+extern "C" bool take_redo_the_send();
+extern "C" contextOop nlr_home_context;
+
+// The return point of an interpreted frame with a pending call at c (cf. CodeIterator::interpreter_return_point).
+static ReturnPoint return_point_for(CodeIterator& c, int* nof_args) {
+  if (c.is_message_send()) {
+    bool with_receiver = c.argumentsType() != Bytecodes::args_only;
+    *nof_args = c.ic()->nof_arguments();
+    return with_receiver ? (c.pop_result() ? rp_send_with_receiver_pop    : rp_send_with_receiver)
+                         : (c.pop_result() ? rp_send_without_receiver_pop : rp_send_without_receiver);
+  }
+  if (c.is_primitive_call()) {
+    // a primitive calling Delta (block evaluation): the callee pops its arguments as well
+    *nof_args = c.prim_cache()->number_of_parameters();
+    switch (c.code()) {
+      case Bytecodes::prim_call_failure:
+      case Bytecodes::prim_call_failure_lookup:
+      case Bytecodes::prim_call_self_failure:
+      case Bytecodes::prim_call_self_failure_lookup: return rp_primitive_can_fail;
+      default:                                       return rp_primitive;
+    }
+  }
+  fatal("deoptimization: unsupported pending call (DLL calls are not supported)");
+  return rp_c_call;
+}
+
+extern "C" void resume_deoptimized_frames(oop result, intptr_t kind, intptr_t home, intptr_t home_id,
+                                          intptr_t* deoptimized_fp, CompiledReturn* out) {
+  intptr_t* saved_fp = last_Delta_fp;
+  oop*      saved_sp = last_Delta_sp;
+  last_Delta_fp = NULL;
+  bool nlr  = kind == returned_with_nlr;
+  bool redo = !nlr && take_redo_the_send();
+  if (nlr) {
+    nlr_result  = result;
+    nlr_home    = home;
+    nlr_home_id = (int) home_id;
+  }
+
+  // unpack the frame array into interpreter frames
+  frame deoptimized(NULL, deoptimized_fp, NULL);	// (frame(sp, fp) would read the pc at sp[-1])
+  objArrayOop array    = deoptimized.frame_array();
+  oop*        old_sp   = deoptimized.real_sender_sp();
+  intptr_t*   old_fp   = (intptr_t*) deoptimized_fp[frame_link_offset];
+  oop*        new_sp   = setup_deoptimization_and_return_new_sp(old_sp, old_fp, array, deoptimized_fp);
+  bool must_find_nlr_target = nlr && nlr_home == (intptr_t) deoptimized_fp;
+  bool nlr_target_found     = false;
+
+  intptr_t*  newest_fp = NULL;
+  intptr_t*  oldest_fp = NULL;
+  ReturnPoint newest_rp = rp_c_call;
+  int        newest_nof_args = 0;
+  u_char*    newest_hp = NULL;
+  {
+    BlockScavenge bs;
+    ResourceMark rm;
+    oop* current_sp = new_sp;
+    int  pos    = StackChunkBuilder::first_frame_index;
+    int  length = array->length();
+    bool first  = true;
+    frame current;
+    do {
+      oop       receiver = array->obj_at(pos++);
+      methodOop method   = methodOop(array->obj_at(pos++));
+      int       bci      = smiOop(array->obj_at(pos++))->value();
+      int       locals   = smiOop(array->obj_at(pos++))->value();
+      current = frame(current_sp, (intptr_t*) current_sp + locals + 2);
+      for (int i = 0; i < locals; i++) current.set_temp(i, array->obj_at(pos++));
+      CodeIterator c(method, bci);
+      current.set_hp(c.next_hp());
+      current.set_receiver(receiver);
+      if (first) {
+        newest_fp = current.fp();
+        newest_hp = c.hp();
+        if (!nlr && !redo) newest_rp = return_point_for(c, &newest_nof_args);
+        current_sp[-1] = (oop) return_pc(rp_c_call);	// not used: the interpreter resumes the frame directly
+      } else {
+        int n;
+        current.patch_pc(return_pc(return_point_for(c, &n)));	// return pc of the newer frame
+      }
+      current.patch_fp(current.fp());			// link of the newer frame
+      // revive the contexts
+      if (!method->is_blockMethod() && method->activation_has_context()) {
+        contextOop con = contextOop(current.temp(0));
+        con->set_parent(oop(current.fp()));
+        if (nlr && nlr_home == (intptr_t) deoptimized_fp && nlr_home_context == con) {
+          nlr_home    = (intptr_t) current.fp();		// the target of the NLR
+          nlr_home_id = ~method->number_of_arguments();
+          nlr_target_found = true;
+        }
+      }
+      oldest_fp = current.fp();
+      first = false;
+      current_sp += frame::interpreter_frame_size(locals);
+    } while (pos <= length);
+    if (current_sp != old_sp) fatal("deoptimization: frames do not end at the sender's stack pointer");
+    current.set_link(old_fp);
+  }
+  if (must_find_nlr_target && !nlr_target_found) fatal("Target for NLR not found when unpacking frame");
+
+  // resume the most recent frame
+  PortableInterpreter in(newest_fp, new_sp, delta_stack());
+  in._base_fp = oldest_fp;
+  Activation act;
+  act.previous = current_activation;
+  act.entry_fp = (intptr_t*) old_sp;
+  current_activation = &act;
+  bool run = true;
+  if (setjmp(act.buf) != 0) {
+    in.fp = act.resume_fp;
+    in.sp = act.resume_sp;
+    last_Delta_fp = NULL;
+    run = in.nlr_unwind(nlr_result, nlr_home, nlr_home_id);
+  } else if (nlr) {
+    run = in.nlr_unwind(nlr_result, nlr_home, nlr_home_id);
+  } else if (redo) {
+    in.hp = newest_hp;				// redo the send
+  } else {
+    in.sp += newest_nof_args;			// the callee has popped them (they are part of the frame array)
+    run = in.continue_caller(return_pc(newest_rp), result);
+  }
+  if (run) in.run();
+  current_activation = act.previous;
+  last_Delta_fp = saved_fp;
+  last_Delta_sp = saved_sp;
+
+  if (in._to_compiled < 0) fatal("deoptimized frames do not return to their caller");
+  out->result       = in._result;
+  out->sp           = in.sp;
+  out->fp           = in.fp;
+  out->kind         = in._to_compiled;
+  out->continuation = in._continuation;
+  out->home         = nlr_home;
+  out->home_id      = nlr_home_id;
 }
 
 extern "C" oop call_delta(void* method, oop receiver, int nofArgs, oop* args) {
@@ -1583,6 +1745,8 @@ class SelfSendFinder : public ObjectClosure {
 };
 
 static intptr_t test_home_id;
+static objArrayOop deopt_test_array;
+extern "C" void unpack_unoptimized_frames();
 
 extern "C" void restart_primitiveValue();
 
@@ -1701,6 +1865,46 @@ bool transitions_arm64_test() {
       T_CHECK(r == as_smiOop(5678) && !have_nlr_through_C, "NLR from compiled code to its interpreted home");
       ic->set(send_code, first, second);	// restore the method
       lprintf("  self send method: %s\n", m->selector()->as_string());
+
+      // deoptimization: a compiled frame (deoptimized, frame array for an activation of m at its send)
+      // gets the result of its callee through unpack_unoptimized_frames; m continues and returns it
+      if (m->nofArgs() == 1) {
+        objArrayOop fa = oopFactory::new_objArray(StackChunkBuilder::first_frame_index - 1 + 4 + 2);	// (1-based)
+        fa->obj_at_put(StackChunkBuilder::number_of_vframes_index, as_smiOop(1));
+        fa->obj_at_put(StackChunkBuilder::number_of_locals_index,  as_smiOop(2));
+        int pos = StackChunkBuilder::first_frame_index;
+        fa->obj_at_put(pos++, Universe::nilObj());		// receiver of m
+        fa->obj_at_put(pos++, m);
+        fa->obj_at_put(pos++, as_smiOop(2));			// bci of the send (after push_arg_1)
+        fa->obj_at_put(pos++, as_smiOop(2));			// locals: temp0, the send's receiver
+        fa->obj_at_put(pos++, Universe::nilObj());		// temp0
+        fa->obj_at_put(pos++, Universe::nilObj());		// expression stack: the receiver of the send
+        deopt_test_array = fa;
+        char *deopt_frame, *callee;
+        { JITWriteScope write_code;
+          { CodeBuffer cb(code + 8192, 1024); MacroAssembler mm(&cb);
+            callee = mm.pc();
+            mm.movl(eax, (intptr_t) as_smiOop(777));
+            mm.ret(0);
+          }
+          { CodeBuffer cb(code + 9216, 1024); MacroAssembler mm(&cb);
+            deopt_frame = mm.pc();
+            mm.enter();
+            mm.subl(esp, 2 * oopSize);
+            mm.movl(edx, Address(asm_word(&deopt_test_array), relocInfo::external_word_type));
+            mm.movl(Address(ebp, frame_frame_array_offset * oopSize), edx);
+            mm.leal(edx, Address(ebp, frame_sender_sp_offset * oopSize));
+            mm.movl(Address(ebp, frame_real_sender_sp_offset * oopSize), edx);
+            mm.movl(edx, asm_word(&unpack_unoptimized_frames));
+            mm.pushl(edx);				// the patched return address
+            mm.jmp(callee, relocInfo::runtime_call_type);
+          }
+        }
+        os::flush_icache(code + 8192, 2048);
+        oop a2[1] = { Universe::nilObj() };
+        r = call_delta(deopt_frame, Universe::nilObj(), 1, a2);
+        T_CHECK(r == as_smiOop(777) && !have_nlr_through_C, "deoptimized frame: unpacked, resumed after the send, returned to C");
+      }
     }
   }
 

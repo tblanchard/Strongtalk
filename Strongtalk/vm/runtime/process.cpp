@@ -714,6 +714,13 @@ void DeltaProcess::deoptimize_redo_last_send() {
   redo_the_send = true;
 }
 
+// for the portable interpreter's unpacking of deoptimized frames
+extern "C" bool take_redo_the_send() {
+  bool redo = redo_the_send;
+  redo_the_send = false;
+  return redo;
+}
+
 // Interpreter entry point for redoing a send.
 extern "C" void redo_bytecode_after_deoptimization();
 

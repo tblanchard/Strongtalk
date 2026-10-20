@@ -139,6 +139,32 @@ continue_compiled:                      // sp: the CompiledReturn filled in by t
 
 
 // ---------------------------------------------------------------------------
+// unpack_unoptimized_frames: the patched return pc of a deoptimized frame (see
+// DeltaProcess::deoptimize_stretch and frame::is_deoptimized_frame). It looks like a call
+// site with IC info so that NLRs pass deoptimized frames. ebp = the deoptimized frame.
+
+        .p2align 4
+        .globl _unpack_unoptimized_frames
+_unpack_unoptimized_frames:
+        movz    xzr, #0xc00             // IC info: NLR target = this + 12
+        movk    xzr, #0, lsl #16
+        b       deoptimized_return_normal
+        b       deoptimized_return_nlr
+
+deoptimized_return_normal:
+        mov     x1, #0                  // kind: normal (eax = result)
+        b       1f
+deoptimized_return_nlr:
+        mov     x1, #1                  // kind: NLR
+1:      sub     sp, sp, #64
+        mov     x2, x21                 // home    (edi)
+        mov     x3, x20                 // home id (esi)
+        mov     x4, x29                 // the deoptimized frame
+        mov     x5, sp                  // out
+        bl      _resume_deoptimized_frames
+        b       continue_compiled
+
+// ---------------------------------------------------------------------------
 // restart_primitiveValue: redoes the evaluation of a block (jumped to by the zombie block and
 // deoptimize block stubs after patching the closure):
 //

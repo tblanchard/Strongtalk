@@ -121,6 +121,5 @@ X86_STUB(interpreter_case_98)
 X86_STUB(interpreter_case_99)
 X86_STUB(redo_bytecode_after_deoptimization)
 X86_STUB(single_step_stub)
-X86_STUB(unpack_unoptimized_frames)
 
 #endif // STRONGTALK_X86_BACKEND

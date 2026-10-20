@@ -1321,6 +1321,30 @@ void MacroAssembler::call_C_sequence(char* entry, int entry_reg, int nof_stack_a
   bind(ret);
   if (nlrTestPoint != NULL) Assembler::ic_info(*nlrTestPoint, 0);
   reset_last_Delta_frame();
+  {
+    // Deoptimization during the call patches the return address of this frame (at esp[-1],
+    // see above) to unpack_unoptimized_frames; on x86 the C function would return there. C
+    // returns through lr on arm64, so follow a patched return address explicitly (with a
+    // pending NLR: to its NLR entry, the IC info of unpack_unoptimized_frames points 12 ahead).
+    Label not_patched, no_nlr_pending;
+    emit(ldst_simm9(LDR, 3, S0, arm(esp), -oopSize));
+    emit(adr(S1, ret.pos() - offset()));
+    emit(cmp_reg(S0, S1));
+    set_flags(flags_sub);
+    jcc(equal, not_patched);
+    load(0, false, T0, Address((intptr_t) &have_nlr_through_C, relocInfo::external_word_type));
+    emit(subs_imm(zr, T0, 0));
+    set_flags(flags_sub);
+    jcc(equal, no_nlr_pending);
+    store(0, zr, Address((intptr_t) &have_nlr_through_C, relocInfo::external_word_type));
+    load(3, false, arm(eax), Address((intptr_t) &nlr_result,  relocInfo::external_word_type));
+    load(3, false, arm(edi), Address((intptr_t) &nlr_home,    relocInfo::external_word_type));
+    load(2, true,  arm(esi), Address((intptr_t) &nlr_home_id, relocInfo::external_word_type));
+    emit(add_imm(S0, S0, 12));
+    bind(no_nlr_pending);
+    emit(br(S0));
+    bind(not_patched);
+  }
   if (nlrTestPoint != NULL) {
     // NLRs through C: the portable interpreter returns from C with have_nlr_through_C set
     // (e.g. a block evaluated by primitiveValue doing an NLR); continue the NLR here with

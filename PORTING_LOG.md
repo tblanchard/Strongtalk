@@ -385,7 +385,19 @@ Phases:
               blocks or interprets block methods (interpret_block_from_compiled).
               Tested: primitiveValue1 of a compiled clean block from C; restart_primitiveValue with a compiled
               block (esp balanced).
-        - [ ] Deoptimization (unpack_unoptimized_frames, deoptimized_return_from_*, redo_bytecode_after_deopt.)
+        - [x] Deoptimization: unpack_unoptimized_frames is a return point slot (.S: IC info, normal / NLR
+              entries) -> resume_deoptimized_frames (portableInterpreter.cpp): unpacks the frame array into
+              interpreter frames in place (as process.cpp unpack_frame_array, with portable return points and
+              word slots - the x86 version addressed stack slots as int*), then resumes the newest frame: after
+              the send (the callee popped its arguments, they are in the array), redoing the send (uncommon
+              traps; take_redo_the_send), or continuing the NLR (home adjusted to the unpacked frame). The
+              interpreter's base frame (_base_fp) leaves the activation to its return pc whatever it is
+              (compiled code / interpreter return point / return_from_Delta: all are code now).
+              Not needed on arm64: deoptimized_return_from_*, redo_bytecode_after_deoptimization (x86 stubs).
+        - [x] Deoptimization during C calls: C returns through lr on arm64, so call_C follows a patched return
+              address (esp[-1] != its return address) explicitly, to the NLR entry if an NLR is pending.
+              Tested: a hand-built deoptimized frame (frame array for an activation of a 1-argument method at
+              its send) is unpacked when its callee returns, resumes after the send and returns to C.
         - [ ] Interpreted blocks through restart_primitiveValue, interpreter primitive_value with compiled
               blocks, NLRs starting in the interpreter passing compiled frames: need a running process (C4).
 - [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
