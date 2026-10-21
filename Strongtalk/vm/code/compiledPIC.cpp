@@ -86,6 +86,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "ic_iterator.hpp"
 #include "compiledPIC.hpp"
 #include "disassembler.hpp"
+#include "oop.inline.hpp"
 #ifdef DELTA_COMPILER
 
 

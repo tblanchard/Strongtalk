@@ -88,6 +88,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "blockOop.hpp"
 #include "blockKlass.hpp"
 #include "block_prims.hpp"
+#include "blockOop.inline.hpp"
 methodOop blockClosureOopDesc::method() const { 
   oop m = addr()->_methodOrJumpAddr;
 

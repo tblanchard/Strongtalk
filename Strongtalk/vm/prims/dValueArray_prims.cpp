@@ -64,8 +64,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "universe.inline.hpp"
 #include "doubleOop.hpp"
 #include "vmSymbols.hpp"
+#include "markSweep.hpp"
 #include "oop.inline.hpp"
 #include "prim_impl.hpp"
+#include "memOop.inline.hpp"
 TRACE_FUNC(TraceDoubleValueArrayPrims, "doubleValueArray")
 
 int doubleValueArrayPrimitives::number_of_calls;

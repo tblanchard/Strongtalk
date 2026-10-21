@@ -73,6 +73,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "objArrayOop.hpp"
 #include "blockKlass.hpp"
 #include "bytecodeTranscoder.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 TRACE_FUNC(TraceMethodPrims, "method")
 
 int methodOopPrimitives::number_of_calls;

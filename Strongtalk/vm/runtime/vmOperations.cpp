@@ -98,6 +98,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "compiler.hpp"
 #include "evaluator.hpp"
 #include "markSweep.hpp"
+#include "oop.inline.hpp"
+#include "memOop.inline.hpp"
 void VM_Operation::evaluate() {
   EventMarker  em("VM operation %s", name());
   ResourceMark rm;

@@ -69,6 +69,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "nmethodScopes.hpp"
 #include "nmethod.hpp"
 #include "klassOop.hpp"
+#include "oop.inline.hpp"
 
 // The sweeper run at real_time ticks. We only swep if the interrupted
 // Delta process is in a well-defined state (see SweeperTask).

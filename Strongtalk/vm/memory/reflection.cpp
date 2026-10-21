@@ -93,6 +93,9 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "timer.hpp"
 #include "oopFactory.hpp"
 #include "vmSymbols.hpp"
+#include "markSweep.hpp"
+#include "oop.inline.hpp"
+#include "memOop.inline.hpp"
 // Converter hierarchy:
 // - memConverter
 //   - byteArrayConverter

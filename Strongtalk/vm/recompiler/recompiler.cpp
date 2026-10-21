@@ -106,6 +106,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "inliner.hpp"
 #include "compiler.hpp"
 #include "rframe.hpp"
+#include "oop.inline.hpp"
 #ifdef DELTA_COMPILER
 
 

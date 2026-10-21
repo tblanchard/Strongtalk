@@ -102,6 +102,9 @@ char* InliningDatabase::directory() {
 #include "oopFactory.hpp"
 #include "os.hpp"
 #include "klassOop.hpp"
+#include "markSweep.hpp"
+#include "oop.inline.hpp"
+#include "memOop.inline.hpp"
 
 const char  quote = '_';
 const char* quote_string = "_\\/:; *?~|><,+=@%&!-";

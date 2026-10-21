@@ -88,6 +88,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "proxyOop.hpp"
 #include "vmOperations.hpp"
 #include "codeIterator.hpp"
+#include "oop.inline.hpp"
 // InterpretedDLL_Cache implementation
 
 void InterpretedDLL_Cache::verify() {

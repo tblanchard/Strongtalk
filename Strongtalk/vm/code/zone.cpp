@@ -89,6 +89,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "compiledPIC.hpp"
 #include "timer.hpp"
 #include "blockOop.hpp"
+#include "oop.inline.hpp"
 #ifdef DELTA_COMPILER
 
 

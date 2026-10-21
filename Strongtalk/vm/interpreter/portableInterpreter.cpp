@@ -143,6 +143,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "vmOperations.hpp"
 #include "recompile.hpp"
 #include <setjmp.h>
+#include "blockOop.inline.hpp"
 
 // ---------------------------------------------------------------------------
 // Globals shared with the rest of the VM

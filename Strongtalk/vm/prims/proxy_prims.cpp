@@ -192,11 +192,10 @@ PRIM_DECL_2(proxyOopPrimitives::smiAt, oop receiver, oop offset) {
   ASSERT_RECEIVER;
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
-  unsigned int value   = (unsigned int) proxyOop(receiver)->long_at(smiOop(offset)->value());
-  unsigned int topBits = value >> (BitsPerWord - Tag_Size);
-  if ((topBits != 0) && (topBits != 3))
-    return markSymbol(vmSymbols::smi_conversion_failed());
-  return as_smiOop((int) value);
+  // a 32-bit (Win32 LONG) field: the image's external structures have 4-byte words
+  // (Platform wordSize); every 32-bit value is a SmallInteger on 64-bit
+  int32_t value = *(int32_t*) ((char*) proxyOop(receiver)->get_pointer() + smiOop(offset)->value());
+  return as_smiOop(value);
 }
 
 PRIM_DECL_3(proxyOopPrimitives::smiAtPut, oop receiver, oop offset, oop value) {
@@ -206,7 +205,11 @@ PRIM_DECL_3(proxyOopPrimitives::smiAtPut, oop receiver, oop offset, oop value) {
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_smi())
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
-  proxyOop(receiver)->long_at_put(smiOop(offset)->value(), smiOop(value)->value());
+  // a 32-bit (Win32 LONG) field, see smiAt
+  smi v = smiOop(value)->value();
+  if (v != (int32_t) v)
+    return markSymbol(vmSymbols::smi_conversion_failed());
+  *(int32_t*) ((char*) proxyOop(receiver)->get_pointer() + smiOop(offset)->value()) = (int32_t) v;
   return receiver;
 }
 

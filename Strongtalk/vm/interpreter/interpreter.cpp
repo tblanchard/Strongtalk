@@ -88,6 +88,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "objArrayOop.hpp"
 #include "blockOop.hpp"
 #include "x86_mapping.hpp"
+#include "klassOop.hpp"
+#include "oop.inline.hpp"
 // Interpreter stack frame
 //
 // An interpreter stack frame always provides space for at least one temporary (temp_0).

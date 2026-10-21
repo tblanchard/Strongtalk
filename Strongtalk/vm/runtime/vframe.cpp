@@ -96,6 +96,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "objArrayOop.hpp"
 #include "tempDecoder.hpp"
 #include "savedRegisters.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 // Ideas:
 //   Maybe cache methodOop in deltaVFrame for faster argument access. (Lars 8/10/95)
 

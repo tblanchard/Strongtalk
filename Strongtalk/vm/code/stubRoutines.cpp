@@ -87,6 +87,9 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "blockOop.hpp"
 #include "jumpTable.hpp"
 #include "x86_mapping.hpp"
+#include "klassOop.hpp"
+#include "oop.inline.hpp"
+#include "blockOop.inline.hpp"
 
 const int max_fast_allocate_size = 9;
 

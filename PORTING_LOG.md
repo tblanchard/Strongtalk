@@ -423,9 +423,39 @@ Phases:
         returns from delta_call_compiled with kind redo_send; call_compiled re-executes the send.
       Speedups vs interpreted (debug build, first column of the benchmark output; the other columns
       are fixed reference numbers): Sieve 281->34, Richards 459->210, Smopstones ~20-40x.
-- [ ] C4 integration: compare interpreter vs compiled results; exercise deoptimization in real runs
-      (zombie block nmethods -> restart_primitiveValue, NLRs from interpreted blocks through compiled
-      frames); call_compiled_from_C with a zombie jump table entry (C-called zombie is not handled:
-      zombie_nmethod treats return_from_Delta as a compiled IC); release build timings;
-      `nmethod::inc_uncommon_trap_counter` etc. write code memory outside JITWriteScope (handled by
-      the fault-handler toggle, slow if frequent).
+- [x] C4 integration (2026-10-21). The image's own VM test suites pass with compiled code, debug and
+      release builds: `vmtest` (benchmarks + VMSuite class tests + dead-code tests, 4 iterations, in a
+      recompiling and an interpreted configuration, heap verified after each) and `vmcompiled`
+      (CompiledCodeOnly: every method compiled at lookup, no deferred uncommon branches).
+      Run: `strongtalk +UseArm64Compiler vmtest` / `vmcompiled` (they set UseRecompilation themselves).
+      Fixes:
+      - BitVector/SimpleBitVector held bits in int but indexed with LogBitsPerWord (6): words now.
+      - ReservedHeapSize default 50 MB of 32-bit words (100 MB): vmtest ran out of old space even
+        interpreted (old space only grows; no automatic full GC).
+      - Nested C->Delta activations start 16 words below last_Delta_sp (stub_push_margin): stub
+        routines push below the caller's return pc before calling C (DLL lookup stub: ebx/ecx); on
+        x86 the nested activation started at the C sp, below them.
+      - Jump table entry blocks (nmethods with blocks) carved from 256K code memory chunks; one mmap
+        each exhausted os_posix's 32 code areas.
+      - loopOpt findRegCandidates ran off the BB list when the loop end was dead code
+        ([^ 1] whileTrue in VMSuite>>dead5) - an original bug hidden without ASSERT.
+      - proxy smiAt/smiAtPut: 32-bit (Win32 LONG) fields - the image's external structures use
+        4-byte words (Platform wordSize = 4); they read a 64-bit long (overrunning 4-byte mallocs)
+        and shifted a 32-bit value by 62 (UB: miscompiled at -O2).
+      - Missing *.inline.hpp includes in ~20 files (an -O2 build did not link: callers relied on
+        out-of-line copies emitted at -O0).
+      Release build: `RELEASE=1 porting/stlink.sh` -> /tmp/stobj_rel (-O2, no ASSERT/DEBUG; develop
+      flags stay settable since PRODUCT is not defined). Release timings (interpreted -> compiled, one
+      pass, compile time included): BubbleSort 42->5, IntMM 21->3, Puzzle 209->18, Takl 80->4,
+      Dictionary 478->36, Richards 46->28, DeltaBlue 153->48; Smopstones 5-12x; warm block evaluation
+      ~50-100x (vmtest iterations 3-4). The debug build is ~10x slower than release.
+      Open:
+      - Proxy pointer fields (proxyAt/proxyAtPut) are 8 bytes, but the image lays out external
+        structures with 4-byte words: the FFI/struct model needs a 64-bit story before the GUI work.
+      - A zombie nmethod called from C through a jump table entry (call_compiled_from_C) is not
+        handled (zombie_nmethod treats return_from_Delta as a compiled IC); same gap as x86, not
+        reachable while MakeBlockMethodZombies is off and C callers use fresh lookups.
+      - nmethod::inc_uncommon_trap_counter etc. write code memory outside JITWriteScope (the
+        fault-handler toggle handles it: 21 faults in a slopstone run).
+      - First-iteration timings include compilation; no comparison of numeric results beyond the
+        test suites' own checks.

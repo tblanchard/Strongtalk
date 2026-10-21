@@ -62,6 +62,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "timer.hpp"
 #include "vmOperations.hpp"
 #include "weakArrayKlass.hpp"
+#include "oop.inline.hpp"
 
 
 

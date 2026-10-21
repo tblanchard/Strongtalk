@@ -64,6 +64,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "vmSymbols.hpp"
 #include "oop.inline.hpp"
 #include "dValueArrayKlass.hpp"
+#include "markSweep.hpp"
+#include "memOop.inline.hpp"
 bool doubleValueArrayOopDesc::verify() {
   bool flag = memOopDesc::verify();
   if (flag) {

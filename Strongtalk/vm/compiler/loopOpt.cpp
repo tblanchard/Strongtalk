@@ -716,9 +716,14 @@ void CompiledLoop::findRegCandidates() {
   const int len = _bbs->length();
   const BB* startBB = _startOfLoop->bb();
   int i;
-  for (i = 0; _bbs->at(i) != startBB; i++) ;	// search for first BB
+  for (i = 0; i < len && _bbs->at(i) != startBB; i++) ;	// search for first BB
   const BB* endBB = _endOfLoop->bb();
   int ncalls = 0;
+  // the loop start or end may have been eliminated as dead code (e.g. [^ 1] whileTrue):
+  // then there are no register candidates (the search used to run off the BB list)
+  int e;
+  for (e = i; e < len && _bbs->at(e) != endBB; e++) ;
+  if (e == len) return;
 
   // iterate through all BBs in the loop
   for (BB* bb = _bbs->at(i); bb != endBB; i++, bb = _bbs->at(i)) {

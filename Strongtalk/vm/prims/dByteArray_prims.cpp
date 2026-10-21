@@ -65,9 +65,11 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "doubleOop.hpp"
 #include "objArrayOop.hpp"
 #include "vmSymbols.hpp"
+#include "markSweep.hpp"
 #include "oop.inline.hpp"
 #include "symbolTable.hpp"
 #include "prim_impl.hpp"
+#include "memOop.inline.hpp"
 TRACE_FUNC(TraceDoubleByteArrayPrims, "doubleByteArray")
 
 int doubleByteArrayPrimitives::number_of_calls;

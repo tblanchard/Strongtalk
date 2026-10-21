@@ -96,6 +96,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "slist.hpp"
 #include "universe.inline.hpp"
 #include "vmSymbols.hpp"
+#include "markSweep.hpp"
 #include "oop.inline.hpp"
 #include "objArrayOop.hpp"
 #include "frame.hpp"
@@ -111,6 +112,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "compiledPIC.hpp"
 #include "registerMask.hpp"
 #include "oopFactory.hpp"
+#include "memOop.inline.hpp"
 # ifdef DELTA_COMPILER
 
 
