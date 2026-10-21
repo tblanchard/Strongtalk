@@ -711,10 +711,17 @@ static Assembler::Condition mapToCC(BranchOpCode op) {
 
 
 static void primitiveCall(InlinedScope* scope, primitive_desc* pdesc) {
+  bool needsDeltaFPCode = pdesc->needs_delta_fp_code();
+#ifdef STRONGTALK_ARM64
+  // The primitive flags describe the x86 implementations: primitiveValueN are stubs jumping
+  // into the block, the double operations are assembly. Here all primitives are C functions
+  // that may call Delta code or allocate (and scavenge), which needs the last Delta frame.
+  needsDeltaFPCode = true;
+#endif
   if (pdesc->can_perform_NLR()) {
-    call_C((char*)(pdesc->fn()), relocInfo::prim_type, pdesc->needs_delta_fp_code(), scope->nlrTestPoint()->label);
+    call_C((char*)(pdesc->fn()), relocInfo::prim_type, needsDeltaFPCode, scope->nlrTestPoint()->label);
   } else {
-    call_C((char*)(pdesc->fn()), relocInfo::prim_type, pdesc->needs_delta_fp_code());
+    call_C((char*)(pdesc->fn()), relocInfo::prim_type, needsDeltaFPCode);
   }
 }
 

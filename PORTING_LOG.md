@@ -402,5 +402,30 @@ Phases:
               blocks, NLRs starting in the interpreter passing compiled frames: need a running process (C4).
 - [ ] C2 remaining: stubs (call_delta entry, interpreter<->compiled calls, IC miss, PICs, NLR, uncommon trap,
       recompile), nativeInstruction patching, relocations.
-- [ ] C3 port oldCodeGenerator + register mapping + primInliner (smi/float).
-- [ ] C4 enable recompilation; deoptimization; benchmarks + interpreter-vs-compiled result comparison.
+- [x] C3 port oldCodeGenerator (2026-10-20). The old backend (the live one) generates arm64 through the
+      x86-interface MacroAssembler; the full `benchmarks` suite runs compiled (318 compilations incl.
+      recompilations and uncommon-trap recompilations, exit 0).
+      Run: `strongtalk +UseRecompilation +UseArm64Compiler [+PrintCompilation] benchmarks` (the
+      user's .strongtalkrc has -UseRecompilation, so it must be overridden on the command line).
+      - C calls: call_C -> MacroAssembler::call_C_sequence (args esp[0..7] -> x0..x7, `ldr x16,lit; blr;
+        b; literal`, return address at esp[-1]); NativeCall recognizes the C-call pattern (R-20).
+      - Invocation counters: nmethod::_counter_cell (C-heap int cell, address embedded in the code,
+        incremented with 32-bit movl32); smi index -> word offset scaled by 2 (smi_to_word_scale);
+        64-bit immediates (intptr_t/unsigned overloads); float section `% oopSize`; oopify_double.
+      - **All primitive calls set the last Delta frame on arm64**: the primitive flags describe the
+        x86 implementations (primitiveValueN are stubs jumping into the block, the double ops are
+        assembly allocating inline); here they are C functions that call Delta code / scavenge. Without
+        it, a C->Delta call started a new activation at the stack base over live frames, and
+        scavenges walked stale frames.
+      - nmethodScopes::getNext rounded scope offsets to 4 bytes; the section is padded to a word (8)
+        -> parsed padding as a scope ("expecting a method" while inlining an existing nmethod).
+      - Zombie nmethods called by the interpreter: zombie_nmethod returns compiled_redo_send (.S), which
+        returns from delta_call_compiled with kind redo_send; call_compiled re-executes the send.
+      Speedups vs interpreted (debug build): Sieve 281->34, Richards 459->210, BubbleSort 18x,
+      Puzzle 2712 (interp col.)->121, Smopstones ~20-40x.
+- [ ] C4 integration: compare interpreter vs compiled results; exercise deoptimization in real runs
+      (zombie block nmethods -> restart_primitiveValue, NLRs from interpreted blocks through compiled
+      frames); call_compiled_from_C with a zombie jump table entry (C-called zombie is not handled:
+      zombie_nmethod treats return_from_Delta as a compiled IC); release build timings;
+      `nmethod::inc_uncommon_trap_counter` etc. write code memory outside JITWriteScope (handled by
+      the fault-handler toggle, slow if frequent).

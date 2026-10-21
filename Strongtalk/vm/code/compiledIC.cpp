@@ -329,6 +329,10 @@ extern "C" char* icSuperLookup(oop recv, CompiledIC* ic) {
 }
 
 
+#ifdef STRONGTALK_ARM64
+extern "C" void compiled_redo_send();	// portableInterpreter_arm64.S
+#endif
+
 extern "C" char* zombie_nmethod(char* return_addr) {
   // Called from zombie nmethods. Determines if called from interpreted
   // or compiled code, does cleanup of the corresponding inline caches
@@ -349,7 +353,12 @@ extern "C" char* zombie_nmethod(char* return_addr) {
     // reset instruction pointer => next instruction beeing executed is the same send
     f.set_hp(ic->send_code_addr());
     // restart send entry point for interpreted sends
+#ifdef STRONGTALK_ARM64
+    // the portable interpreter redoes the send when delta_call_compiled returns this way
+    return (char*) &compiled_redo_send;
+#else
     return Interpreter::redo_send_entry();
+#endif
   } else {
     // nmethod called from compiled code
     CompiledIC* ic = CompiledIC_from_return_addr(return_addr);

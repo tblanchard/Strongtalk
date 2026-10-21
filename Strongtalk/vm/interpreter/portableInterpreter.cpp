@@ -212,7 +212,7 @@ struct CompiledReturn {
   intptr_t  home_id;			// NLR: esi (home scope id; ~nof_args for interpreted homes)
   char*     continuation;		// interpret_from_compiled: where compiled code continues
 };
-enum { returned_normally = 0, returned_with_nlr = 1 };
+enum { returned_normally = 0, returned_with_nlr = 1, redo_send = 2 };
 
 extern "C" void delta_call_compiled(char* entry, oop receiver, oop* sp, intptr_t* fp, char* return_pc, CompiledReturn* out);
 extern "C" void resume_deoptimized_frames(oop result, intptr_t kind, intptr_t home, intptr_t home_id, intptr_t* deoptimized_fp, CompiledReturn* out);
@@ -416,6 +416,13 @@ bool PortableInterpreter::call_compiled(char* entry, oop recv, ReturnPoint rp) {
   if (r.kind == returned_with_nlr) {
     // the NLR continues in this frame (the callee's arguments are still on the stack)
     return nlr_unwind(r.result, r.home, (int) r.home_id);
+  }
+  if (r.kind == redo_send) {
+    // the callee was a zombie nmethod: zombie_nmethod cleaned up the IC and reset the
+    // frame's hp to the send, which is executed again (its arguments are still on the stack)
+    assert(r.sp == sp, "arguments must still be on the stack");
+    hp = saved_hp();
+    return true;
   }
   sp = r.sp;						// the callee popped its arguments
   return continue_caller(return_pc(rp), r.result);
@@ -1432,6 +1439,7 @@ oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, boo
   oop*      saved_sp = last_Delta_sp;
   oop* sp = saved_fp != NULL ? saved_sp - 2 : stack->high;
   if (sp - delta_stack_slack < stack->low) fatal("Delta stack overflow");
+  assert(saved_fp != NULL || current_activation == NULL, "C called from Delta code without last Delta frame");
 
   *--sp = NULL;					// return address of the entry frame (C)
   *--sp = NULL;					// link

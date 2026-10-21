@@ -93,6 +93,19 @@ _compiled_returned_nlr:
         str     x21, [x9, #32]          // out->home    (edi)
         str     x20, [x9, #40]          // out->home_id (esi)
 
+        b       restore_C
+
+// a zombie nmethod called by the interpreter (zombie_nmethod, stubRoutines.cpp): the send is
+// redone; esp = the arguments (the return pc has been popped), the frame's hp = the send
+        .globl _compiled_redo_send
+_compiled_redo_send:
+        ldr     x9, [x27, #SAVE_OUT]
+        str     x0, [x9, #0]            // out->result (the receiver)
+        str     x28, [x9, #8]           // out->sp
+        str     x29, [x9, #16]          // out->fp
+        mov     x10, #2
+        str     x10, [x9, #24]          // out->kind = redo send
+
 restore_C:
         mov     sp, x27
         ldp     x19, x20, [sp, #0]

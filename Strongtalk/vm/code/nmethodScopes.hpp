@@ -135,8 +135,9 @@ class nmethodScopes : public ValueObj {
     if (!s) return root();
     int offset = s->next_offset();
 
-    if (offset + (sizeof(int) - (offset%sizeof(int))) % sizeof(int)
-        >= (_oops_offset)*sizeof(oop)) return NULL;
+    // the scope bytes are padded to a word (ByteArray::alignToWord)
+    if (offset + (BytesPerWord - (offset%BytesPerWord)) % BytesPerWord
+        >= oops_offset()) return NULL;
     return at(offset, ScopeDesc::invalid_pc);
   }
 
