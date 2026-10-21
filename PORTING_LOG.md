@@ -421,8 +421,8 @@ Phases:
         -> parsed padding as a scope ("expecting a method" while inlining an existing nmethod).
       - Zombie nmethods called by the interpreter: zombie_nmethod returns compiled_redo_send (.S), which
         returns from delta_call_compiled with kind redo_send; call_compiled re-executes the send.
-      Speedups vs interpreted (debug build): Sieve 281->34, Richards 459->210, BubbleSort 18x,
-      Puzzle 2712 (interp col.)->121, Smopstones ~20-40x.
+      Speedups vs interpreted (debug build, first column of the benchmark output; the other columns
+      are fixed reference numbers): Sieve 281->34, Richards 459->210, Smopstones ~20-40x.
 - [ ] C4 integration: compare interpreter vs compiled results; exercise deoptimization in real runs
       (zombie block nmethods -> restart_primitiveValue, NLRs from interpreted blocks through compiled
       frames); call_compiled_from_C with a zombie jump table entry (C-called zombie is not handled:
