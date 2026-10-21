@@ -37,9 +37,9 @@ int findFirstUnused(LongRegisterMask** strings, int len, int start);
   // a pseudo-class -- int(this) actually holds the bits, so there's no
   // allocation
   class SimpleBitVector : public ValueObj {
-    int bits;
+    intptr_t bits;
    public:
-    SimpleBitVector(int b = 0) { bits = b; } 
+    SimpleBitVector(intptr_t b = 0) { bits = b; } 
 
     SimpleBitVector allocate(int l) {
       assert(l >= 0 && l < BitsPerWord, "need longer bit vector");
@@ -62,7 +62,7 @@ int findFirstUnused(LongRegisterMask** strings, int len, int start);
    protected:
     int maxLength;		// max # bits
     int length;			// number of bits, not words
-    int* bits;			// array containing the bits
+    intptr_t* bits;		// array containing the bits (words)
     
     int  indexFromNumber(int i) { return i >> LogBitsPerWord; }
     int offsetFromNumber(int i) { return lowerBits(i, LogBitsPerWord); }
@@ -73,18 +73,20 @@ int findFirstUnused(LongRegisterMask** strings, int len, int start);
     
     int bitsLength(int l) { return indexFromNumber(l - 1) + 1; }
     
-    int* createBitString(int l) {
+    static void clear_bits(intptr_t* bs, int n) { for (int i = 0; i < n; i++) bs[i] = 0; }
+
+    intptr_t* createBitString(int l) {
       int blen = bitsLength(l);
-      int* bs = NEW_RESOURCE_ARRAY( int, blen);
-      set_words(bs, blen, 0);
+      intptr_t* bs = NEW_RESOURCE_ARRAY( intptr_t, blen);
+      clear_bits(bs, blen);
       return bs; }
-    int* copyBitString(int len) {
+    intptr_t* copyBitString(int len) {
       assert(len >= maxLength, "can't shorten");
       int blen = bitsLength(len);
-      int* bs = NEW_RESOURCE_ARRAY( int, blen);
+      intptr_t* bs = NEW_RESOURCE_ARRAY( intptr_t, blen);
       int blength = bitsLength(maxLength);
-      copy_words(bits, bs, blength);
-      if (blength < blen) set_words(bs + blength, blen - blength, 0);
+      for (int i = 0; i < blength; i++) bs[i] = bits[i];
+      if (blength < blen) clear_bits(bs + blength, blen - blength);
       return bs; }
     
   public:
@@ -93,7 +95,7 @@ int findFirstUnused(LongRegisterMask** strings, int len, int start);
       length = maxLength = l; bits = createBitString(l); }
     
   protected:
-    BitVector(int l, int ml, int* bs) {
+    BitVector(int l, int ml, intptr_t* bs) {
       maxLength = ml; length = l; bits = bs; }
     
   public:
@@ -124,7 +126,7 @@ int findFirstUnused(LongRegisterMask** strings, int len, int start);
     void doForAllOnes(intDoFn f);  // call f for all 1 bits
 
     void setLength(int l) 	{ assert(l < maxLength, "too big"); length = l; }
-    void clear() 		{ set_words(bits, bitsLength(length), 0); }
+    void clear() 		{ clear_bits(bits, bitsLength(length)); }
     
     void print_short();
     void print();

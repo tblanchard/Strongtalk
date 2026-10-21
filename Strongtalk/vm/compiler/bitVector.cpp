@@ -57,7 +57,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
     assert(length <= maxLength, "grew too much");
     bool changed = false;
     for (int i = indexFromNumber(other->length-1); i >= 0; i--) {
-      int old = bits[i];
+      intptr_t old = bits[i];
       bits[i] |= other->bits[i];
       changed |= (old != bits[i]);
     }
@@ -67,7 +67,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   bool BitVector::intersectWith(BitVector* other) {
     bool changed = false;
     for (int i = indexFromNumber(min(length, other->length)-1); i >= 0; i--) {
-      int old = bits[i];
+      intptr_t old = bits[i];
       bits[i] &= other->bits[i];
       changed |= (old != bits[i]);
     }
@@ -89,10 +89,10 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
     int   endIndex = indexFromNumber(last);
     if (startIndex == endIndex) {
       assert(last - first < BitsPerWord, "oops");
-      int mask = nthMask(last - first + 1);
+      intptr_t mask = nthMask(last - first + 1);
       bits[startIndex] |= mask << offsetFromNumber(first);
     } else {
-      bits[startIndex] |= AllBits << offsetFromNumber(first);
+      bits[startIndex] |= intptr_t(AllBits) << offsetFromNumber(first);
       for (int i = startIndex + 1; i < endIndex; i++) bits[i] = AllBits;
       bits[endIndex] |= nthMask(offsetFromNumber(last) + 1);
     }
@@ -128,7 +128,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   
   void BitVector::doForAllOnes(intDoFn f) {
     for (int i = indexFromNumber(length-1); i >= 0; i--) {
-      int b = bits[i];
+      intptr_t b = bits[i];
       for (int j = 0; j < BitsPerWord; j++) {
 	if (isSet(b, j)) {
 	  f(i * BitsPerWord + j);

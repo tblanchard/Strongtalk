@@ -97,8 +97,26 @@ static const char jump_instruction = '\xE9';
 
 char* jumpTable::allocate_jump_entries(int size) {
 #ifdef STRONGTALK_ARM64
-  char* entries = os::allocate_code_memory(size * jumpTableEntry::size());	// entries are executed
-  if (entries == NULL) fatal("cannot allocate code memory for the jump table");
+  // Entries are executed, so they live in code memory. The blocks of the nmethods with
+  // blocks (see allocate) are small and many: they are carved out of larger chunks
+  // (as on x86, the blocks are never freed).
+  static char* chunk      = NULL;
+  static int   chunk_free = 0;
+  const  int   chunk_size = 256 * K;
+  int bytes = size * jumpTableEntry::size();
+  if (bytes > chunk_size / 4) {
+    char* entries = os::allocate_code_memory(bytes);
+    if (entries == NULL) fatal("cannot allocate code memory for the jump table");
+    return entries;
+  }
+  if (bytes > chunk_free) {
+    chunk = os::allocate_code_memory(chunk_size);
+    if (chunk == NULL) fatal("cannot allocate code memory for the jump table");
+    chunk_free = chunk_size;
+  }
+  char* entries = chunk;
+  chunk      += bytes;
+  chunk_free -= bytes;
   return entries;
 #else
   return AllocateHeap(size * jumpTableEntry::size(), "jump table");

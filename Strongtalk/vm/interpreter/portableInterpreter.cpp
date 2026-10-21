@@ -1378,6 +1378,17 @@ bool PortableInterpreter::run() {
 // frame_next_Delta_fp_offset) and runs the interpreter until the method returns.
 oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, bool is_block);
 
+// Where Delta code called from C starts on the Delta stack: at the top, or for nested calls
+// below the calling Delta frame (keeping its return pc at last_Delta_sp[-1]) and below the
+// words a stub routine may have pushed after setting the last Delta frame (e.g. the DLL
+// lookup stub saves ebx/ecx there before calling C). On x86 the nested activation started at
+// the C sp, below such pushes; here the Delta stack is separate, so leave a margin for them.
+const int stub_push_margin = 16;	// words
+
+static oop* nested_activation_sp(intptr_t* saved_fp, oop* saved_sp, DeltaStack* stack) {
+  return saved_fp != NULL ? saved_sp - 1 - stub_push_margin : stack->high;
+}
+
 oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is_block) {
   if (is_block && blockClosureOop(receiver)->isCompiledBlock()) {
     return call_compiled_from_C(blockClosureOop(receiver)->jump_table_entry()->entry_point(), receiver, nof_args, args, true);
@@ -1385,8 +1396,7 @@ oop call_delta_entry(methodOop m, oop receiver, int nof_args, oop* args, bool is
   DeltaStack* stack = delta_stack();
   intptr_t* saved_fp = last_Delta_fp;
   oop*      saved_sp = last_Delta_sp;
-  // nested calls continue below the calling Delta frame (keep its return pc at sp[-1])
-  oop* sp = saved_fp != NULL ? saved_sp - 2 : stack->high;
+  oop* sp = nested_activation_sp(saved_fp, saved_sp, stack);
   if (sp - delta_stack_slack < stack->low) fatal("Delta stack overflow");
 
   *--sp = NULL;					// return address of the entry frame (C)
@@ -1437,7 +1447,7 @@ oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, boo
   DeltaStack* stack = delta_stack();
   intptr_t* saved_fp = last_Delta_fp;
   oop*      saved_sp = last_Delta_sp;
-  oop* sp = saved_fp != NULL ? saved_sp - 2 : stack->high;
+  oop* sp = nested_activation_sp(saved_fp, saved_sp, stack);
   if (sp - delta_stack_slack < stack->low) fatal("Delta stack overflow");
   assert(saved_fp != NULL || current_activation == NULL, "C called from Delta code without last Delta frame");
 

@@ -257,7 +257,7 @@ class debugFlags {
   develop(MaxElementPrintSize                ,    10, "Maximum number of elements to print"                                         ) \
                                                                                                                                       \
 /* allocation parameters */                                                                                                           \
-  product(ReservedHeapSize                   ,  50*K, "Maximum size for object heap in Kbytes"                                      ) \
+  product(ReservedHeapSize, 50*K*(BytesPerWord/4), "Maximum size for object heap in Kbytes (50 MB of 32-bit words)"               ) \
   product(ObjectHeapExpandSize               ,   512, "Chunk size (in Kbytes) by which the object heap grows"                       ) \
   product(EdenSize                           ,   512, "size of eden (in Kbytes)"                                                    ) \
   product(SurvivorSize                       ,    64, "size of survivor spaces (in Kbytes)"                                         ) \
