@@ -449,13 +449,39 @@ Phases:
       pass, compile time included): BubbleSort 42->5, IntMM 21->3, Puzzle 209->18, Takl 80->4,
       Dictionary 478->36, Richards 46->28, DeltaBlue 153->48; Smopstones 5-12x; warm block evaluation
       ~50-100x (vmtest iterations 3-4). The debug build is ~10x slower than release.
-      Open:
-      - Proxy pointer fields (proxyAt/proxyAtPut) are 8 bytes, but the image lays out external
-        structures with 4-byte words: the FFI/struct model needs a 64-bit story before the GUI work.
-      - A zombie nmethod called from C through a jump table entry (call_compiled_from_C) is not
-        handled (zombie_nmethod treats return_from_Delta as a compiled IC); same gap as x86, not
-        reachable while MakeBlockMethodZombies is off and C callers use fresh lookups.
-      - nmethod::inc_uncommon_trap_counter etc. write code memory outside JITWriteScope (the
-        fault-handler toggle handles it: 21 faults in a slopstone run).
-      - First-iteration timings include compilation; no comparison of numeric results beyond the
-        test suites' own checks.
+      Open items fixed (2026-10-21, "C5"):
+      - External words: pointers stored in the image's 4-byte struct fields (proxyAt:/proxyAt:put:)
+        go through a 32-bit handle table (ExternalWords, proxy_prims.cpp; 0xA0000000.. handles;
+        32-bit values stored as they are). +TestArm64Runtime tests it.
+      - Zombie nmethod called from C: zombie_nmethod returns compiled_redo_send for return_from_Delta,
+        call_compiled_from_C then interprets the nmethod's method. Delta::call_generic re-looked up a
+        zombie through its own (stale) cache - fixed (clear before lookup).
+      - nmethod header fields (code memory) are written in nmethodHeaderWrite scopes: 0 fault toggles.
+      - Results comparison: porting/compare_results.sh files in porting/results.st at quit
+        ($STRONGTALK_EVAL_FILE, system_prims.cpp) interpreted and compiled (LIMIT=invocation counter
+        limit, default 1000) and diffs the RESULT lines. At the default limit (10000): identical.
+        It found (interpreted too):
+        - SmallInteger <-> LargeInteger conversion truncated to 32 bits (int_to_Integer, as_smi).
+        - LargeInteger division by multi-digit divisors / negative operands: missing code (fatal);
+          implemented (Knuth D in qr_decomposition, floor div/mod); unsigned_rem(x < y) returned y.
+        - unsigned_mul looped forever on a 0 digit; cmp(0, negative) said equal (original bugs).
+      - Image patches: porting/image_patches.st (symlinked as image_patches.st next to the image, or
+        $STRONGTALK_PATCH_FILE) is filed in when the image first reads its command line
+        (GetCommandLineA shim -> file_in_image_patches): SmallInteger>>digitsForAbs: (printString
+        stopped at 10 digits) and DeltaRewriter>>normalSendNode: (to:by:do: with a variable step
+        left a send with an inlined block - an original image compiler bug).
+      - GC safety: primitives that keep an argument across a call that can GC must re-read it from
+        the caller's Delta stack (PrimitiveArgument, block_prims.cpp: unwindprotect, blockRepeat) -
+        on x86 the C parameters were these stack slots. SavedRegisters are GC roots.
+      - Old space: a full GC runs after a scavenge when the remaining reservation is < 1/8 (the
+        original VM left full GCs to the image); exhausting ReservedHeapSize is a clear fatal in
+        release builds too (VirtualSpace::expand only asserted it).
+      - Debugging aids: $STRONGTALK_NO_COMPILE ("Class>>sel" substrings / #selector, blank separated)
+        excludes methods from compilation (Compiler::compile); +ZapNewSpaceAfterScavenge.
+      Still open:
+      - With very aggressive compilation (InvocationCounterLimit <= ~1000) the image compiler running
+        compiled code occasionally misbehaves (DeltaScope/nil receives map:...); GC dependent (gone
+        without scavenges), with OptimizeIntegerLoops + DeferUncommonBranches. Not seen at the default
+        limit (benchmarks, vmtest, vmcompiled, results comparison pass).
+      - rem: is unimplemented for LargeIntegers in the image (Number>>rem:); Integer>>bitShift: and
+        Number>>raisedTo: likewise (image limitations).

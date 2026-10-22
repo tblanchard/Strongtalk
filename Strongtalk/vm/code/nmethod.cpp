@@ -310,8 +310,15 @@ jumpTableEntry* nmethod::jump_table_entry() const {
 }
 
 
+#ifdef STRONGTALK_ARM64
+nmethodHeaderWrite::nmethodHeaderWrite()  { os::jit_write_begin(); }
+nmethodHeaderWrite::~nmethodHeaderWrite() { os::jit_write_end(); }
+#endif
+
+
 void nmethod::setVersion(int v) {
   assert(v > 0 && v <= MaxVersions, "bad version");
+  nmethodHeaderWrite w;
   flags.version = v;
 }
 
@@ -429,6 +436,7 @@ void nmethod::cleanup_inline_caches() {
 
 void nmethod::makeOld() {
   LOG_EVENT1("marking nmethod %#x as old", this);
+  nmethodHeaderWrite w;
   flags.isYoung = 0;
 }
 
@@ -514,8 +522,10 @@ void nmethod::makeZombie(bool clearInlineCaches) {
   }
 
   // Update flags
-  flags.state = zombie;
-  flags.isToBeRecompiled = 0;
+  { nmethodHeaderWrite w;
+    flags.state = zombie;
+    flags.isToBeRecompiled = 0;
+  }
   assert(isZombie(), "just checking");
  
   // Make sure the entry is gone from the lookup cache & inline caches
@@ -1083,7 +1093,7 @@ void nmethod::sweeper_step(double decay_factor) {
   // Ignore zombies
   if (isZombie()) return;
   decay_invocation_count(decay_factor);
-  _uncommon_trap_counter = int(_uncommon_trap_counter / decay_factor);
+  { nmethodHeaderWrite w; _uncommon_trap_counter = int(_uncommon_trap_counter / decay_factor); }
   cleanup_inline_caches();
   incrementAge();
 }

@@ -127,7 +127,7 @@ class IntegerOps: AllStatic {
   static int  ash_result_size_in_bytes(Integer& x, int      n);
 
   static int  copy_result_size_in_bytes(Integer& x);
-  static int  int_to_Integer_result_size_in_bytes(int i);
+  static int  int_to_Integer_result_size_in_bytes(smi i);
   static int  double_to_Integer_result_size_in_bytes(double x);
   static int  string_to_Integer_result_size_in_bytes(char* s, int base);
   static int  Integer_to_string_result_size_in_bytes(Integer& x, int base);
@@ -153,7 +153,7 @@ class IntegerOps: AllStatic {
 
   // copy & conversion operations
   static void copy(Integer& x, Integer& z);
-  static void int_to_Integer(int i, Integer& z);
+  static void int_to_Integer(smi i, Integer& z);	// a smi needs up to 2 digits on 64-bit
   static void double_to_Integer(double x, Integer& z);
   static void string_to_Integer(char* s, int base, Integer& z);
   static void Integer_to_string(Integer& x, int base, char* s);

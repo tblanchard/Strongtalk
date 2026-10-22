@@ -446,8 +446,42 @@ class NewBackendGuard: StackObj {
 bool NewBackendGuard::_first_use = true;
 
 
+// Debugging aid: $STRONGTALK_NO_COMPILE is a blank separated list of substrings of
+// "Class>>selector" or exact selectors (#selector); matching methods are not compiled
+// (Compiler::compile returns NULL; to find miscompiled methods by bisection).
+static bool excluded_from_compilation(klassOop klass, symbolOop selector) {
+  static const char* filter = getenv("STRONGTALK_NO_COMPILE");
+  if (filter == NULL || *filter == '\0') return false;
+  ResourceMark rm;
+  stringStream name(200);
+  klass->klass_part()->print_name_on(&name);
+  name.print(">>");
+  selector->print_symbol_on(&name);
+  const char* n = name.as_string();
+  const char* p = filter;
+  while (*p != '\0') {
+    const char* e = strchr(p, ' ');
+    size_t len = e == NULL ? strlen(p) : (size_t) (e - p);
+    if (len > 1 && *p == '#') {
+      // #selector: exact selector
+      const char* sel = strstr(n, ">>") + 2;
+      if (strlen(sel) == len - 1 && strncmp(sel, p + 1, len - 1) == 0) return true;
+    } else if (len > 0) {
+      for (const char* s = n; *s != '\0'; s++) if (strncmp(s, p, len) == 0) return true;
+    }
+    if (e == NULL) break;
+    p = e + 1;
+  }
+  return false;
+}
+
 nmethod* Compiler::compile() {
   NewBackendGuard guard;
+  if (is_method_compile()) {	// (block nmethods are compiled on their first call and must be compiled)
+    oop sel = key->selector_or_method();		// (a method for super sends)
+    if (sel->is_method()) sel = methodOop(sel)->selector();
+    if (sel->is_symbol() && excluded_from_compilation(key->klass(), symbolOop(sel))) return NULL;
+  }
 
   if ((PrintProgress > 0) && (nofCompilations % PrintProgress == 0)) stdOut->print(".");
   const char* compiling;

@@ -248,6 +248,12 @@ char* CompiledIC::normalLookup(oop recv) {
     oop result = Delta::call(recv, sel, msg);
 
     if (!have_nlr_through_C) {
+      // continuing compiled code with the result of doesNotUnderstand: is not implemented
+      { ResourceMark rm;
+        stdOut->print("doesNotUnderstand: returned in compiled code: ");
+        recv->klass()->print_value(); stdOut->print(" >> "); selector()->print_value(); stdOut->cr();
+        DeltaProcess::active()->trace_stack();
+      }
       Unimplemented();
     }
     // return a substitute nmethod so that stub routine doesn't crash
@@ -333,6 +339,7 @@ extern "C" char* icSuperLookup(oop recv, CompiledIC* ic) {
 
 #ifdef STRONGTALK_ARM64
 extern "C" void compiled_redo_send();	// portableInterpreter_arm64.S
+extern "C" void return_from_Delta();	// portableInterpreter_arm64.S
 #endif
 
 extern "C" char* zombie_nmethod(char* return_addr) {
@@ -346,6 +353,14 @@ extern "C" char* zombie_nmethod(char* return_addr) {
   //       (the same method as for NLRs used, the target is the send
   //       restart entry point).
   VerifyNoScavenge vna;
+#ifdef STRONGTALK_ARM64
+  if (return_addr == (char*) &return_from_Delta) {
+    // nmethod called from C through its jump table entry (call_compiled_from_C, which
+    // redoes the call with the nmethod's method)
+    LOG_EVENT("zombie nmethod called from C");
+    return (char*) &compiled_redo_send;
+  }
+#endif
   if (Interpreter::contains(return_addr)) {
     // nmethod called from interpreted code
     frame          f  = DeltaProcess::active()->last_frame();

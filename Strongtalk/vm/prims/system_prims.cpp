@@ -112,6 +112,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "os.hpp"
 #include "dll.hpp"
 #include "mixinOop.hpp"
+#include "lookupCache.hpp"
+#include "delta.hpp"
 TRACE_FUNC(TraceSystemPrims, "system")
 
 int systemPrimitives::number_of_calls;
@@ -371,8 +373,54 @@ PRIM_DECL_0(systemPrimitives::smalltalk_array) {
   return Universe::systemDictionaryObj();
 }
 
+// Files in a file in chunk format (expressions and method definitions ending in !) with the
+// image's own file-in (aString readStream fileIn); returns false if the file cannot be read.
+// Must run in an active Delta process.
+bool file_in_source_file(const char* name) {
+  ResourceMark rm;
+  FILE* f = fopen(name, "rb");
+  if (f == NULL) return false;
+  fseek(f, 0, SEEK_END);
+  long size = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  char* contents = NEW_RESOURCE_ARRAY(char, size + 1);
+  size_t n = fread(contents, 1, (size_t) size, f);
+  fclose(f);
+  oop source = oopFactory::new_symbol(contents, (int) n);	// a byte string the image can read
+  oop stream = Delta::call(source, oopFactory::new_symbol("readStream"));
+  Delta::call(stream, oopFactory::new_symbol("fileIn"));
+  return true;
+}
+
+// Image patches: corrections of the 32-bit image for the 64-bit VM ($STRONGTALK_PATCH_FILE or
+// image_patches.st in the current directory, see porting/image_patches.st). Filed in once, when
+// the image first reads its command line (SystemInitializer>>run, after the base class
+// initializers; earlier the image cannot file in yet).
+void file_in_image_patches() {
+  static bool patched = false;
+  if (patched) return;
+  patched = true;
+  const char* patches = getenv("STRONGTALK_PATCH_FILE");
+  if (patches == NULL) patches = "image_patches.st";
+  FILE* f = fopen(patches, "rb");
+  if (f == NULL) return;
+  fclose(f);
+  // file-in needs the Smalltalk namespace, initialized later by runNonCriticalClassInitializers
+  // (which initializes it again)
+  Delta::call(Universe::find_global("Smalltalk"), oopFactory::new_symbol("initialize"));
+  if (file_in_source_file(patches) && PrintImagePatches) lprintf("[filed in image patches %s]\n", patches);
+}
+
+// Files in the file named by $STRONGTALK_EVAL_FILE before the VM quits, e.g. to print results
+// with Transcript (used to compare interpreted and compiled code, porting/compare_results.sh).
+static void file_in_eval_file() {
+  const char* name = getenv("STRONGTALK_EVAL_FILE");
+  if (name != NULL && !file_in_source_file(name)) lprintf("cannot open STRONGTALK_EVAL_FILE %s\n", name);
+}
+
 PRIM_DECL_0(systemPrimitives::quit) {
   PROLOGUE_0("quit");
+  file_in_eval_file();
   if (PrintJITModeFaults) lprintf("code memory mode switches by faults: %d\n", os::jit_mode_faults());
   if (VerifyFileOut) methodOopDesc::verify_fileout_all();
   exit(0);

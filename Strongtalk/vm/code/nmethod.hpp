@@ -57,6 +57,17 @@ struct nmFlags {
 
 nmethod* findNMethod(void* start);
 nmethod* new_nmethod(Compiler* c);
+// The nmethod header is in code memory (see zoneHeap.cpp), which a thread on arm64 can either
+// write or execute: changes of the header fields after installation are done in a write
+// scope (the fault handler would switch too, at a much higher cost).
+class nmethodHeaderWrite : public StackObj {
+ public:
+#ifdef STRONGTALK_ARM64
+  nmethodHeaderWrite();
+  ~nmethodHeaderWrite();
+#endif
+};
+
 class nmethod : public OopNCode {
  protected:
   uint16 _special_handler_call_offset;	// offset (in bytes) of call to special handler (*) (see comment below)
@@ -120,12 +131,12 @@ class nmethod : public OopNCode {
   
   // Interface for number_of_callers
   int  number_of_links() const		{ return _number_of_links; }
-  void inc_number_of_links()		{ _number_of_links++; }
-  void dec_number_of_links()		{ _number_of_links--; }
+  void inc_number_of_links()		{ nmethodHeaderWrite w; _number_of_links++; }
+  void dec_number_of_links()		{ nmethodHeaderWrite w; _number_of_links--; }
 
   // Interface for uncommon_trap_invocation
   int  uncommon_trap_counter() const	{ return _uncommon_trap_counter; }
-  void inc_uncommon_trap_counter()	{ _uncommon_trap_counter++; }
+  void inc_uncommon_trap_counter()	{ nmethodHeaderWrite w; _uncommon_trap_counter++; }
 
   // Returns the parent nmethod if present, NULL otherwise
   nmethod* parent();
@@ -160,24 +171,24 @@ class nmethod : public OopNCode {
   bool	isUncommonRecompiled() const	{ return flags.isUncommonRecompiled; }
 
   bool	isYoung();
-  void	makeYoung()			{ flags.isYoung = 1; }
+  void	makeYoung()			{ nmethodHeaderWrite w; flags.isYoung = 1; }
   void	makeOld();
 
   int	age() const			{ return flags.age; }
-  void	incrementAge()			{ const int MaxAge = 15; flags.age = min(flags.age + 1, MaxAge); }
+  void	incrementAge()			{ nmethodHeaderWrite w; const int MaxAge = 15; flags.age = min(flags.age + 1, MaxAge); }
 
   bool	is_marked_for_deoptimization() const{ return flags.markedForDeoptimization; }
-  void	mark_for_deoptimization()	{ flags.markedForDeoptimization = 1; }
-  void	unmark_for_deoptimization()	{ flags.markedForDeoptimization = 0; }
+  void	mark_for_deoptimization()	{ nmethodHeaderWrite w; flags.markedForDeoptimization = 1; }
+  void	unmark_for_deoptimization()	{ nmethodHeaderWrite w; flags.markedForDeoptimization = 0; }
 
   bool	isToBeRecompiled() const	{ return flags.isToBeRecompiled; }
-  void	makeToBeRecompiled()		{ flags.isToBeRecompiled = 1; }
+  void	makeToBeRecompiled()		{ nmethodHeaderWrite w; flags.isToBeRecompiled = 1; }
 
   bool	is_block() const		{ return flags.is_block == 1; }
   bool	is_method() const		{ return flags.is_block == 0; }
 
   int   level() const;
-  void  setLevel(int newLevel)		{ flags.level = newLevel; }
+  void  setLevel(int newLevel)		{ nmethodHeaderWrite w; flags.level = newLevel; }
 
   int   version() const 		{ return flags.version; }
   void  setVersion(int v);

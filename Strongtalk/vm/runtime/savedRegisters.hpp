@@ -39,6 +39,9 @@ class SavedRegisters : AllStatic {
   // for generated code that saves the registers itself (arm64)
   static oop*       register_address(int register_number);
   static intptr_t** stored_frame_pointer_address();
+  // GC roots: the saved registers hold the registers of the last Delta frame while it is
+  // examined (uncommon traps, deoptimization), which may allocate
+  static void oops_do(void f(oop*));
 };
 
 

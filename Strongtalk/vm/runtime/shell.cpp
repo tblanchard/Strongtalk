@@ -59,9 +59,11 @@ int main(int argc, char* argv[]) {
     extern bool PIC_arm64_test();		// compiledPIC.cpp
     extern bool StubRoutines_arm64_test();	// stubRoutines.cpp
     extern bool transitions_arm64_test();	// portableInterpreter.cpp
+    extern bool external_words_test();		// proxy_prims.cpp
     bool ok = PIC_arm64_test();
     ok = StubRoutines_arm64_test() && ok;
     ok = transitions_arm64_test() && ok;
+    ok = external_words_test() && ok;
     exit(ok ? 0 : 1);
   }
 #endif

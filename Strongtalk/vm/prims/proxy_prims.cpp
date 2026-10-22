@@ -231,7 +231,8 @@ PRIM_DECL_3(proxyOopPrimitives::proxyAt, oop receiver, oop offset, oop result) {
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!result->is_proxy())
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
-  proxyOop(result)->set_pointer((void*)proxyOop(receiver)->long_at(smiOop(offset)->value()));
+  // a 4-byte pointer field (see ExternalWords)
+  proxyOop(result)->set_pointer(ExternalWords::at((char*) proxyOop(receiver)->get_pointer() + smiOop(offset)->value()));
   return result;
 }
 
@@ -242,7 +243,8 @@ PRIM_DECL_3(proxyOopPrimitives::proxyAtPut, oop receiver, oop offset, oop value)
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_proxy())
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
-  proxyOop(receiver)->long_at_put(smiOop(offset)->value(), (long)proxyOop(value)->get_pointer());
+  // a 4-byte pointer field (see ExternalWords)
+  ExternalWords::at_put((char*) proxyOop(receiver)->get_pointer() + smiOop(offset)->value(), proxyOop(value)->get_pointer());
   return receiver;
 }
 
@@ -446,3 +448,97 @@ PRIM_DECL_3(proxyOopPrimitives::byteAtPut, oop receiver, oop offset, oop value) 
   return receiver;
 }
 #pragma optimize( "", on ) 
+
+// ---------------------------------------------------------------------------
+// External words (see proxy_prims.hpp): the pointers of the handles, and an open
+// addressing hash table (pointer -> handle index + 1) so that a pointer always gets the
+// same handle. Entries are never removed: a freed address that is reused maps to the
+// same pointer again, so the tables only grow with the distinct addresses stored.
+
+static void**    external_pointers       = NULL;	// handle index -> pointer
+static int       external_pointers_count = 0;
+static int       external_pointers_max   = 0;
+static uint32_t* external_hash           = NULL;	// slot -> handle index + 1 (0: empty)
+static int       external_hash_size      = 0;		// power of 2
+
+static inline uint32_t external_hash_of(void* p, int size) {
+  uintptr_t v = (uintptr_t) p;
+  v ^= v >> 29; v *= 0x9E3779B97F4A7C15ull; v ^= v >> 32;
+  return (uint32_t) v & (size - 1);
+}
+
+static void external_hash_insert(int index) {
+  uint32_t i = external_hash_of(external_pointers[index], external_hash_size);
+  while (external_hash[i] != 0) i = (i + 1) & (external_hash_size - 1);
+  external_hash[i] = index + 1;
+}
+
+uint32_t ExternalWords::encode(void* p) {
+  uintptr_t v = (uintptr_t) p;
+  if (v <= 0xFFFFFFFFu) {
+    // fits: stored as is (a value in the handle range would be decoded as a handle)
+    assert(v < handle_base || v >= handle_limit, "32-bit value in the external handle range");
+    return (uint32_t) v;
+  }
+  if (external_hash_size > 0) {
+    for (uint32_t i = external_hash_of(p, external_hash_size); external_hash[i] != 0; i = (i + 1) & (external_hash_size - 1)) {
+      int index = external_hash[i] - 1;
+      if (external_pointers[index] == p) return handle_base + index;
+    }
+  }
+  if (external_pointers_count == (int) (handle_limit - handle_base)) fatal("too many external pointers");
+  if (external_pointers_count == external_pointers_max) {
+    external_pointers_max = external_pointers_max == 0 ? 1024 : external_pointers_max * 2;
+    external_pointers = (void**) realloc(external_pointers, external_pointers_max * sizeof(void*));
+    if (external_pointers == NULL) fatal("out of memory for external pointers");
+  }
+  int index = external_pointers_count++;
+  external_pointers[index] = p;
+  if (2 * external_pointers_count > external_hash_size) {	// keep the load below 1/2
+    free(external_hash);
+    external_hash_size = external_hash_size == 0 ? 2048 : external_hash_size * 2;
+    external_hash = (uint32_t*) calloc(external_hash_size, sizeof(uint32_t));
+    if (external_hash == NULL) fatal("out of memory for external pointers");
+    for (int j = 0; j < external_pointers_count; j++) external_hash_insert(j);
+  } else {
+    external_hash_insert(index);
+  }
+  return handle_base + index;
+}
+
+void* ExternalWords::decode(uint32_t w) {
+  if (w >= handle_base && w < handle_base + (uint32_t) external_pointers_count) return external_pointers[w - handle_base];
+  return (void*) (uintptr_t) w;		// zero extended (as the shim's INVALID_HANDLE_VALUE)
+}
+
+bool ExternalWords::test() {
+  int failures = 0;
+#define EW_CHECK(cond, what) if (!(cond)) { failures++; lprintf("  FAILED %s\n", what); }
+  uint32_t field[4];
+  ExternalWords::at_put(&field[0], NULL);
+  EW_CHECK(field[0] == 0 && ExternalWords::at(&field[0]) == NULL, "NULL stored as 0");
+  ExternalWords::at_put(&field[1], (void*) (uintptr_t) 0xFFFFFFFFu);
+  EW_CHECK(field[1] == 0xFFFFFFFFu && ExternalWords::at(&field[1]) == (void*) (uintptr_t) 0xFFFFFFFFu, "32-bit values stored as they are");
+  void* p = malloc(16);
+  void* q = malloc(16);
+  ExternalWords::at_put(&field[2], p);
+  ExternalWords::at_put(&field[3], q);
+  EW_CHECK(field[2] >= handle_base && field[2] < handle_limit && field[2] != field[3], "pointers stored as distinct handles");
+  EW_CHECK(ExternalWords::at(&field[2]) == p && ExternalWords::at(&field[3]) == q, "handles decode to their pointers");
+  EW_CHECK(ExternalWords::encode(p) == field[2], "a pointer keeps its handle");
+  // many pointers (rehashing)
+  bool all = true;
+  for (int i = 0; i < 10000; i++) {
+    void* r = (char*) p + 16 * (i + 1) + ((uintptr_t) 1 << 40);	// not dereferenced
+    uint32_t w = ExternalWords::encode(r);
+    if (ExternalWords::decode(w) != r || ExternalWords::encode(r) != w) all = false;
+  }
+  EW_CHECK(all && ExternalWords::decode(field[2]) == p, "10000 pointers round trip");
+  free(p);
+  free(q);
+  lprintf("external words test: %d failures\n", failures);
+  return failures == 0;
+#undef EW_CHECK
+}
+
+bool external_words_test() { return ExternalWords::test(); }

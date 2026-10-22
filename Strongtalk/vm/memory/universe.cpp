@@ -121,6 +121,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "mixinOop.hpp"
 #include "smiKlass.hpp"
 #include "processKlass.hpp"
+#include "savedRegisters.hpp"
 bool NeedScavenge  = false;
 bool bootstrapping = true;
 
@@ -683,6 +684,8 @@ void Universe::oops_do(void f(oop*)) {
   code->oops_do(f);
   // Iterate over all handles
   Handles::oops_do(f);
+  // Iterate over the saved registers of the last Delta frame (if saved)
+  SavedRegisters::oops_do(f);
   // Iterate over the oops in the inlining database
   InliningDatabase::oops_do(f);
 }

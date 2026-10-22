@@ -25,6 +25,24 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 // Primitives for proxy
 
+// External words. The image lays out external (C) structures as on 32-bit Win32: 4-byte
+// words (Platform wordSize), so pointer fields are 4 bytes. A 64-bit pointer stored into
+// external memory (proxyAt:put:, shims filling out parameters) is encoded as a 32-bit
+// handle from a reserved range and decoded when read back (proxyAt:). Values that fit in
+// 32 bits (NULL, small handles, 0xFFFFFFFF) are stored as they are; real pointers never
+// do (no user memory below 4 GB on macOS arm64). Pointers passed in registers (DLL call
+// arguments and results) are not affected.
+class ExternalWords : AllStatic {
+ public:
+  static const uint32_t handle_base  = 0xA0000000;
+  static const uint32_t handle_limit = 0xB0000000;
+  static uint32_t encode(void* p);		// the 32-bit word representing p
+  static void*    decode(uint32_t w);		// the pointer represented by w
+  static void*    at(void* addr)                 { return decode(*(uint32_t*) addr); }
+  static void     at_put(void* addr, void* p)    { *(uint32_t*) addr = encode(p); }
+  static bool     test();			// self test (+TestArm64Runtime)
+};
+
 class proxyOopPrimitives : AllStatic {
  private: 
   static void inc_calls() { number_of_calls++; }

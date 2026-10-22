@@ -121,7 +121,9 @@ oop Delta::call_generic(DeltaCallCache* ic, oop receiver, oop selector, int nofA
     // use ic entry - but first make sure it's not a zombie nmethod
     jumpTableEntry* entry = ic->result().entry();
     if (entry != NULL && entry->method()->isZombie()) {
-      // is a zombie nmethod => do a new lookup
+      // is a zombie nmethod => do a new lookup (clear the cache first: lookup returns the
+      // cached result while the key matches, i.e. the zombie again)
+      ic->clear();
       LookupResult result = ic->lookup(receiver->klass(), symbolOop(selector));
       if (result.is_empty()) fatal("lookup failure - not treated");
       return call_delta(result.value(), receiver, nofArgs, args);

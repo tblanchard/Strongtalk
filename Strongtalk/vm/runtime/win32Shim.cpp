@@ -177,8 +177,12 @@ static void windows_path(const char* path, char* buffer, size_t size) {
 // ---------------------------------------------------------------------------
 // Process environment
 
+extern void file_in_image_patches();	// system_prims.cpp
+
 // The command line as one string; arguments containing blanks are quoted.
+// The image reads it at startup: the image patches are filed in then (see system_prims.cpp).
 static word GetCommandLineA() {
+  file_in_image_patches();
   static char* line = NULL;
   if (line == NULL) {
     size_t len = 1;

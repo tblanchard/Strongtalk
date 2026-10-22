@@ -47,6 +47,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "process.hpp"
 #include "x86_mapping.hpp"
 #include "assembler.hpp"
+#include "universe.hpp"
 // Need to be static so they can be accessed in assembly code
 // of SavedRegisters::save_registers() (compiler doesn't accept
 // static class variables).
@@ -85,6 +86,16 @@ oop* SavedRegisters::register_address(int register_number) {
   if (register_number == edi.number()) return &saved_edi;
   fatal("esp and ebp are not saved");
   return NULL;
+}
+
+void SavedRegisters::oops_do(void f(oop*)) {
+  if (stored_frame_pointer == NULL) return;		// no registers saved
+  oop* regs[] = { &saved_eax, &saved_ecx, &saved_edx, &saved_ebx, &saved_esi, &saved_edi };
+  for (int i = 0; i < 6; i++) {
+    // registers may hold non-oops (e.g. untagged loop values): only heap objects are roots
+    oop o = *regs[i];
+    if (o->is_mem() && Universe::is_heap((oop*) o)) f(regs[i]);
+  }
 }
 
 intptr_t** SavedRegisters::stored_frame_pointer_address() {

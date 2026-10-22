@@ -1466,6 +1466,14 @@ oop call_compiled_from_C(char* entry, oop receiver, int nof_args, oop* args, boo
 
   last_Delta_fp = saved_fp;
   last_Delta_sp = saved_sp;
+  if (r.kind == redo_send) {
+    // the entry's nmethod is a zombie (zombie_nmethod): call its method in the interpreter
+    // instead (blocks: zombie block nmethods go through restart_primitiveValue)
+    assert(!is_block, "zombie block nmethods do not redo the call");
+    nmethod* nm = ((jumpTableEntry*) entry)->method();
+    guarantee(nm != NULL && nm->isZombie(), "redo of a call from C without zombie nmethod");
+    return call_delta_entry(nm->method(), receiver, nof_args, args, false);
+  }
   if (r.kind == returned_with_nlr) {
     // the NLR leaves the Delta code called from C
     have_nlr_through_C = true;

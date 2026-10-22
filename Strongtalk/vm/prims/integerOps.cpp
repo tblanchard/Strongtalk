@@ -240,16 +240,15 @@ double Integer::as_double(bool& ok) const {
 
 
 smiOop Integer::as_smi(bool& ok) const {
+  // a smi has up to 62 bits on 64-bit: 1 or 2 digits
   ok = true;
-  switch (_signed_length) {
-    case -1:
-      if (_first_digit <= -smi_min) return as_smiOop(-smi(_first_digit));
-      break;
-    case  0:
-      return as_smiOop(0);
-    case  1:
-      if (_first_digit <=  smi_max) return as_smiOop( smi(_first_digit));
-      break;
+  int l = length();
+  if (l == 0) return as_smiOop(0);
+  if (l <= 2) {
+    uint64_t magnitude = digits()[0];
+    if (l == 2) magnitude |= uint64_t(digits()[1]) << logB;
+    if (_signed_length > 0 && magnitude <= uint64_t(smi_max))  return as_smiOop( smi(magnitude));
+    if (_signed_length < 0 && magnitude <= uint64_t(-smi_min)) return as_smiOop(-smi(magnitude));
   }
   ok = false;
   return as_smiOop(0);
@@ -385,18 +384,19 @@ void IntegerOps::unsigned_mul(Integer& x, Integer& y, Integer& z) {
   int i  = xl + yl;
   while (i > 0) { i--; z[i] = 0; }
   // i == 0
-  int k = 0;
   while (i < xl) {
     Digit d = x[i];
     if (d != 0) {
       int j = 0;
-      k = i;
+      int k = i;
       Digit c = 0;
       while (j < yl) { z[k] = axpy(d, y[j], z[k], c); j++; k++; }
-      if    (c != 0) { z[k] = c;                           k++; }
-      i++;
+      z[k] = c;					// z[k] was 0: no row reached it yet
     }
+    i++;					// (was inside the if: x with a 0 digit looped forever)
   }
+  int k = xl + yl;
+  while (k > 0 && z[k-1] == 0) k--;
   z.set_length(k);
 }
 
@@ -439,53 +439,58 @@ Digit* IntegerOps::qr_decomposition(Integer& x0, Integer& y0) {
     Digit d = y0._first_digit;
     while (i > 0) { i--; x[i+1] = xdy(x[i], d, c); }
     x[0] = c;
-  } else if (xl >= yl) {
-    missing_code_for("division by large integers");
-    // full division
-    x[xl] = 0;
-    Digit* y = y0.digits();
-    Digit d = (hlfB - 1) / y[yl-1] + 1;
-
-    if (d != 1) {
-      // scale x (already copied)
-      x[xl] = scale(x, d, xl);
-      // make a copy of y
-      y = NEW_RESOURCE_ARRAY(Digit, yl);
-      int i = yl;
-      while (i > 0) { i--; y[i] = y0[i]; }
-      // scale y
-      Digit c = scale(y, d, yl);
-      if (c != 0) fatal("qr_decomposition broken");
-    }
-
-    Digit y1 = y[yl-1];
-    Digit y2 = y[yl-2];
-    int   i  = xl;
-    while (i >= yl) {
-      Digit q = (x[i] == y1) ? oneB : xdy(x[i-1], y1, x[i]);
-
-      while (true) {}
-
-      int   j = i-yl;
-      int   k = 0;
-      Digit c = 0;
-      while (k < yl) { j++; k++; }
-      if (true) {
-        
-      } else {
-        x[i] = q;
-      }
-      i--;
-    }
-    if (d != 1) {
-      int   i = yl;
-      Digit c = 0;
-      while (i > 0) { i--; x[i] = xdy(x[i], d, c); }
-    }
   } else {
-    // xl < yl
-    //
-    // add some more comments here
+    // multi-digit y: Knuth's algorithm D (TAOCP 4.3.1) on the normalized operands. The quotient
+    // digit of step j replaces x[j+yl], which is 0 after the step, so qr keeps the layout above.
+    x[xl] = 0;
+    int s = logB - ::length_in_bits(y0[yl-1]);		// normalize: top bit of y set
+    Digit* y = NEW_RESOURCE_ARRAY(Digit, yl);
+    for (int k = yl - 1; k > 0; k--) y[k] = s == 0 ? y0[k] : (y0[k] << s) | (y0[k-1] >> (logB - s));
+    y[0] = y0[0] << s;
+    if (s != 0) {
+      for (int k = xl; k > 0; k--) x[k] = (x[k] << s) | (x[k-1] >> (logB - s));
+      x[0] = x[0] << s;
+    }
+    const uint64_t b = uint64_t(1) << logB;
+    for (int j = xl - yl; j >= 0; j--) {
+      // estimate the quotient digit from the top two digits, correct it with the third
+      uint64_t num  = (uint64_t(x[j+yl]) << logB) | x[j+yl-1];
+      uint64_t qhat = num / y[yl-1];
+      uint64_t rhat = num % y[yl-1];
+      while (qhat >= b || qhat * y[yl-2] > ((rhat << logB) | x[j+yl-2])) {
+        qhat--;
+        rhat += y[yl-1];
+        if (rhat >= b) break;
+      }
+      // x[j .. j+yl] -= qhat * y
+      int64_t  t;
+      uint64_t k = 0;
+      for (int i = 0; i < yl; i++) {
+        uint64_t p = qhat * y[i];
+        t = int64_t(x[i+j]) - int64_t(k) - int64_t(p & (b - 1));
+        x[i+j] = Digit(t);
+        k = (p >> logB) - (t >> logB);
+      }
+      t = int64_t(x[j+yl]) - int64_t(k);
+      x[j+yl] = Digit(t);
+      if (t < 0) {
+        // qhat was one too large: add y back
+        qhat--;
+        uint64_t c = 0;
+        for (int i = 0; i < yl; i++) {
+          uint64_t sum = uint64_t(x[i+j]) + y[i] + c;
+          x[i+j] = Digit(sum);
+          c = sum >> logB;
+        }
+        x[j+yl] = Digit(uint64_t(x[j+yl]) + c);
+      }
+      x[j+yl] = Digit(qhat);			// the quotient digit (the remainder part is < y)
+    }
+    // unnormalize the remainder x[0 .. yl-1]
+    if (s != 0) {
+      for (int k = 0; k < yl - 1; k++) x[k] = (x[k] >> s) | (x[k+1] << (logB - s));
+      x[yl-1] = x[yl-1] >> s;
+    }
   }
   return x;
 }
@@ -514,8 +519,9 @@ void IntegerOps::unsigned_rem(Integer& x, Integer& y, Integer& z) {
   int xl = x.length();
   int yl = y.length();
   if (xl < yl) {
-    // unsigned x < unsigned y => z = y
-    copy(y, z);
+    // unsigned x < unsigned y => z = x
+    copy(x, z);
+    if (z.is_negative()) neg(z);
   } else {
     // xl >= yl
     ResourceMark rm;
@@ -535,7 +541,7 @@ int IntegerOps::unsigned_cmp(Integer& x, Integer& y) {
   if (xl == yl && xl > 0) {
     int i = xl - 1;
     while (i > 0 && x[i] == y[i]) i--;
-    return int(x[i] - y[i]);
+    return (x[i] > y[i]) - (x[i] < y[i]);	// (int(x[i] - y[i]) wraps for differences >= 2^31)
   } else {
     return xl - yl;
   }
@@ -605,24 +611,14 @@ int IntegerOps::rem_result_size_in_bytes(Integer& x, Integer& y) {
 
 
 int IntegerOps::div_result_size_in_bytes(Integer& x, Integer& y) {
-  int l;
-  if (!x.is_negative() && y.is_positive()) {
-    l = unsigned_quo_result_length(x, y);
-  } else {
-    missing_code_for("division with negative numbers");
-  }
+  // floor division: one more digit when the quotient is rounded away from 0 (see div)
+  int l = unsigned_quo_result_length(x, y) + (x.is_negative() != y.is_negative() ? 1 : 0);
   return Integer::length_to_size_in_bytes(l);
 }
 
 
 int IntegerOps::mod_result_size_in_bytes(Integer& x, Integer& y) {
-  int l;
-  if (!x.is_negative() && y.is_positive()) {
-    l = unsigned_rem_result_length(x, y);
-  } else {
-    missing_code_for("division with negative numbers");
-  }
-  return Integer::length_to_size_in_bytes(l);
+  return Integer::length_to_size_in_bytes(unsigned_rem_result_length(x, y));
 }
 
 
@@ -670,8 +666,9 @@ int IntegerOps::copy_result_size_in_bytes(Integer& x) {
 }
 
 
-int IntegerOps::int_to_Integer_result_size_in_bytes(int i) {
-  return Integer::length_to_size_in_bytes(i != 0);
+int IntegerOps::int_to_Integer_result_size_in_bytes(smi i) {
+  uint64_t magnitude = i < 0 ? uint64_t(0) - uint64_t(i) : uint64_t(i);
+  return Integer::length_to_size_in_bytes(magnitude == 0 ? 0 : (magnitude >> logB) == 0 ? 1 : 2);
 }
 
 
@@ -752,20 +749,31 @@ void IntegerOps::rem(Integer& x, Integer& y, Integer& z) {
 
 
 void IntegerOps::div(Integer& x, Integer& y, Integer& z) {
-  if (!x.is_negative() && y.is_positive()) {
-    unsigned_quo(x, y, z);
-  } else {
-    missing_code_for("division with negative numbers");
+  // floor division (Smalltalk //): the truncated quotient, rounded towards -infinity
+  unsigned_quo(x, y, z);
+  if (x.is_negative() != y.is_negative()) {
+    Integer r;
+    unsigned_rem(x, y, r);
+    if (!r.is_zero()) {
+      Integer one, t;
+      int_to_Integer(1, one);
+      unsigned_add(z, one, t);
+      copy(t, z);
+    }
+    if (!z.is_zero()) neg(z);
   }
 }
 
 
 void IntegerOps::mod(Integer& x, Integer& y, Integer& z) {
-  if (!x.is_negative() && y.is_positive()) {
-    unsigned_rem(x, y, z);
-  } else {
-    missing_code_for("division with negative numbers");
+  // floor modulo (Smalltalk \\): the result has the sign of y
+  unsigned_rem(x, y, z);
+  if (!z.is_zero() && x.is_negative() != y.is_negative()) {
+    Integer t;
+    unsigned_sub(y, z, t);			// |y| - (|x| rem |y|)
+    copy(t, z);
   }
+  if (y.is_negative() && !z.is_zero()) neg(z);
 }
 
 
@@ -822,7 +830,8 @@ int IntegerOps::cmp(Integer& x, Integer& y) {
   if (x.is_negative() == y.is_negative()) {
     return x.is_negative() ? unsigned_cmp(y, x) : unsigned_cmp(x, y);
   } else {
-    return x.signum();
+    // different signs: one is negative (signum would be 0 for x = 0 and y < 0)
+    return x.is_negative() ? -1 : 1;
   }
 }
 
@@ -844,17 +853,12 @@ void IntegerOps::copy(Integer& x, Integer& z) {
 }
 
 
-void IntegerOps::int_to_Integer(int i, Integer& z) {
-  if (i < 0) {
-    z.set_length(-1);
-    z._first_digit = Digit(-i);
-  } else if (i == 0) {
-    z.set_length( 0);
-    // no digits in this case
-  } else {
-    z.set_length( 1);
-    z._first_digit = Digit( i);
-  }
+void IntegerOps::int_to_Integer(smi i, Integer& z) {
+  uint64_t magnitude = i < 0 ? uint64_t(0) - uint64_t(i) : uint64_t(i);
+  int l = magnitude == 0 ? 0 : (magnitude >> logB) == 0 ? 1 : 2;	// no digits for 0
+  if (l >= 1) z.digits()[0] = Digit(magnitude);
+  if (l == 2) z.digits()[1] = Digit(magnitude >> logB);
+  z.set_length(i < 0 ? -l : l);
 }
 
 

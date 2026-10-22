@@ -293,6 +293,13 @@ void oldSpace::update_offset_array(oop* p, oop* p_end) {
 oop* oldSpace::expand_and_allocate(int size) {
   int min_size = ReservedSpace::page_align_size(size);
   int expand_size = max(min_size, ObjectHeapExpandSize * K);
+  if (Universe::old_gen.virtual_space.uncommitted_size() < expand_size) {
+    // (VirtualSpace::expand only asserts this; in a release build it would map past the reservation)
+    if (Universe::old_gen.virtual_space.uncommitted_size() < min_size) {
+      fatal1("old space exhausted: increase ReservedHeapSize (now %d K)", ReservedHeapSize);
+    }
+    expand_size = min_size;
+  }
   Universe::old_gen.virtual_space.expand(expand_size);
   set_end((oop*) Universe::old_gen.virtual_space.high());
   return allocate(size);

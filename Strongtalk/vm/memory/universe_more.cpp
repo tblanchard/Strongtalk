@@ -63,6 +63,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "vmOperations.hpp"
 #include "weakArrayKlass.hpp"
 #include "oop.inline.hpp"
+#include "savedRegisters.hpp"
 
 
 
@@ -101,6 +102,14 @@ oop* Universe::scavenge_and_allocate(int size, oop* p) {
 
   VM_Scavenge op(p);
   VMProcess::execute(&op);
+  // Old space only grows (it is expanded within ReservedHeapSize): collect it when the
+  // remaining reservation gets small (the original VM left full collections to the image)
+  if (Universe::old_gen.virtual_space.uncommitted_size() + old_gen.free() < ReservedHeapSize * K / 8) {
+    oop keep = p != NULL ? *p : Universe::nilObj();
+    VM_GarbageCollect gc(&keep);
+    VMProcess::execute(&gc);
+    if (p != NULL) *p = keep;
+  }
   assert(DeltaProcess::active()->last_Delta_fp() != NULL, "last Delta fp should be present");
   assert(DeltaProcess::active()->last_Delta_sp() != NULL, "last Delta fp should be present");
   return allocate_without_scavenge(size);
@@ -146,6 +155,7 @@ void Universe::scavenge(oop* p) {
 
     Universe::roots_do(scavenge_oop);
     Handles::oops_do(scavenge_oop);
+    SavedRegisters::oops_do(scavenge_oop);
 
     {FOR_EACH_OLD_SPACE(s) s->scavenge_recorded_stores();}
 
@@ -163,6 +173,16 @@ void Universe::scavenge(oop* p) {
     WeakArrayRegister::check_and_scavenge_contents();
 
     new_gen.swap_spaces();
+
+    if (ZapNewSpaceAfterScavenge) {
+      // the evacuated spaces (eden, the new to space) are free: fill them with a value that
+      // faults when used as an oop, so that stale pointers into them are found where used
+      const oop zap = oop(uintptr_t(0xbaadf00dbaadf001ull));	// a memOop tag, non-canonical address
+      space* spaces[] = { new_gen.eden(), new_gen.to() };
+      for (int k = 0; k < 2; k++) {
+        for (oop* q = spaces[k]->bottom(); q < spaces[k]->end(); q++) *q = zap;
+      }
+    }
 
     // Set the desired survivor size to half the real survivor space
     int desired_survivor_size = new_gen.to()->capacity()/2;

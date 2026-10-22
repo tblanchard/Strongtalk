@@ -203,13 +203,31 @@ extern "C" contextOop allocateContext2() {
 extern "C" bool have_nlr_through_C;
 extern "C" oop  nlr_result;
 
+// The primitive's arguments are on the Delta stack of its caller (at last_Delta_sp, set by the
+// interpreter and compiled code before calling C), where a GC updates them. An argument used
+// after a call that can GC (e.g. Delta::call) must be read from there again: on x86 the C
+// function read its (stack) parameters from these slots, on arm64 they are passed in registers.
+class PrimitiveArgument : public StackObj {
+  oop* _slot;
+  oop  _value;
+ public:
+  PrimitiveArgument(oop value, int nof_arguments) : _slot(NULL), _value(value) {
+    oop* args = (oop*) last_Delta_sp;
+    for (int i = 0; args != NULL && i < nof_arguments; i++) {
+      if (args[i] == value) { _slot = &args[i]; break; }
+    }
+  }
+  oop value() const { return _slot != NULL ? *_slot : _value; }
+};
+
 PRIM_DECL_2(unwindprotect, oop receiver, oop protectBlock) {
   PROLOGUE_2("unwindprotect", receiver, protectBlock);
+  PrimitiveArgument protect(protectBlock, 2);		// used after a call that can GC
   oop res = Delta::call(receiver, vmSymbols::value());
 
   if (have_nlr_through_C) {
     unwindInfo enabler;
-    res  = Delta::call(protectBlock, vmSymbols::value(), nlr_result);
+    res  = Delta::call(protect.value(), vmSymbols::value(), nlr_result);
     // Now since we have to continue the first non-local-return
     // the nlr_result must be correct.
   }
@@ -219,7 +237,8 @@ PRIM_DECL_2(unwindprotect, oop receiver, oop protectBlock) {
 
 PRIM_DECL_1(blockRepeat, oop receiver) {
   PROLOGUE_1("blockRepeat", receiver);
-  do Delta::call(receiver, vmSymbols::value());
+  PrimitiveArgument block(receiver, 1);			// called again after calls that can GC
+  do Delta::call(block.value(), vmSymbols::value());
   while (!have_nlr_through_C);
   return smiOop_zero; // The return value is ignored by the NLR
 }
