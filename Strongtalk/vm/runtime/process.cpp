@@ -1303,3 +1303,25 @@ void suspend_process_at_stack_overflow(intptr_t* sp, intptr_t* fp, char* pc) {
     proc->set_terminating();
   }
 }
+
+
+#if defined(__APPLE__)
+#include <fcntl.h>
+#include <unistd.h>
+// Diagnostics for the GUI ("Dump GUI State", win32User.mm): appends the states and stacks of
+// all processes to path. Not synchronized with the running process; for hangs.
+extern "C" void win32_dump_processes(const char* path) {
+  fflush(stdout);
+  int saved = dup(1);
+  int fd = open(path, O_WRONLY | O_APPEND | O_CREAT, 0644);
+  if (fd < 0 || saved < 0) return;
+  dup2(fd, 1);
+  close(fd);
+  stdOut->print_cr("\nactive process:");
+  if (DeltaProcess::active() != NULL) { ResourceMark rm; DeltaProcess::active()->print(); }
+  Processes::print();
+  fflush(stdout);
+  dup2(saved, 1);
+  close(saved);
+}
+#endif

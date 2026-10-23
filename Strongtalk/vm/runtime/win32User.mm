@@ -47,6 +47,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 
 extern "C" uint32_t win32_external_word(void* p);	// proxy_prims.cpp
 extern "C" void*    win32_external_pointer(uint32_t w);
+extern "C" void     win32_dump_processes(const char* path);	// process.cpp
 
 namespace w32 {
 
@@ -1083,6 +1084,20 @@ word destroy_window(word hwnd) {
     GUILocker l;
     if (w->destroyed) return 1;
   }
+  // DestroyWindow first takes the keyboard focus from the window and its children (the image
+  // releases windows in WM_NCDESTROY and must not find a focused view then)
+  word focused = 0;
+  {
+    GUILocker l;
+    if (w->queue != NULL) {
+      Window* f = window(w->queue->focus);
+      for (Window* a = f; a != NULL; a = a->parent) {
+        if (a == w) { focused = f->handle; w->queue->focus = 0; break; }
+      }
+    }
+  }
+  if (focused != 0) send_message(focused, WM_KILLFOCUS, 0, 0);
+  if (window(hwnd) == NULL) return 1;
   send_message(hwnd, WM_DESTROY, 0, 0);
   // the children (they may destroy themselves meanwhile)
   while (true) {
@@ -2592,6 +2607,8 @@ static word ChooseFontA(word cf)       { return 0; }	// cancelled
 //   close <title>                 WM_CLOSE
 //   quit                          exit the process
 
+static void dump_gui_state();
+
 static Window* script_window(const std::string& title) {
   GUILocker l;
   Window* found = NULL;
@@ -2660,6 +2677,23 @@ static void* script_thread(void* arg) {
     std::string scmd = cmd;
     if (scmd == "wait") { usleep(atoi(rest) * 1000); continue; }
     if (scmd == "quit") { win32_gui_exit(0); }
+    if (scmd == "state") {			// state: Dump GUI State, and the queues to stderr
+      dump_gui_state();
+      FILE* st = fopen("/tmp/strongtalk-gui-state.txt", "r");
+      char l2[1024];
+      while (st && fgets(l2, sizeof l2, st)) { if (strstr(l2, "thread ") && strstr(l2, "messages")) fprintf(stderr, "[state]%s", l2); }
+      if (st) fclose(st);
+      continue;
+    }
+    if (scmd == "modal") {			// modal <ms>: a modal loop on the main thread (as an alert or popup menu)
+      int ms = atoi(rest);
+      run_on_main(^{
+        NSDate* end = [NSDate dateWithTimeIntervalSinceNow: ms / 1000.0];
+        while ([end timeIntervalSinceNow] > 0)
+          [[NSRunLoop currentRunLoop] runMode: NSModalPanelRunLoopMode beforeDate: [NSDate dateWithTimeIntervalSinceNow: 0.05]];
+      });
+      continue;
+    }
     if (scmd == "terminate") { run_on_main(^{ [NSApp terminate: nil]; }); continue; }	// Command-Q
     if (scmd == "windows") {
       GUILocker l;
@@ -2895,6 +2929,7 @@ static void dump_gui_state() {
   }
   fclose(f);
   for (auto& p : pngs) { Window* w = window(p.first); if (w) write_png(w, p.second.c_str()); }
+  win32_dump_processes("/tmp/strongtalk-gui-state.txt");
 }
 
 // ---------------------------------------------------------------------------

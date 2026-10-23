@@ -384,6 +384,10 @@ void os::breakpoint() {
 int os::message_box(const char* title, const char* message) {
   fprintf(stderr, "\n%s\n%s [y/n] ", title, message);
   fflush(stderr);
+  if (::getenv("STRONGTALK_STACK_TRACE") != NULL) {	// non-interactive runs: answer yes
+    fprintf(stderr, "y\n");
+    return true;
+  }
   if (!isatty(fileno(stdin))) {
     fprintf(stderr, "n\n");
     return false;
