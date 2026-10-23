@@ -51,8 +51,8 @@ _return_from_Delta:
 // pushing return_pc as its return address. Returns when the compiled code returns to
 // return_pc, normally or with an NLR; out (see CompiledReturn) describes how.
 
-        .equ    SAVE_SIZE, 112          // x19-x30 (96), out (8), padding (8)
-        .equ    SAVE_OUT, 96
+        .equ    SAVE_SIZE, 176          // x19-x30 (96), d8-d15 (64), out (8), padding (8)
+        .equ    SAVE_OUT, 160
 
         .p2align 2
         .globl _delta_call_compiled
@@ -64,6 +64,10 @@ _delta_call_compiled:
         stp     x25, x26, [sp, #48]
         stp     x27, x28, [sp, #64]
         stp     x29, x30, [sp, #80]
+        stp     d8, d9, [sp, #96]       // callee saved in C; compiled code keeps the
+        stp     d10, d11, [sp, #112]    //   x87 register stack in d8-d15
+        stp     d12, d13, [sp, #128]
+        stp     d14, d15, [sp, #144]
         str     x5, [sp, #SAVE_OUT]
         mov     x27, sp                 // the innermost save area
         sub     x28, x2, #8             // push the return pc
@@ -114,6 +118,10 @@ restore_C:
         ldp     x25, x26, [sp, #48]
         ldp     x27, x28, [sp, #64]
         ldp     x29, x30, [sp, #80]
+        ldp     d8, d9, [sp, #96]
+        ldp     d10, d11, [sp, #112]
+        ldp     d12, d13, [sp, #128]
+        ldp     d14, d15, [sp, #144]
         add     sp, sp, #SAVE_SIZE
         ret
 

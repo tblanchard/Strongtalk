@@ -513,9 +513,12 @@ Phases:
       - InvocationCounterLimit <= 2 exhausts the jump table ("grow not implemented", jumpTable.cpp).
         At <= 5 the debug build asserts in Inliner (no subscope found for a block inlined in an
         earlier nmethod); the code falls back to the interpreted method's type feedback (release OK).
-      - The release build's +TestArm64Assembler reports 384 x87-emulation failures (fcompp/fnstsw,
-        fprem, ftst); the debug build has none (also at the C5 commit).
       - The startup image patches are filed in through the source DB: every launch appends them to
         source/strongtalkchange.log and rewrites the source index files of the patched classes.
       - rem: is unimplemented for LargeIntegers in the image (Number>>rem:); Integer>>bitShift: and
         Number>>raisedTo: likewise (image limitations).
+- [x] x87 emulation clobbered C callee-saved registers (2026-10-23). The x87 stack lives in d8-d15,
+      which are callee saved in the arm64 C ABI; nothing saved them on entry from C. The release
+      +TestArm64Assembler (384 failures in fcompp/fnstsw, fprem, ftst) kept its loop values in d8-d15
+      across the call. delta_call_compiled and the assembler test harness now save/restore d8-d15.
+      Both builds: 89137 checks, 0 failures; vmtest, vmcompiled, results comparison pass.

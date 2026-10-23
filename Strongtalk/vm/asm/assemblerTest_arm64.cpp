@@ -117,7 +117,8 @@ class TestCode {
   TestCode() {
     cb = new CodeBuffer(16 * 1024, 4 * 1024);
     m  = new MacroAssembler(cb);
-    m->emit(sub_imm(sp, sp, 64));
+    m->emit(sub_imm(sp, sp, 128));
+    for (int d = 8; d <= 15; d++) m->emit(fldst_uimm(STR, 3, d, sp, 64 + (d - 8) * 8));	// callee saved (x87 stack)
     m->emit(ldst_uimm(STR, 3, 19, sp, 0));
     m->emit(ldst_uimm(STR, 3, 20, sp, 8));
     m->emit(ldst_uimm(STR, 3, 21, sp, 16));
@@ -138,7 +139,8 @@ class TestCode {
     m->emit(ldst_uimm(LDR, 3, 28, sp, 24));
     m->emit(ldst_uimm(LDR, 3, 29, sp, 32));
     m->emit(ldst_uimm(LDR, 3, 30, sp, 40));
-    m->emit(add_imm(sp, sp, 64));
+    for (int d = 8; d <= 15; d++) m->emit(fldst_uimm(LDR, 3, d, sp, 64 + (d - 8) * 8));
+    m->emit(add_imm(sp, sp, 128));
     m->emit(a64::ret());
     m->finalize();
     return (TestFn) install_scratch(cb->code_begin(), cb->code_size());
