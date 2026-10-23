@@ -513,8 +513,6 @@ Phases:
       - InvocationCounterLimit <= 2 exhausts the jump table ("grow not implemented", jumpTable.cpp).
         At <= 5 the debug build asserts in Inliner (no subscope found for a block inlined in an
         earlier nmethod); the code falls back to the interpreted method's type feedback (release OK).
-      - The startup image patches are filed in through the source DB: every launch appends them to
-        source/strongtalkchange.log and rewrites the source index files of the patched classes.
       - rem: is unimplemented for LargeIntegers in the image (Number>>rem:); Integer>>bitShift: and
         Number>>raisedTo: likewise (image limitations).
 - [x] x87 emulation clobbered C callee-saved registers (2026-10-23). The x87 stack lives in d8-d15,
@@ -522,3 +520,12 @@ Phases:
       +TestArm64Assembler (384 failures in fcompp/fnstsw, fprem, ftst) kept its loop values in d8-d15
       across the call. delta_call_compiled and the assembler test harness now save/restore d8-d15.
       Both builds: 89137 checks, 0 failures; vmtest, vmcompiled, results comparison pass.
+- [x] Image patches saved into strongtalk.bst (2026-10-23). Filing in image_patches.st on every launch
+      appended it to source/strongtalkchange.log (11.5 MB) and left .bak/.new files. The source DB was
+      first resynced to the 2006 save (change log truncated to the size in strongtalksource.id,
+      X.bak -> X, .new removed), then one run filed in the patches and ran `Dumper saveSystem`
+      (new strongtalk.bst, source DB consistent: log 7986719 bytes). The image_patches.st link was
+      removed from the image directory; porting/image_patches.st stays the record of the patches
+      (to rebuild: link it into a resynced image directory, launch once, Dumper saveSystem).
+      The originals are in image-backup-2026-10-23/. With the saved image and no patch file a launch
+      writes nothing to source/; vmtest, vmcompiled, benchmarks and the results comparison pass.
