@@ -206,6 +206,7 @@ struct Window : Obj {
   bool                 display_pending;
   POINT                min_track;	// WM_GETMINMAXINFO
   word                 dc;		// the window's own DC (CS_OWNDC semantics for all windows)
+  word                 last_focus;	// top-level: the focus window to restore on activation
   Window(WndClass* c);
   ~Window();
 };

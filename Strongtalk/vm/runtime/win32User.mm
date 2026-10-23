@@ -42,6 +42,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "win32Shim.hpp"
 #include <mach/mach_time.h>
 #include <map>
+#include <functional>
 
 extern "C" uint32_t win32_external_word(void* p);	// proxy_prims.cpp
 extern "C" void*    win32_external_pointer(uint32_t w);
@@ -283,8 +284,12 @@ static int screen_width = 1440, screen_height = 900;	// main display, logical pi
 int win32_screen_width()  { return screen_width; }
 int win32_screen_height() { return screen_height; }
 
+} // namespace w32
+void win32_gui_exit(int code);
+namespace w32 {
+
 static void* vm_thread_start(void* arg) {
-  exit(vm_main_function(vm_argc, vm_argv));
+  win32_gui_exit(vm_main_function(vm_argc, vm_argv));
   return NULL;
 }
 
@@ -303,6 +308,14 @@ static void ensure_gui() {
 static bool on_main_thread() { return pthread_main_np() != 0; }
 
 } // namespace w32
+
+// Ends the process. With AppKit running, exit() would run the static destructors while the
+// main thread still uses the GUI state: flush and _exit instead.
+void win32_gui_exit(int code) {
+  fflush(NULL);
+  if (w32::gui_ready) _exit(code);
+  exit(code);
+}
 
 int win32_gui_main(int argc, char** argv, int (*vm_main)(int argc, char** argv)) {
   using namespace w32;
@@ -374,8 +387,9 @@ struct Queue {
   bool                      quit;
   word                      quit_code;
   uint32_t                  key_state;	// KS_ flags as of the last message retrieved
+  word                      focus;	// the focus window of the thread (as in Win32)
   QMessage                  last;	// the last message retrieved
-  Queue(uint32_t id) : thread_id(id), quit(false), quit_code(0), key_state(0) {
+  Queue(uint32_t id) : thread_id(id), quit(false), quit_code(0), key_state(0), focus(0) {
     pthread_cond_init(&cond, NULL);
   }
 };
@@ -533,12 +547,11 @@ static word RegisterClassA(word wndclass) {
 // Windows
 
 static std::vector<Window*> top_levels;
-static word focus_hwnd   = 0;
 static word capture_hwnd = 0;
 
 Window::Window(WndClass* c) : Obj(K_WINDOW), cls(c), wndproc(c ? c->wndproc : 0), style(0), ex_style(0),
   parent(NULL), id(0), user_data(0), menu(0), visible(false), enabled(true), destroyed(false), erase(false),
-  size_sent(false), queue(NULL), control(NULL), nswindow(NULL), surface(NULL), display_pending(false), dc(0) {
+  size_sent(false), last_focus(0), queue(NULL), control(NULL), nswindow(NULL), surface(NULL), display_pending(false), dc(0) {
   rect = update = dirty = make_rect(0, 0, 0, 0);
   memset(&vscroll, 0, sizeof vscroll);
   memset(&hscroll, 0, sizeof hscroll);
@@ -694,6 +707,9 @@ static POINT client_to_screen(Window* w, POINT p) {
 
 // the deepest visible, enabled window containing p (top-level surface coordinates)
 static Window* child_at(Window* w, int x, int y) {
+  // children are clipped to the client area (they never cover the scroll bars)
+  POINT co = client_origin_in_top(w);
+  if (!rect_contains(rect_offset(client_rect(w), co.x, co.y), x, y)) return w;
   for (Window* c : w->children) {
     if (!c->visible || c->destroyed) continue;
     POINT o = window_origin_in_top(c);
@@ -714,6 +730,13 @@ word send_message(word hwnd, word msg, word wparam, word lparam) {
     Window* w = window(hwnd);
     if (w == NULL) return 0;
     proc = w->wndproc;
+    if (w->queue != NULL && current_queue != NULL && w->queue != current_queue) {
+      // a window of another thread: its procedure must run there, but the sender holds the VM
+      // (a synchronous DLL call), so the message is posted
+      if (TraceGUI) fprintf(stderr, "Strongtalk GUI: message 0x%lx to a window of another thread posted\n", (long) msg);
+      enqueue(w->queue, make_message(hwnd, msg, wparam, lparam));
+      return 0;
+    }
   }
   if (TraceMessages) fprintf(stderr, "[send 0x%lx 0x%04lx 0x%lx 0x%lx]\n", (long) hwnd, (long) msg, (long) wparam, (long) lparam);
   if (proc == 0) return def_window_proc(hwnd, msg, wparam, lparam);
@@ -751,22 +774,26 @@ static word PostQuitMessage(word code) {
 // ---------------------------------------------------------------------------
 // Focus and capture
 
+// SetFocus: the focus is per thread; windows of other threads cannot get it
 static word set_focus(word hwnd) {
+  Queue* q = my_queue();
   word old;
   {
     GUILocker l;
-    if (hwnd != 0 && window(hwnd) == NULL) return 0;
-    old = focus_hwnd;
+    Window* w = window(hwnd);
+    if (hwnd != 0 && (w == NULL || w->queue != q)) return 0;
+    old = window(q->focus) ? q->focus : 0;
     if (old == hwnd) return old;
-    focus_hwnd = hwnd;
+    q->focus = hwnd;
+    if (w != NULL) top_level(w)->last_focus = hwnd;
   }
   if (old != 0 && window(old) != NULL) send_message(old, WM_KILLFOCUS, hwnd, 0);
-  if (hwnd != 0) send_message(hwnd, WM_SETFOCUS, old, 0);
+  if (hwnd != 0 && window(hwnd) != NULL) send_message(hwnd, WM_SETFOCUS, old, 0);
   return old;
 }
 
 static word SetFocus(word hwnd) { return set_focus(hwnd); }
-static word GetFocus()          { GUILocker l; return window(focus_hwnd) ? focus_hwnd : 0; }
+static word GetFocus()          { Queue* q = my_queue(); GUILocker l; return window(q->focus) ? q->focus : 0; }
 
 static word SetCapture(word hwnd) {
   word old;
@@ -1062,7 +1089,7 @@ word destroy_window(word hwnd) {
     GUILocker l;
     w->destroyed = true;
     w->visible = false;
-    if (focus_hwnd == hwnd) focus_hwnd = 0;
+    if (w->queue != NULL && w->queue->focus == hwnd) w->queue->focus = 0;
     if (capture_hwnd == hwnd) capture_hwnd = 0;
   }
   send_message(hwnd, WM_NCDESTROY, 0, 0);
@@ -1823,8 +1850,8 @@ static std::u16string key_chars(NSEvent* e, int vk) {
 
 static word key_target(HANDLE top_hwnd) {
   Window* top = window(top_hwnd);
-  if (top == NULL) return 0;
-  Window* f = window(focus_hwnd);
+  if (top == NULL || top->queue == NULL) return 0;
+  Window* f = window(top->queue->focus);
   if (f != NULL && top_level(f) == top) return f->handle;
   return top->handle;
 }
@@ -1878,17 +1905,20 @@ static void top_level_activated(HANDLE hwnd, bool active) {
   GUILocker l;
   Window* top = window(hwnd);
   if (top == NULL || top->queue == NULL) return;
-  Window* f = window(focus_hwnd);
+  Queue* q = top->queue;
+  Window* f = window(q->focus);
   if (active) {
     if (f != NULL && top_level(f) == top) return;
-    if (f != NULL && f->queue) enqueue(f->queue, make_message(f->handle, WM_KILLFOCUS, hwnd, 0));
-    focus_hwnd = hwnd;
-    enqueue(top->queue, make_message(hwnd, WM_SETFOCUS, f ? f->handle : 0, 0));
+    if (f != NULL) enqueue(q, make_message(f->handle, WM_KILLFOCUS, hwnd, 0));
+    Window* restore = window(top->last_focus);
+    if (restore == NULL || top_level(restore) != top) restore = top;
+    q->focus = restore->handle;
+    enqueue(q, make_message(restore->handle, WM_SETFOCUS, f ? f->handle : 0, 0));
   } else {
     if (f == NULL || top_level(f) != top) return;
-    // the window keeps the focus window (Win32 restores it on activation): only tell it
-    enqueue(f->queue, make_message(f->handle, WM_KILLFOCUS, 0, 0));
-    focus_hwnd = 0;
+    top->last_focus = f->handle;
+    enqueue(q, make_message(f->handle, WM_KILLFOCUS, 0, 0));
+    q->focus = 0;
   }
 }
 
@@ -2279,6 +2309,33 @@ static void schedule_menu_bar_update() {
   });
 }
 
+static std::string scripted_popup_choice;	// the next TrackPopupMenu chooses this item (GUI scripts)
+
+static std::string plain_text(const std::string& text) {	// without '&' and the accelerator
+  std::string s;
+  for (size_t i = 0; i < text.size(); i++) {
+    if (text[i] == '\t') break;
+    if (text[i] == '&') { if (i + 1 < text.size() && text[i + 1] == '&') { s += '&'; i++; } continue; }
+    s += text[i];
+  }
+  return s;
+}
+
+// the command id of the item with that text in m or its submenus (0 if none); popup: its menu
+static word find_item_by_text(Menu* m, const std::string& text, word* popup = NULL) {
+  for (MenuItem& i : m->items) {
+    if (!(i.flags & MF_POPUP) && plain_text(i.text) == text) { if (popup) *popup = m->handle; return i.id; }
+  }
+  for (MenuItem& i : m->items) {
+    if (!(i.flags & MF_POPUP)) continue;
+    Menu* sub = lookup_as<Menu>(i.submenu, K_MENU);
+    if (sub == NULL) continue;
+    word id = find_item_by_text(sub, text, popup);
+    if (id != 0) return id;
+  }
+  return 0;
+}
+
 // TrackPopupMenu(hmenu, flags, x, y, reserved, hwnd, rect)
 static word TrackPopupMenu(word hmenu, word flags, word x, word y, word reserved, word hwnd, word rect) {
   enum { TPM_RETURNCMD = 0x100, TPM_NONOTIFY = 0x80 };
@@ -2286,6 +2343,19 @@ static word TrackPopupMenu(word hmenu, word flags, word x, word y, word reserved
   send_message(hwnd, WM_INITMENUPOPUP, hmenu, 0);
   __block word selected = 0;
   POINT p = { (int32_t) x, (int32_t) y };
+  if (!scripted_popup_choice.empty()) {	// GUI test scripts: choose without showing the menu
+    std::string choice = scripted_popup_choice;
+    scripted_popup_choice.clear();
+    word id = 0;
+    {
+      GUILocker l;
+      Menu* m = lookup_as<Menu>(hmenu, K_MENU);
+      if (m != NULL) id = find_item_by_text(m, choice);
+    }
+    fprintf(stderr, "[script] popup choice \"%s\" -> %ld\n", choice.c_str(), (long) id);
+    if (id != 0 && !(flags & TPM_RETURNCMD)) post_message(hwnd, WM_COMMAND, id & 0xFFFF, 0);
+    return (flags & TPM_RETURNCMD) ? id : (id != 0);
+  }
   run_on_main_sync(^{
     NSMenu* menu = [[NSMenu alloc] init];
     menu.delegate = menu_target;
@@ -2354,6 +2424,8 @@ static word GetClipboardData(word format) {
 // ---------------------------------------------------------------------------
 // Message boxes
 
+static std::string scripted_alert_choice;	// the next MessageBoxA answers this button (GUI scripts)
+
 static word MessageBoxA(word hwnd, word text, word caption, word type) {
   enum { MB_OK = 0, MB_OKCANCEL = 1, MB_ABORTRETRYIGNORE = 2, MB_YESNOCANCEL = 3, MB_YESNO = 4, MB_RETRYCANCEL = 5 };
   enum { IDOK = 1, IDCANCEL = 2, IDABORT = 3, IDRETRY = 4, IDIGNORE = 5, IDYES = 6, IDNO = 7 };
@@ -2363,6 +2435,16 @@ static word MessageBoxA(word hwnd, word text, word caption, word type) {
   int icon = (int) (type & 0xF0);
   int default_button = (int) ((type >> 8) & 0xF);
   __block word result = IDOK;
+  if (!scripted_alert_choice.empty()) {	// GUI test scripts: answer without showing it
+    std::string c = scripted_alert_choice;
+    scripted_alert_choice.clear();
+    static const struct { const char* name; int id; } ids[] = {
+      { "OK", IDOK }, { "Cancel", IDCANCEL }, { "Abort", IDABORT }, { "Retry", IDRETRY }, { "Ignore", IDIGNORE },
+      { "Yes", IDYES }, { "No", IDNO }, { NULL, 0 } };
+    for (int i = 0; ids[i].name; i++) if (strcasecmp(c.c_str(), ids[i].name) == 0) result = ids[i].id;
+    fprintf(stderr, "[script] message box \"%s\": %s -> %ld\n", ansi_to_utf8(text ? (const char*) text : "").c_str(), c.c_str(), (long) result);
+    return result;
+  }
   run_on_main_sync(^{
     NSAlert* alert = [[NSAlert alloc] init];
     alert.messageText = title;
@@ -2486,6 +2568,9 @@ static word ChooseFontA(word cf)       { return 0; }	// cancelled
 //   drag <title> <x0> <y0> <x1> <y1>                     left button drag
 //   type <title> <text>           characters (WM_KEYDOWN/WM_CHAR/WM_KEYUP), \n is Return
 //   key <title> <vk> [shift|ctrl] a virtual key, e.g. key Launcher 0x28
+//   menu <title> <item>           choose a menu bar item (by its text, without '&')
+//   popup <title> <item>          the next popup menu (TrackPopupMenu) chooses that item
+//   alert - <button>              the next message box answers that button (OK, Yes, No, ...)
 //   close <title>                 WM_CLOSE
 //   quit                          exit the process
 
@@ -2556,7 +2641,7 @@ static void* script_thread(void* arg) {
     fprintf(stderr, "[script] %s\n", line);
     std::string scmd = cmd;
     if (scmd == "wait") { usleep(atoi(rest) * 1000); continue; }
-    if (scmd == "quit") { exit(0); }
+    if (scmd == "quit") { win32_gui_exit(0); }
     if (scmd == "windows") {
       GUILocker l;
       for (Window* t : top_levels)
@@ -2584,6 +2669,7 @@ static void* script_thread(void* arg) {
     }
     if (scmd == "dump") {	// dump <name> [<title>]: the name came first
       std::string name = title, wtitle = rest;
+      if (wtitle.size() >= 2 && wtitle.front() == '"' && wtitle.back() == '"') wtitle = wtitle.substr(1, wtitle.size() - 2);
       Window* w = script_window(wtitle);
       if (w == NULL) { fprintf(stderr, "[script] no window \"%s\"\n", wtitle.c_str()); continue; }
       char out[PATH_MAX];
@@ -2632,6 +2718,36 @@ static void* script_thread(void* arg) {
       if (mods & KS_CONTROL) { if (vk >= 'A' && vk <= 'Z') chars += (char16_t) (vk - 'A' + 1); }
       else if (vk == VK_RETURN || vk == VK_BACK || vk == VK_TAB || vk == VK_ESCAPE) chars += (char16_t) vk;
       script_key(w, vk, chars, mods);
+    } else if (scmd == "menus") {		// menus <title>: print the menu bar
+      GUILocker l;
+      std::function<void(word, int)> print = [&](word hmenu, int depth) {
+        Menu* m = lookup_as<Menu>(hmenu, K_MENU);
+        if (m == NULL) return;
+        for (MenuItem& i : m->items) {
+          fprintf(stderr, "[menu] %*s%s%s\n", depth * 2, "", (i.flags & MF_SEPARATOR) ? "----" : plain_text(i.text).c_str(),
+                  (i.flags & (MF_GRAYED | MF_DISABLED)) ? " (disabled)" : "");
+          if (i.flags & MF_POPUP) print(i.submenu, depth + 1);
+        }
+      };
+      print(w->menu, 0);
+    } else if (scmd == "menu") {		// menu <title> <item text>: as chosen from the menu bar
+      word id = 0, popup = 0;
+      HANDLE h = w->handle;
+      {
+        GUILocker l;
+        Menu* m = lookup_as<Menu>(w->menu, K_MENU);
+        if (m != NULL) id = find_item_by_text(m, rest, &popup);
+      }
+      if (id == 0) { fprintf(stderr, "[script] no menu item \"%s\"\n", rest); continue; }
+      bool ok;
+      send_from_main(h, WM_INITMENUPOPUP, popup, 0, 5000, &ok);
+      post_message(h, WM_COMMAND, id & 0xFFFF, 0);
+    } else if (scmd == "alert") {		// alert - <button>: the next message box answers it
+      GUILocker l;
+      scripted_alert_choice = rest;
+    } else if (scmd == "popup") {		// popup <title> <item text>: the next popup menu chooses it
+      GUILocker l;
+      scripted_popup_choice = rest;
     } else if (scmd == "close") {
       post_message(w->handle, WM_CLOSE, 0, 0);
     } else {

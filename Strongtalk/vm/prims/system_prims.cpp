@@ -95,6 +95,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "markSweep.hpp"
 #include "memOop.inline.hpp"
 #include "system_prims.hpp"
+#include "win32Shim.hpp"
 #include "nmethodScopes.hpp"
 #include "objArrayOop.hpp"
 #include "vmOperations.hpp"
@@ -423,7 +424,11 @@ PRIM_DECL_0(systemPrimitives::quit) {
   file_in_eval_file();
   if (PrintJITModeFaults) lprintf("code memory mode switches by faults: %d\n", os::jit_mode_faults());
   if (VerifyFileOut) methodOopDesc::verify_fileout_all();
+#if defined(__APPLE__)
+  win32_gui_exit(0);
+#else
   exit(0);
+#endif
   return badOop;
 }
 

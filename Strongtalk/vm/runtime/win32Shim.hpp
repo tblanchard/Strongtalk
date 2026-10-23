@@ -26,6 +26,7 @@ void win32_windows_path(const char* posix, char* buffer, size_t size);	// POSIX 
 
 // main() runs vm_main on a VM thread; the main thread runs AppKit once the GUI is used
 int  win32_gui_main(int argc, char** argv, int (*vm_main)(int argc, char** argv));
+void win32_gui_exit(int code);		// exit (safe while AppKit runs)
 #endif
 
 #endif // VM_RUNTIME_WIN32SHIM_HPP
