@@ -42,6 +42,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "win32Shim.hpp"
 #include <mach/mach_time.h>
 #include <map>
+#include <unordered_map>
 #include <functional>
 
 extern "C" uint32_t win32_external_word(void* p);	// proxy_prims.cpp
@@ -183,34 +184,37 @@ static void gui_wait(pthread_cond_t* cond, int timeout_ms = -1) {
   lock_depth = depth;
 }
 
-static const HANDLE handle_base = 0x00010000;	// below the ExternalWords range (0xA0000000)
-static std::vector<Obj*> handles;
-static std::vector<uint32_t> free_handles;
+// Handles are not reused (as Win32, which does not reuse them soon): the image keeps handles of
+// destroyed objects for a while (e.g. its HWND -> Window registry), and a recycled one would
+// reach the wrong object.
+static const HANDLE handle_base  = 0x00010000;	// below the ExternalWords range (0xA0000000)
+static const HANDLE handle_limit = 0x9FFF0000;
+static std::unordered_map<HANDLE, Obj*> handles;
+static HANDLE next_handle = handle_base;
 
 Obj::Obj(ObjKind k) : kind(k), handle(0), stock(false) {
   GUILocker l;
-  uint32_t index;
-  if (!free_handles.empty()) { index = free_handles.back(); free_handles.pop_back(); handles[index] = this; }
-  else                       { index = (uint32_t) handles.size(); handles.push_back(this); }
-  handle = handle_base + 4 * index;
+  do {
+    handle = next_handle;
+    next_handle += 4;
+    if (next_handle >= handle_limit) next_handle = handle_base;	// after 670 million objects
+  } while (handles.count(handle) != 0);
+  handles[handle] = this;
 }
 
 Obj::~Obj() {
   GUILocker l;
-  uint32_t index = (handle - handle_base) / 4;
-  if (index < handles.size() && handles[index] == this) {
-    handles[index] = NULL;
-    free_handles.insert(free_handles.begin(), index);	// reuse the oldest handles first
-  }
+  auto i = handles.find(handle);
+  if (i != handles.end() && i->second == this) handles.erase(i);
 }
 
 Obj* lookup(word h, ObjKind kind) {
   GUILocker l;
-  if (h < (word) handle_base || ((h - handle_base) & 3) != 0) return NULL;
-  uint64_t index = (uint64_t) (h - handle_base) / 4;
-  if (index >= handles.size()) return NULL;
-  Obj* o = handles[index];
-  if (o == NULL || (kind != K_ANY && o->kind != kind)) return NULL;
+  if (h < (word) handle_base || h >= (word) handle_limit || (h & 3) != 0) return NULL;
+  auto i = handles.find((HANDLE) h);
+  if (i == handles.end()) return NULL;
+  Obj* o = i->second;
+  if (kind != K_ANY && o->kind != kind) return NULL;
   return o;
 }
 
@@ -2455,6 +2459,9 @@ static word MessageBoxA(word hwnd, word text, word caption, word type) {
     fprintf(stderr, "[script] message box \"%s\": %s -> %ld\n", ansi_to_utf8(text ? (const char*) text : "").c_str(), c.c_str(), (long) result);
     return result;
   }
+  // one at a time: nested modal alerts would only return in reverse order
+  static pthread_mutex_t alert_mutex = PTHREAD_MUTEX_INITIALIZER;
+  pthread_mutex_lock(&alert_mutex);
   run_on_main_sync(^{
     NSAlert* alert = [[NSAlert alloc] init];
     alert.messageText = title;
@@ -2479,6 +2486,7 @@ static word MessageBoxA(word hwnd, word text, word caption, word type) {
     int index = (int) (r - NSAlertFirstButtonReturn);
     result = index >= 0 && index < (int) ids.size() ? ids[index] : IDCANCEL;
   });
+  pthread_mutex_unlock(&alert_mutex);
   return result;
 }
 
@@ -2652,6 +2660,7 @@ static void* script_thread(void* arg) {
     std::string scmd = cmd;
     if (scmd == "wait") { usleep(atoi(rest) * 1000); continue; }
     if (scmd == "quit") { win32_gui_exit(0); }
+    if (scmd == "terminate") { run_on_main(^{ [NSApp terminate: nil]; }); continue; }	// Command-Q
     if (scmd == "windows") {
       GUILocker l;
       for (Window* t : top_levels)
@@ -2745,6 +2754,36 @@ static void* script_thread(void* arg) {
                                       windowNumber: nsw.windowNumber context: nil eventNumber: 0 clickCount: 1 pressure: i == 0 ? 1 : 0];
           [nsw sendEvent: e];
         }
+      });
+    } else if (scmd == "realhover") {		// realhover <title> <ms>: mouse moves (NSEvents) over the window
+      int ms = atoi(rest);
+      HANDLE h = w->handle;
+      for (int t = 0; t < ms; t += 16) {
+        int k = t / 16;
+        run_on_main(^{
+          NSWindow* nsw = nil;
+          { GUILocker l; Window* x = window(h); if (x) nsw = ns_window(x); }
+          if (nsw == nil) return;
+          NSSize sz = nsw.contentView.bounds.size;
+          NSPoint p = NSMakePoint(fmod(37.0 * k, sz.width), fmod(23.0 * k, sz.height));
+          NSEvent* e = [NSEvent mouseEventWithType: NSEventTypeMouseMoved location: p modifierFlags: 0
+                                          timestamp: [NSProcessInfo processInfo].systemUptime windowNumber: nsw.windowNumber
+                                            context: nil eventNumber: 0 clickCount: 0 pressure: 0];
+          [nsw sendEvent: e];
+        });
+        usleep(16000);
+      }
+    } else if (scmd == "resize") {		// resize <title> <w> <h>: as the user (AppKit setFrame)
+      sscanf(rest, "%d %d", &n1, &n2);
+      HANDLE h = w->handle;
+      run_on_main_sync(^{
+        NSWindow* nsw = nil;
+        { GUILocker l; Window* x = window(h); if (x) nsw = ns_window(x); }
+        if (nsw == nil) return;
+        NSRect c = [nsw contentRectForFrameRect: nsw.frame];
+        c.origin.y += c.size.height - n2;
+        c.size = NSMakeSize(n1, n2);
+        [nsw setFrame: [nsw frameRectForContentRect: c] display: YES];
       });
     } else if (scmd == "screen") {		// screen <title> <name>: what the view shows, after an AppKit redisplay
       HANDLE h = w->handle;
@@ -2884,14 +2923,15 @@ static void run_app() {
   start_script();
 }
 - (NSApplicationTerminateReply) applicationShouldTerminate: (NSApplication*) app {
-  // closing all windows ends the sessions; the image decides whether to quit
-  std::vector<word> tops;
+  // as closing the Launcher (the first window): the image asks and quits
+  word first = 0;
   {
     GUILocker l;
-    for (Window* t : top_levels) if (t->visible) tops.push_back(t->handle);
+    for (Window* t : top_levels) if (t->visible && !t->destroyed) { first = t->handle; break; }
   }
-  for (word h : tops) post_message(h, WM_CLOSE, 0, 0);
-  return tops.empty() ? NSTerminateNow : NSTerminateCancel;
+  if (first == 0) return NSTerminateNow;
+  post_message(first, WM_CLOSE, 0, 0);
+  return NSTerminateCancel;
 }
 - (BOOL) applicationShouldTerminateAfterLastWindowClosed: (NSApplication*) app {
   return NO;
