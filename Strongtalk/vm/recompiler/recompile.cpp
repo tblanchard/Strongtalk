@@ -115,6 +115,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "inliner.hpp"
 #include "compiler.hpp"
 #include "rframe.hpp"
+#include "savedRegisters.hpp"
 #ifdef DELTA_COMPILER
 
 
@@ -168,6 +169,7 @@ char* Recompilation::nmethod_invocation_counter_overflow(oop rcvr, char* retpc) 
   // called by an nmethod whenever the nmethod's invocation counter reaches its limit
   // retpc is the recompilee's return PC (i.e., the pc of the nmethod which triggered
   // the invocation counter overflow).
+  SavedRegistersScope srs;
   ResourceMark rm;
   nmethod* trigger = findNMethod(retpc);
   LOG_EVENT3("nmethod_invocation_counter_overflow: rcvr = %#x, pc = %#x (nmethod %#x)", rcvr, retpc, trigger);

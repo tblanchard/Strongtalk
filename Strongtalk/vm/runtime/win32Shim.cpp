@@ -233,9 +233,13 @@ static word GetModuleHandleA(word name) {
 }
 
 // SYSTEMTIME: wYear, wMonth, wDayOfWeek, wDay, wHour, wMinute, wSecond, wMilliseconds (16 bit each)
+extern bool st_fake_time_enabled();	// os_posix.cpp
+extern uint64_t st_fake_micros();
+
 static word GetLocalTime(word system_time) {
   struct timeval tv;
   gettimeofday(&tv, NULL);
+  if (st_fake_time_enabled()) { uint64_t us = st_fake_micros(); tv.tv_sec = (time_t) (us / 1000000); tv.tv_usec = (suseconds_t) (us % 1000000); }
   struct tm t;
   localtime_r(&tv.tv_sec, &t);
   uint16_t* st = (uint16_t*) system_time;

@@ -145,13 +145,20 @@ void blockClosureOopDesc::deoptimize() {
   LOG_EVENT1("Deoptimized context in blockClosure -> switch to methodOop 0x%lx", nm);
   assert(nm, "nmethod must be present");
 
+  if (scope->method()->is_copying_block()) {
+    // the lexical scope is self (or a parameter) in both the compiled and the interpreted
+    // form: there is no compiled context to translate
+    set_method(scope->method());
+    return;
+  }
+
   assert(!StackChunkBuilder::is_deoptimizing(), "you cannot be in deoptimization mode");
   StackChunkBuilder::begin_deoptimization();
 
   // Patch the block closure to unoptimized form
   set_method(scope->method());
   con = compiledVFrame::compute_canonical_context(scope->parent(), NULL, con);
-  set_lexical_scope(con);
+  set_lexical_scope(con == NULL ? contextOop(nilObj) : con);	// no context: nil (as in the interpreter)
 
   StackChunkBuilder::end_deoptimization();
 }

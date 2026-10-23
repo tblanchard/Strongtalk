@@ -478,10 +478,44 @@ Phases:
         release builds too (VirtualSpace::expand only asserted it).
       - Debugging aids: $STRONGTALK_NO_COMPILE ("Class>>sel" substrings / #selector, blank separated)
         excludes methods from compilation (Compiler::compile); +ZapNewSpaceAfterScavenge.
+- [x] Aggressive compilation (2026-10-22, "C6"). The results comparison passes at
+      InvocationCounterLimit 10, 100 and 1000 (debug and release; release also at 5). Found with a
+      deterministic setup: ASLR off (posix_spawn with _POSIX_SPAWN_DISABLE_ASLR), -t,
+      $STRONGTALK_FAKE_TIME (os_posix.cpp: every time query advances a fake clock by 1 ms), and a fresh
+      copy of the image directory per run (the image patches rewrite source/ files). Then a
+      $STRONGTALK_ONLY_COMPILE whitelist ddmin isolated DeltaCodeScope>>isInlineable, and a
+      compiled-vs-interpreted differential check plus per-loop masking isolated one integer loop.
+      Fixes (all original bugs unless noted):
+      - BasicNode::removeUpToMerge cut the link to a branch successor before recursing into it, so a
+        merge shared with live code (here the NLR merge of the sends in a loop, when OptimizeIntegerLoops
+        removed the loop's non-smi `>=` send) looked private and was deleted with the outer NLR test.
+        An NLR through the loop body then continued at the loop increment: `^ false` in a block
+        passed to realSubScopesDo: answered true (the "DeltaScope class >> map:toHeap:" DNUs).
+      - Deoptimized/materialized block closures got canonical_context() = NULL (SmallInteger 0) as
+        lexical scope when the home allocates no context (nameDesc.cpp BlockValueNameDesc /
+        MemoizedBlockNameDesc, blockClosureOopDesc::deoptimize); now nil, or self for copying blocks
+        (as push_closure does). Recompilation asserted on the 0 receiver.
+      - LoopHeaderNode::generateArrayLoopTests compared the unloaded bound register with 1 and
+        overwrote the array register with its size; LoopHeaderNode::print_string looped over the
+        wrong array (+PrintCode crashed).
+      - Saved registers (C5) were GC roots forever: the stubs never cleared them, so stale values
+        (interior pointers that look like memOops, e.g. bytecode pointers) were followed by mark-sweep
+        (vmtest crashed in the deterministic setup). SavedRegistersScope in uncommon_trap and
+        nmethod_invocation_counter_overflow clears them (port bug).
+      - Mark-sweep phases 2 and 3 write oop roots in nmethods through the reversed pointer chains
+        outside the zone's JITWriteScope: the whole collection runs in one now. Toggling W^X in the
+        fault handler does not stick (the retried write faults again), so code writes need scopes
+        (port bug; layout dependent: release vmtest at HEAD passed, debug crashed).
+      Debugging aids: $STRONGTALK_ONLY_COMPILE (whitelist, same syntax as NO_COMPILE),
+      $STRONGTALK_NO_INLINE (exact selectors excluded from inlining), $STRONGTALK_ASSERT_BACKTRACE
+      (native backtrace on assertion failures), $STRONGTALK_FAKE_TIME.
       Still open:
-      - With very aggressive compilation (InvocationCounterLimit <= ~1000) the image compiler running
-        compiled code occasionally misbehaves (DeltaScope/nil receives map:...); GC dependent (gone
-        without scavenges), with OptimizeIntegerLoops + DeferUncommonBranches. Not seen at the default
-        limit (benchmarks, vmtest, vmcompiled, results comparison pass).
+      - InvocationCounterLimit <= 2 exhausts the jump table ("grow not implemented", jumpTable.cpp).
+        At <= 5 the debug build asserts in Inliner (no subscope found for a block inlined in an
+        earlier nmethod); the code falls back to the interpreted method's type feedback (release OK).
+      - The release build's +TestArm64Assembler reports 384 x87-emulation failures (fcompp/fnstsw,
+        fprem, ftst); the debug build has none (also at the C5 commit).
+      - The startup image patches are filed in through the source DB: every launch appends them to
+        source/strongtalkchange.log and rewrites the source index files of the patched classes.
       - rem: is unimplemented for LargeIntegers in the image (Number>>rem:); Integer>>bitShift: and
         Number>>raisedTo: likewise (image limitations).

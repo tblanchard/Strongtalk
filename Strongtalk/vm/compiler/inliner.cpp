@@ -269,6 +269,21 @@ char* CompilerInliningPolicy::shouldInline(InlinedScope* s, InlinedScope* callee
     return "method getting too big";
   }
   if (shouldNotInline()) return "should not inline (special)";
+  { // debugging aid: $STRONGTALK_NO_INLINE is a blank separated list of selectors that are not inlined
+    static const char* no_inline = getenv("STRONGTALK_NO_INLINE");
+    if (no_inline != NULL && *no_inline != '\0') {
+      ResourceMark rm;
+      const char* sel = method->selector()->as_string();
+      size_t l = strlen(sel);
+      for (const char* p = no_inline; *p != '\0'; ) {
+        const char* e = strchr(p, ' ');
+        size_t len = e == NULL ? strlen(p) : (size_t) (e - p);
+        if (len == l && strncmp(p, sel, len) == 0) return "excluded by STRONGTALK_NO_INLINE";
+        if (e == NULL) break;
+        p = e + 1;
+      }
+    }
+  }
   // performance bug: should check how many recursive calls the method has -- unrolling factorial
   // to depth N gives N copies, but unrolling fibonacci gives 2**N
   // also, should look at call chain to estimate how big inlined recursion will get

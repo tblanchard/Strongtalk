@@ -107,6 +107,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "compiler.hpp"
 #include "stackChunk.hpp"
 #include "stubRoutines.hpp"
+#include "savedRegisters.hpp"
 #ifdef DELTA_COMPILER
 
 // Tells whether the call has been executed before
@@ -216,6 +217,7 @@ void uncommon_trap() {
   }
   */
 
+  SavedRegistersScope srs;
   ResourceMark rm;
   // Find the frame that caused the uncommon trap
   DeltaProcess* process = DeltaProcess::active();

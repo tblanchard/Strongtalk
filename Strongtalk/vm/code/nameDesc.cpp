@@ -147,6 +147,15 @@ bool IllegalNameDesc::equal(NameDesc* other) const {
 
 extern "C" oop allocateBlock(smiOop nofArgs);
 
+// The lexical scope of a block materialized during deoptimization, as the interpreter's
+// push_closure bytecodes set it: self for a copying block, otherwise the context or nil
+// (canonical_context() answers NULL -- SmallInteger 0 -- if the home allocates no context).
+static contextOop materialized_lexical_scope(methodOop block_method, compiledVFrame* vf) {
+  if (block_method->block_info() == methodOopDesc::expects_self) return contextOop(vf->receiver());
+  contextOop con = vf->canonical_context();
+  return con == NULL ? contextOop(nilObj) : con;
+}
+
 oop BlockValueNameDesc::value(const frame* fr) const {
   // create a block closure
   if (MaterializeEliminatedBlocks || StackChunkBuilder::is_deoptimizing()) {
@@ -155,7 +164,7 @@ oop BlockValueNameDesc::value(const frame* fr) const {
     blk->set_method(block_method());
 
     compiledVFrame* vf = compiledVFrame::new_vframe(fr, parent_scope(), 0);
-    blk->set_lexical_scope(vf->canonical_context());
+    blk->set_lexical_scope(materialized_lexical_scope(block_method(), vf));
     return blk;
   } else {
     ResourceMark rm;
@@ -183,7 +192,7 @@ oop MemoizedBlockNameDesc::value(const frame* fr) const {
 	 allocateBlock(as_smiOop(block_method()->number_of_arguments())));
     blk->set_method(block_method());
 
-    blk->set_lexical_scope(vf->canonical_context());
+    blk->set_lexical_scope(materialized_lexical_scope(block_method(), vf));
     return blk;
   } else {
     ResourceMark rm;

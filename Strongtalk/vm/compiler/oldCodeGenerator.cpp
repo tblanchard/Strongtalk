@@ -2096,16 +2096,18 @@ void LoopHeaderNode::generateArrayLoopTests(Label& prev, Label& failure) {
 	 guarantee(_lowerBound->cpReg() == _lowerBound, "should use cpReg()");
        } else {
 	 const Register t = movePRegToReg(_lowerBound ? _lowerBound : _loopVar, tempReg);
-	 theMacroAssm->cmpl(boundReg, as_smiOop(1));
+	 theMacroAssm->cmpl(t, as_smiOop(1));		// (the original compared boundReg, not loaded yet)
 	 theMacroAssm->jcc(Assembler::less, failure);
        }
       }
 
       // test upper bound
       boundReg = movePRegToReg(_upperBound, boundReg);
-      const Register t = movePRegToReg(atNode->src(), tempReg);
-      theMacroAssm->movl(t, Address(t, byteOffset(atNode->sizeOffset())));
-      theMacroAssm->cmpl(boundReg, t);
+      // the array may be allocated to a register (movePRegToReg returns it): load the size into
+      // tempReg (the original overwrote the array register with its size)
+      const Register a = movePRegToReg(atNode->src(), tempReg);
+      theMacroAssm->movl(tempReg, Address(a, byteOffset(atNode->sizeOffset())));
+      theMacroAssm->cmpl(boundReg, tempReg);
       theMacroAssm->jcc(Assembler::above, failure);
     }
   }

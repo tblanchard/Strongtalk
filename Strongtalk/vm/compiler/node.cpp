@@ -1723,8 +1723,12 @@ void BasicNode::removeUpToMerge() {
     while (n->nSuccessors() > 1) {
       int i = n->nSuccessors() - 1;
       Node* succ = n->next(i);
+      // A successor shared with other (live) branches -- e.g. the merge of
+      // several sends' NLR paths -- must survive.  Test before cutting the
+      // link: afterwards a merge left with one predecessor looks private.
+      bool shared = succ->nPredecessors() >= 2;
       n->removeNext(succ);
-      succ->removeUpToMerge();
+      if (!shared) succ->removeUpToMerge();
     }
     Node* nextn = n->next();
     if (!n->deleted) n->eliminate(thisBB, NULL, true, false);
@@ -3024,7 +3028,7 @@ char* LoopHeaderNode::print_string(char* buf, bool printAddr) const {
     }
     if (_registerCandidates != NULL) {
       my_sprintf(buf, "reg vars = ");
-      for (int i = 0; i < _tests->length(); i++) my_sprintf(buf, "%s ", _registerCandidates->at(i)->preg()->name());
+      for (int i = 0; i < _registerCandidates->length(); i++) my_sprintf(buf, "%s ", _registerCandidates->at(i)->preg()->name());
     }
     if (_tests != NULL) {
       for (int i = 0; i < _tests->length(); i++) {

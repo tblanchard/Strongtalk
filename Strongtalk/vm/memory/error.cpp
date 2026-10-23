@@ -143,7 +143,13 @@ void report_error(const char* title, const char* format, ...) {
   }
 }
 
+#include <execinfo.h>
 void report_assertion_failure(const char* code_str, const char* file_name, int line_no, const char* message) {
+  if (getenv("STRONGTALK_ASSERT_BACKTRACE") != NULL) {	// debugging aid: C backtrace of failed assertions
+    void* frames[40];
+    int n = backtrace(frames, 40);
+    backtrace_symbols_fd(frames, n, 2);
+  }
   report_error("Assertion Failure", "assert(%s, \"%s\")\n%s, %d",
 	        code_str, message, file_name, line_no);
 }

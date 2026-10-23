@@ -225,6 +225,18 @@ void os::fetch_top_frame(Thread* thread, intptr_t** sp, intptr_t** fp, char** pc
 
 static struct rusage process_usage;
 
+// Debugging aid: with $STRONGTALK_FAKE_TIME set, all clocks return a counter that advances by
+// 1 ms per query, so that runs are repeatable (with -t, which turns off the timer tasks).
+bool st_fake_time_enabled() {
+  static int enabled = -1;
+  if (enabled < 0) enabled = getenv("STRONGTALK_FAKE_TIME") != NULL;
+  return enabled != 0;
+}
+uint64_t st_fake_micros() {
+  static uint64_t now = 1000000000ull * 1000;	// microseconds
+  return now += 1000;
+}
+
 int os::updateTimes() {
   return getrusage(RUSAGE_SELF, &process_usage) == 0;
 }
@@ -234,10 +246,12 @@ static inline double timeval_as_double(const struct timeval& t) {
 }
 
 double os::userTime() {
+  if (st_fake_time_enabled()) return (double) st_fake_micros() / 1.0e6;
   return timeval_as_double(process_usage.ru_utime);
 }
 
 double os::systemTime() {
+  if (st_fake_time_enabled()) return 0.0;
   return timeval_as_double(process_usage.ru_stime);
 }
 
@@ -254,11 +268,13 @@ static bool thread_times(Thread* thread, double* user, double* system) {
 }
 
 double os::user_time_for(Thread* thread) {
+  if (st_fake_time_enabled()) return (double) st_fake_micros() / 1.0e6;
   double user, system;
   return thread_times(thread, &user, &system) ? user : 0.0;
 }
 
 double os::system_time_for(Thread* thread) {
+  if (st_fake_time_enabled()) return 0.0;
   double user, system;
   return thread_times(thread, &user, &system) ? system : 0.0;
 }
@@ -268,7 +284,7 @@ static mach_timebase_info_data_t timebase;
 
 // Counter ticks are mach absolute time units (nanoseconds * numer/denom).
 long_int os::elapsed_counter() {
-  uint64_t count = mach_absolute_time();
+  uint64_t count = st_fake_time_enabled() ? st_fake_micros() * 24 : mach_absolute_time();
   return long_int((unsigned int) count, (unsigned int) (count >> 32));
 }
 
@@ -278,11 +294,13 @@ long_int os::elapsed_frequency() {
 }
 
 double os::elapsedTime() {
+  if (st_fake_time_enabled()) return (double) st_fake_micros() / 1.0e6;
   uint64_t ticks = mach_absolute_time() - initial_counter;
   return (double) ticks * timebase.numer / timebase.denom / 1.0e9;
 }
 
 double os::currentTime() {
+  if (st_fake_time_enabled()) return (double) st_fake_micros() / 1.0e6;
   struct timeval now;
   gettimeofday(&now, NULL);
   return timeval_as_double(now);

@@ -446,12 +446,21 @@ class NewBackendGuard: StackObj {
 bool NewBackendGuard::_first_use = true;
 
 
-// Debugging aid: $STRONGTALK_NO_COMPILE is a blank separated list of substrings of
-// "Class>>selector" or exact selectors (#selector); matching methods are not compiled
-// (Compiler::compile returns NULL; to find miscompiled methods by bisection).
+// Debugging aids (to find miscompiled methods by bisection): $STRONGTALK_NO_COMPILE and
+// $STRONGTALK_ONLY_COMPILE are blank separated lists of substrings of "Class>>selector" or
+// exact selectors (#selector); matching methods are not compiled, or only matching methods
+// are compiled (Compiler::compile returns NULL for the others).
+static bool matches_compile_filter(const char* filter, klassOop klass, symbolOop selector);
+
 static bool excluded_from_compilation(klassOop klass, symbolOop selector) {
-  static const char* filter = getenv("STRONGTALK_NO_COMPILE");
-  if (filter == NULL || *filter == '\0') return false;
+  static const char* no_compile   = getenv("STRONGTALK_NO_COMPILE");
+  static const char* only_compile = getenv("STRONGTALK_ONLY_COMPILE");
+  if (no_compile   != NULL && *no_compile   != '\0' &&  matches_compile_filter(no_compile, klass, selector))   return true;
+  if (only_compile != NULL && *only_compile != '\0' && !matches_compile_filter(only_compile, klass, selector)) return true;
+  return false;
+}
+
+static bool matches_compile_filter(const char* filter, klassOop klass, symbolOop selector) {
   ResourceMark rm;
   stringStream name(200);
   klass->klass_part()->print_name_on(&name);

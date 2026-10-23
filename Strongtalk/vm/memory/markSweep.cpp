@@ -93,6 +93,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "weakArrayKlass.hpp"
 #include "symbolTable.hpp"
 #include "timer.hpp"
+#include "os.hpp"
 GrowableArray<memOop>* MarkSweep::stack;
 GrowableArray<int>*    MarkSweep::hcode_offsets;
 int                    MarkSweep::hcode_pos;
@@ -115,9 +116,13 @@ oop MarkSweep::collect(oop p) {
 
   allocate();	// allocate stack for traversal
 
-  mark_sweep_phase1(&p);
-  mark_sweep_phase2();
-  mark_sweep_phase3();
+  { // oop roots in nmethods and PICs (code memory) are written through the reversed
+    // pointer chains in all three phases, not only while the zone iterates them
+    JITWriteScope write_code;
+    mark_sweep_phase1(&p);
+    mark_sweep_phase2();
+    mark_sweep_phase3();
+  }
 
   deallocate(); // clear allocated structures
   

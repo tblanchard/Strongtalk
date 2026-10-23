@@ -44,5 +44,14 @@ class SavedRegisters : AllStatic {
   static void oops_do(void f(oop*));
 };
 
+// The registers saved by a stub are valid (and GC roots) only during the stub's C call:
+// the C entry points (uncommon_trap, nmethod_invocation_counter_overflow) clear them on exit.
+// Stale saved values are not oops any more (or never were: the registers may hold interior
+// pointers that look like memOops) and must not be visited by the GC.
+class SavedRegistersScope : StackObj {
+ public:
+  ~SavedRegistersScope()	{ SavedRegisters::clear(); }
+};
+
 
 #endif // VM_RUNTIME_SAVEDREGISTERS_HPP_HPP
