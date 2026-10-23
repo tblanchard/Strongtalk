@@ -323,6 +323,14 @@ void FreeHeap(void* p) {
 // a memory leak.  Use CHeapObj as the base class of such objects to make it explicit
 // that they're allocated on the C heap.
 void* operator new(size_t size){
+#ifdef __APPLE__
+  // the definition replaces operator new in all libraries (the system frameworks used by the
+  // GUI, win32GUI.mm, allocate with it), and operator delete stays the C++ library's (free)
+  void* p = malloc(size == 0 ? 1 : size);
+  if (p == NULL) fatal("out of memory (global operator new)");
+  return p;
+#else
   fatal("should not call global (default) operator new");
   return (void *) AllocateHeap(size, "global operator new");
+#endif
 }

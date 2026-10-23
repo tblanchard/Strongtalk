@@ -19,13 +19,20 @@ for f in */*.cpp; do
   if (( jobs_running >= 8 )); then wait; jobs_running=0; fi
 done
 wait
+for f in */*.mm(N); do			# Objective-C++ (the GUI, win32User.mm)
+  o=$OUT/${${f//\//_}%.mm}_mm.o
+  if [[ $o -nt $f && $o -nt $newest_hdr ]]; then continue; fi
+  ( nice -n 15 clang++ -arch arm64 -std=gnu++20 -fobjc-arc -c $CFLAGS -w -DDELTA_COMPILER $INC $f -o $o 2>>$OUT/compile_errors.txt ) &
+done
+wait
 for f in */*.S(N); do			# assembly sources (arm64 transitions)
   o=$OUT/${${f//\//_}%.S}_S.o
   if [[ $o -nt $f ]]; then continue; fi
   clang -arch arm64 -c $f -o $o 2>>$OUT/compile_errors.txt
 done
 
-clang++ -arch arm64 $OUT/*.o -o $OUT/strongtalk 2>$OUT/link.txt
+clang++ -arch arm64 $OUT/*.o -o $OUT/strongtalk -framework AppKit -framework CoreGraphics -framework CoreText \
+  -framework QuartzCore -framework ImageIO 2>$OUT/link.txt
 grep -E '^  "' $OUT/link.txt | sed -E 's/^  "([^"]*)".*/\1/' | sort -u > $OUT/undefined.txt
 echo "objects: $(ls $OUT/*.o | wc -l)  compile errors: $(grep -c 'error:' $OUT/compile_errors.txt)  undefined symbols: $(wc -l < $OUT/undefined.txt)"
 grep -q 'error' $OUT/link.txt && grep -v '^  "' $OUT/link.txt | head -5

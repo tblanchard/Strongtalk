@@ -66,6 +66,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "oop.inline.hpp"
 #include "prim_impl.hpp"
 #include "proxy_prims.hpp"
+#include <pthread.h>
 TRACE_FUNC(TraceProxyPrims, "proxy")
 
 int proxyOopPrimitives::number_of_calls;
@@ -100,20 +101,21 @@ PRIM_DECL_3(proxyOopPrimitives::setHighLow, oop receiver, oop high, oop low) {
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!low->is_smi())
     return markSymbol(vmSymbols::second_argument_has_wrong_type());
-  uint32_t h     = (uint32_t) smiOop(high)->value();
-  uint32_t l     = (uint32_t) smiOop(low)->value();
-  uint32_t value = (h << 16) | l;
-  proxyOop(receiver)->set_pointer((void*) (uintptr_t) value);
+  // high may have more than 16 bits: callback argument addresses are 64-bit (callBack.cpp)
+  uintptr_t h     = (uintptr_t) smiOop(high)->value();
+  uintptr_t l     = (uintptr_t) (uint32_t) smiOop(low)->value();
+  uintptr_t value = (h << 16) | l;
+  proxyOop(receiver)->set_pointer((void*) value);
   return receiver;
 }
 
 PRIM_DECL_1(proxyOopPrimitives::getHigh, oop receiver) {
   PROLOGUE_1("getHigh", receiver);
   ASSERT_RECEIVER;
-  // high 16 bits of the low 32 bits of the pointer
-  uint32_t value = (uint32_t) (uintptr_t) proxyOop(receiver)->get_pointer();
-  value = value >> 16;
-  return as_smiOop(value);
+  // the pointer without its low 16 bits (bits 16..31 for 32-bit values, as in Win32; all of
+  // them for 64-bit pointers, so that setHigh:low: rebuilds the pointer)
+  uintptr_t value = (uintptr_t) proxyOop(receiver)->get_pointer();
+  return as_smiOop((smi) (value >> 16));
 }
 
 PRIM_DECL_1(proxyOopPrimitives::getLow, oop receiver) {
@@ -473,6 +475,13 @@ static void external_hash_insert(int index) {
   external_hash[i] = index + 1;
 }
 
+// The table is shared by the VM threads (GUI functions run in asynchronous DLL calls)
+static pthread_mutex_t external_words_lock = PTHREAD_MUTEX_INITIALIZER;
+struct ExternalWordsLocker {
+  ExternalWordsLocker()  { pthread_mutex_lock(&external_words_lock); }
+  ~ExternalWordsLocker() { pthread_mutex_unlock(&external_words_lock); }
+};
+
 uint32_t ExternalWords::encode(void* p) {
   uintptr_t v = (uintptr_t) p;
   if (v <= 0xFFFFFFFFu) {
@@ -480,6 +489,7 @@ uint32_t ExternalWords::encode(void* p) {
     assert(v < handle_base || v >= handle_limit, "32-bit value in the external handle range");
     return (uint32_t) v;
   }
+  ExternalWordsLocker locker;
   if (external_hash_size > 0) {
     for (uint32_t i = external_hash_of(p, external_hash_size); external_hash[i] != 0; i = (i + 1) & (external_hash_size - 1)) {
       int index = external_hash[i] - 1;
@@ -507,9 +517,15 @@ uint32_t ExternalWords::encode(void* p) {
 }
 
 void* ExternalWords::decode(uint32_t w) {
+  if (w < handle_base || w >= handle_limit) return (void*) (uintptr_t) w;
+  ExternalWordsLocker locker;
   if (w >= handle_base && w < handle_base + (uint32_t) external_pointers_count) return external_pointers[w - handle_base];
   return (void*) (uintptr_t) w;		// zero extended (as the shim's INVALID_HANDLE_VALUE)
 }
+
+// for the GUI emulation (win32User.mm, win32Gdi.cpp; without the VM headers)
+extern "C" uint32_t win32_external_word(void* p)       { return ExternalWords::encode(p); }
+extern "C" void*    win32_external_pointer(uint32_t w) { return ExternalWords::decode(w); }
 
 bool ExternalWords::test() {
   int failures = 0;

@@ -96,7 +96,14 @@ Thread* os::create_thread(int main(void* parameter), void* parameter, int* id_ad
   thread->main      = main;
   thread->parameter = parameter;
   thread->id        = new_thread_id();
-  if (pthread_create(&thread->pthread, NULL, &thread_start, thread) != 0) {
+  // the portable interpreter nests C frames (call_delta, unwind protects) and the GUI calls
+  // system frameworks: more than the default 512 KB
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setstacksize(&attr, 16 * 1024 * 1024);
+  int failed = pthread_create(&thread->pthread, &attr, &thread_start, thread);
+  pthread_attr_destroy(&attr);
+  if (failed != 0) {
     free(thread);
     return NULL;
   }
@@ -392,7 +399,7 @@ void os::fatalExit(int num) {
 
 void* os::get_hInstance()    { return NULL; }
 void* os::get_prevInstance() { return NULL; }
-int   os::get_nCmdShow()     { return 0; }
+int   os::get_nCmdShow()     { return 1; }	// SW_SHOWNORMAL (the image shows its windows with it)
 
 // DLL support
 

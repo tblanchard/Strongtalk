@@ -208,4 +208,34 @@ _restart_primitiveValue:
         bl      _interpret_block_from_compiled
         b       continue_compiled
 
+// ---------------------------------------------------------------------------
+// Callbacks (C -> Delta, callBack.cpp): CALLBACK_THUNKS entry points, one per callback index.
+// Thunk i sets w9 = i and joins callback_common, which passes the register arguments
+// x0..x7 as an array: arm64_handle_callback(int index, intptr_t* args) answers the result.
+
+        .equ    CALLBACK_THUNKS, 256
+
+        .p2align 3
+        .globl _callback_thunks
+_callback_thunks:
+        .set    thunk_index, 0
+        .rept   CALLBACK_THUNKS
+        mov     w9, #thunk_index
+        b       callback_common
+        .set    thunk_index, thunk_index + 1
+        .endr
+
+callback_common:
+        stp     x29, x30, [sp, #-80]!
+        mov     x29, sp
+        stp     x0, x1, [sp, #16]
+        stp     x2, x3, [sp, #32]
+        stp     x4, x5, [sp, #48]
+        stp     x6, x7, [sp, #64]
+        mov     w0, w9
+        add     x1, sp, #16
+        bl      _arm64_handle_callback
+        ldp     x29, x30, [sp], #80
+        ret
+
 #endif

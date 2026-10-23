@@ -124,7 +124,9 @@ PRIM_DECL_1(callBackPrimitives::invokeC, oop proxy) {
   PROLOGUE_1("invokeC", proxy);
   if (!proxy->is_proxy())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
-  fntype f = (fntype) proxyOop(proxy)->get_pointer();
-  return as_smiOop( (smi) (intptr_t) (*f) (10, 5));
+  // (not fntype: variadic arguments are passed on the stack on arm64)
+  typedef intptr_t (*c_fn2)(intptr_t a, intptr_t b);
+  c_fn2 f = (c_fn2) proxyOop(proxy)->get_pointer();
+  return as_smiOop((smi) (*f) (10, 5));
 }
 

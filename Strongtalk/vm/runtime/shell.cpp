@@ -38,7 +38,18 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #ifdef _WINDOWS
 int my_main(int argc, char* argv[]) {
 #else
+static int vm_main(int argc, char* argv[]);
+
 int main(int argc, char* argv[]) {
+#if defined(__APPLE__)
+  // AppKit needs the main thread: the VM runs on another one (win32User.mm)
+  return win32_gui_main(argc, argv, &vm_main);
+#else
+  return vm_main(argc, argv);
+#endif
+}
+
+static int vm_main(int argc, char* argv[]) {
   win32_shim_set_arguments(argc, argv);	// the image reads the command line via GetCommandLineA
 #endif
   parse_arguments(argc, argv);		// overrides default flag settings

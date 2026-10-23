@@ -782,6 +782,13 @@ void PortableInterpreter::call_dll(bool async) {
     a[i] = x->is_smi() ? smiOop(x)->value() : (intptr_t) proxyOop(x)->get_pointer();
   }
 
+  if (TraceDLLCalls) {
+    extern const char* win32_shim_name_of(dll_func f);	// win32Shim.cpp
+    const char* name = win32_shim_name_of(f);
+    lprintf("[DLL %s%s(", name ? name : "?", async ? " async" : "");
+    for (int i = 0; i < n; i++) lprintf(i ? ", 0x%lx" : "0x%lx", (long) a[i]);
+    lprintf(")]\n");
+  }
   enter_C(next);
   DeltaProcess* state = NULL;
   if (async) DLLs::enter_async_call(&state);

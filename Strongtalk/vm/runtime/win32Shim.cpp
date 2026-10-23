@@ -26,8 +26,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 // COMDLG32 (see Platform>>DLLMapName:). On other hosts os::dll_load / os::dll_lookup
 // resolve KERNEL32 functions to the POSIX based implementations below (with Win32
 // semantics: HANDLEs, BOOL results, 32-bit DWORD out parameters, GetLastError codes).
-// The GUI libraries are not available (yet): their functions are not found, so the image
-// reports which one it needs.
+// The GUI libraries are emulated on macOS (win32User.mm, win32Gdi.cpp, win32Controls.cpp);
+// their functions that are not implemented resolve to a stub (STRONGTALK_TRACE_GUI lists them).
 
 #include "platform.hpp"
 #ifndef _WIN32
@@ -172,6 +172,15 @@ static void windows_path(const char* path, char* buffer, size_t size) {
   if (drive != 0) snprintf(buffer, size, "%c:%s", drive, path[prefix] ? path + prefix : "/");
   else            strlcpy(buffer, path, size);
   for (char* p = buffer; *p; p++) if (*p == '/') *p = '\\';
+}
+
+// for the GUI emulation (file dialogs, LoadImageA)
+void win32_posix_path(const char* win, char* buffer, size_t size) {
+  strlcpy(buffer, PosixPath((word) win), size);
+}
+
+void win32_windows_path(const char* posix, char* buffer, size_t size) {
+  windows_path(posix, buffer, size);
 }
 
 // ---------------------------------------------------------------------------
@@ -487,8 +496,6 @@ static word GlobalFree(word handle)   { free((void*) handle); return 0; }
 // ---------------------------------------------------------------------------
 // Library table
 
-struct ShimFunction { const char* name; dll_func fn; };
-
 #define SHIM(f) { #f, (dll_func) &f }
 static const ShimFunction kernel32_functions[] = {
   SHIM(GetLastError),
@@ -528,11 +535,27 @@ static const ShimFunction no_functions[] = { { NULL, NULL } };
 
 static const ShimLibrary shim_libraries[] = {
   { "KERNEL32.DLL", kernel32_functions },
-  { "USER32.DLL",   no_functions },		// GUI: not available yet
+#if defined(__APPLE__)
+  { "USER32.DLL",   win32_user32_functions },
+  { "GDI32.DLL",    win32_gdi32_functions },
+  { "COMDLG32.DLL", win32_comdlg32_functions },
+#else
+  { "USER32.DLL",   no_functions },		// GUI: not available
   { "GDI32.DLL",    no_functions },
   { "COMDLG32.DLL", no_functions },
+#endif
   { NULL, NULL }
 };
+
+static word gui_stub();
+
+// the name of a shim function (+TraceDLLCalls)
+const char* win32_shim_name_of(dll_func fn) {
+  for (const ShimLibrary* l = shim_libraries; l->name != NULL; l++) {
+    for (const ShimFunction* f = l->functions; f->name != NULL; f++) if (f->fn == fn) return f->name;
+  }
+  return fn == (dll_func) &gui_stub ? "(GUI stub)" : NULL;
+}
 
 DLL* win32_shim_load(const char* name) {
   for (const ShimLibrary* l = shim_libraries; l->name != NULL; l++) {
@@ -548,7 +571,7 @@ bool win32_shim_is_library(DLL* library) {
   return false;
 }
 
-// Stand-in for GUI functions (USER32, GDI32, COMDLG32) until there is a native UI:
+// Stand-in for GUI functions (USER32, GDI32, COMDLG32) that are not implemented:
 // returns a non-zero value (a fake handle / TRUE). This lets the class initializers that
 // create pens, brushes and bitmaps run in command line mode.
 static word gui_stub() {
@@ -560,8 +583,8 @@ dll_func win32_shim_lookup(const char* name, DLL* library) {
   for (const ShimFunction* f = l->functions; f->name != NULL; f++) {
     if (strcmp(f->name, name) == 0) return f->fn;
   }
-  if (l->functions == no_functions) {
-    if (TraceGUIStubs) fprintf(stderr, "Strongtalk: %s %s is a GUI stub (no native UI yet)\n", l->name, name);
+  if (l != shim_libraries) {			// a GUI library
+    if (TraceGUIStubs) fprintf(stderr, "Strongtalk: %s %s is a GUI stub (not implemented)\n", l->name, name);
     return (dll_func) &gui_stub;
   }
   fprintf(stderr, "Strongtalk: %s %s is not available on this platform\n", l->name, name);

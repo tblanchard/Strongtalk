@@ -85,6 +85,8 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "dll.hpp"
 #include "codeIterator.hpp"
 #include "proxyOop.hpp"
+#include "prim_def.hpp"
+#include "proxy_prims.hpp"
 #include "oopFactory.hpp"
 #include "universe.inline.hpp"
 #include "vmSymbols.hpp"
@@ -108,6 +110,31 @@ static char* store_long(char* chunk, long l) {
   return chunk + sizeof(long);
 }
 
+#ifdef STRONGTALK_ARM64
+// arm64: callbacks are the precompiled thunks in portableInterpreter_arm64.S (both calling
+// conventions are the same; arguments in x0..x7). Thunk i is callback index i.
+extern "C" char callback_thunks[];
+static const int callback_thunk_count = 256;
+static const int callback_thunk_size  = 8;
+
+static void* callback_thunk(int index) {
+  if (index < 0 || index >= callback_thunk_count) return NULL;
+  return callback_thunks + index * callback_thunk_size;
+}
+
+void* callBack::registerPascalCall(int index, int nofArgs) {
+  return nofArgs <= 8 ? callback_thunk(index) : NULL;
+}
+
+void* callBack::registerCCall(int index) {
+  return callback_thunk(index);
+}
+
+void callBack::unregister(void* block) {
+  assert(block, "block is not valid");	// thunks are static
+}
+
+#else
 extern "C" int handlePascalCallBackStub();
 extern "C" int handleCCallBackStub();
 
@@ -150,6 +177,8 @@ void callBack::unregister(void* block) {
   free((char*) block);
 }
 
+#endif // STRONGTALK_ARM64
+
 // handleCallBack is called from the two assembly stubs:
 // - handlePascalCallBackStub
 // - handleCCallBackStub
@@ -158,15 +187,17 @@ typedef void* (*call_out_func_4)(intptr_t a, intptr_t b, intptr_t c, intptr_t d)
 
 extern "C" bool have_nlr_through_C;
 
-extern "C" volatile void* handleCallBack(int index, int params) {
+// params: the address of the arguments (32-bit words), passed to the image in two parts
+// (CallBack>>vmCallBackIndex:stackHigh:stackLow:, ExternalProxy>>setHigh:low:)
+static void* call_back_into_delta(int index, uintptr_t params) {
   DeltaProcess* proc = NULL;
 
   if (Universe::callBack_receiver()->is_nil()) {
     warning("callBack receiver is not set");
   }
 
-  int low  = get_unsigned_bitfield(params,  0, 16);
-  int high = get_unsigned_bitfield(params, 16, 16);
+  smi low  = (smi) (params & 0xFFFF);
+  smi high = (smi) (params >> 16);
 
   if (DeltaProcess::active()->thread_id() != os::current_thread_id()) {
     // We'are now back in a asynchronous DLL call so give up the control
@@ -215,3 +246,23 @@ extern "C" volatile void* handleCallBack(int index, int params) {
   // Call Delta level error routine
   return result;
 }
+
+extern "C" volatile void* handleCallBack(int index, int params) {
+  return call_back_into_delta(index, (uint32_t) params);
+}
+
+#ifdef STRONGTALK_ARM64
+// Called by the callback thunks with the register arguments x0..x7. The image reads callback
+// arguments as 32-bit words (CallBack>>fetchArgument:stack:class:): values that fit in 32 bits
+// are passed as is, pointers as external words (see ExternalWords).
+extern "C" intptr_t arm64_handle_callback(int index, intptr_t* args) {
+  uint32_t words[8];
+  for (int i = 0; i < 8; i++) {
+    intptr_t v = args[i];
+    words[i] = v == (intptr_t) (int32_t) v || v == (intptr_t) (uint32_t) v
+             ? (uint32_t) v
+             : ExternalWords::encode((void*) v);
+  }
+  return (intptr_t) call_back_into_delta(index, (uintptr_t) words);
+}
+#endif
