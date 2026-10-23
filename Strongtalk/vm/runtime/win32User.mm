@@ -51,6 +51,9 @@ namespace w32 {
 
 bool TraceGUI = getenv("STRONGTALK_TRACE_GUI") != NULL;
 static bool TraceMessages = getenv("STRONGTALK_TRACE_MESSAGES") != NULL;
+// GUI test scripts run invisibly (no Dock icon, transparent windows that ignore the mouse), so that
+// they do not get in the way of a user; STRONGTALK_GUI_VISIBLE=1 shows them
+static bool HiddenGUI = getenv("STRONGTALK_GUI_SCRIPT") != NULL && getenv("STRONGTALK_GUI_VISIBLE") == NULL;
 
 // ---------------------------------------------------------------------------
 // Win32 constants
@@ -388,8 +391,9 @@ struct Queue {
   word                      quit_code;
   uint32_t                  key_state;	// KS_ flags as of the last message retrieved
   word                      focus;	// the focus window of the thread (as in Win32)
+  bool                      waiting;	// in GetMessageA
   QMessage                  last;	// the last message retrieved
-  Queue(uint32_t id) : thread_id(id), quit(false), quit_code(0), key_state(0), focus(0) {
+  Queue(uint32_t id) : thread_id(id), quit(false), quit_code(0), key_state(0), focus(0), waiting(false) {
     pthread_cond_init(&cond, NULL);
   }
 };
@@ -921,6 +925,7 @@ static void create_ns_window(Window* w) {
     view.layer.backgroundColor = CGColorGetConstantColor(kCGColorWhite);
     view.layer.magnificationFilter = kCAFilterNearest;
     nsw.contentView = view;
+    if (HiddenGUI) { nsw.alphaValue = 0; nsw.ignoresMouseEvents = YES; }
     STWindowDelegate* d = [[STWindowDelegate alloc] init];
     d->hwnd = hwnd;
     nsw.delegate = d;
@@ -1175,7 +1180,7 @@ static void show_window(Window* w, word cmd) {
     else if (cmd == SW_SHOWMINIMIZED || cmd == SW_MINIMIZE || cmd == SW_SHOWMINNOACTIVE) [nsw miniaturize: nil];
     else if (activate) {
       [nsw makeKeyAndOrderFront: nil];
-      [NSApp activateIgnoringOtherApps: YES];
+      if (!HiddenGUI) [NSApp activateIgnoringOtherApps: YES];
     } else                                     [nsw orderFront: nil];
   });
 }
@@ -1197,7 +1202,7 @@ static word SetForegroundWindow(word hwnd) {
     Window* top = window(h);
     if (top == NULL || top->nswindow == NULL || !top->visible) return;
     [ns_window(top) makeKeyAndOrderFront: nil];
-    [NSApp activateIgnoringOtherApps: YES];
+    if (!HiddenGUI) [NSApp activateIgnoringOtherApps: YES];
   });
   return 1;
 }
@@ -1575,7 +1580,9 @@ static word GetMessageA(word msg, word hwnd, word min, word max) {
         break;
       }
       int delay = next_timer_delay(q);
+      q->waiting = true;
       gui_wait(&q->cond, delay);
+      q->waiting = false;
     }
     message_retrieved(q, m);
   }
@@ -2267,6 +2274,9 @@ static void update_main_menu() {
   [app_menu addItem: [NSMenuItem separatorItem]];
   [app_menu addItemWithTitle: @"Hide Strongtalk" action: @selector(hide:) keyEquivalent: @"h"];
   [app_menu addItem: [NSMenuItem separatorItem]];
+  NSMenuItem* dump = [app_menu addItemWithTitle: @"Dump GUI State" action: @selector(dumpGUIState:) keyEquivalent: @""];
+  dump.target = menu_target;
+  [app_menu addItem: [NSMenuItem separatorItem]];
   [app_menu addItemWithTitle: @"Quit Strongtalk" action: @selector(terminate:) keyEquivalent: @"q"];
   app_item.submenu = app_menu;
   [main addItem: app_item];
@@ -2718,6 +2728,47 @@ static void* script_thread(void* arg) {
       if (mods & KS_CONTROL) { if (vk >= 'A' && vk <= 'Z') chars += (char16_t) (vk - 'A' + 1); }
       else if (vk == VK_RETURN || vk == VK_BACK || vk == VK_TAB || vk == VK_ESCAPE) chars += (char16_t) vk;
       script_key(w, vk, chars, mods);
+    } else if (scmd == "realclick" || scmd == "realclose") {	// through AppKit: NSEvents, performClose:
+      sscanf(rest, "%d %d", &n1, &n2);
+      HANDLE h = w->handle;
+      bool close = scmd == "realclose";
+      run_on_main_sync(^{
+        NSWindow* nsw = nil;
+        { GUILocker l; Window* x = window(h); if (x) nsw = ns_window(x); }
+        if (nsw == nil) return;
+        if (close) { [nsw performClose: nil]; return; }
+        [nsw makeKeyAndOrderFront: nil];
+        NSPoint p = NSMakePoint(n1, nsw.contentView.bounds.size.height - n2);	// window coordinates (y up)
+        for (int i = 0; i < 2; i++) {
+          NSEvent* e = [NSEvent mouseEventWithType: i == 0 ? NSEventTypeLeftMouseDown : NSEventTypeLeftMouseUp
+                                          location: p modifierFlags: 0 timestamp: [NSProcessInfo processInfo].systemUptime
+                                      windowNumber: nsw.windowNumber context: nil eventNumber: 0 clickCount: 1 pressure: i == 0 ? 1 : 0];
+          [nsw sendEvent: e];
+        }
+      });
+    } else if (scmd == "screen") {		// screen <title> <name>: what the view shows, after an AppKit redisplay
+      HANDLE h = w->handle;
+      std::string name = rest;
+      __block CGImageRef shown = NULL;
+      run_on_main_sync(^{
+        NSWindow* nsw = nil;
+        { GUILocker l; Window* x = window(h); if (x) nsw = ns_window(x); }
+        if (nsw == nil) return;
+        [nsw.contentView setNeedsDisplay: YES];
+        [nsw displayIfNeeded];
+        [CATransaction flush];
+        id c = nsw.contentView.layer.contents;
+        if (c != nil && CFGetTypeID((__bridge CFTypeRef) c) == CGImageGetTypeID()) shown = CGImageRetain((__bridge CGImageRef) c);
+      });
+      char out[PATH_MAX];
+      snprintf(out, sizeof out, "%s/%s.png", dir ? dir : "/tmp", name.c_str());
+      if (shown == NULL) { fprintf(stderr, "[script] the view of \"%s\" shows no image\n", title.c_str()); continue; }
+      CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8*) out, strlen(out), false);
+      CGImageDestinationRef dest = CGImageDestinationCreateWithURL(url, CFSTR("public.png"), 1, NULL);
+      CGImageDestinationAddImage(dest, shown, NULL);
+      CGImageDestinationFinalize(dest);
+      CFRelease(dest); CFRelease(url); CGImageRelease(shown);
+      fprintf(stderr, "[script] wrote %s\n", out);
     } else if (scmd == "menus") {		// menus <title>: print the menu bar
       GUILocker l;
       std::function<void(word, int)> print = [&](word hmenu, int depth) {
@@ -2768,12 +2819,52 @@ static void start_script() {
 }
 
 // ---------------------------------------------------------------------------
+// Diagnostics: "Dump GUI State" (application menu) writes the state of the windows and the
+// message queues to /tmp/strongtalk-gui-state.txt and the window contents to /tmp/strongtalk-gui-*.png
+
+static void dump_gui_state() {
+  FILE* f = fopen("/tmp/strongtalk-gui-state.txt", "w");
+  if (f == NULL) return;
+  std::vector<std::pair<HANDLE, std::string>> pngs;
+  {
+    GUILocker l;
+    uint32_t now = tick_count();
+    fprintf(f, "Strongtalk GUI state (tick %u)\n\nqueues:\n", now);
+    for (Queue* q : queues) {
+      fprintf(f, "  thread %u: %zu messages, %zu sent, %zu timers, focus 0x%lx, quit %d, waiting %d, last message 0x%lx (%u ms ago)\n",
+              q->thread_id, q->messages.size(), q->sent.size(), q->timers.size(), (long) q->focus, q->quit, q->waiting,
+              (long) q->last.message, now - q->last.time);
+      for (size_t i = 0; i < q->messages.size() && i < 10; i++)
+        fprintf(f, "    0x%lx 0x%04lx 0x%lx 0x%lx\n", (long) q->messages[i].hwnd, (long) q->messages[i].message,
+                (long) q->messages[i].wparam, (long) q->messages[i].lparam);
+    }
+    fprintf(f, "\nwindows:\n");
+    std::function<void(Window*, int)> print = [&](Window* w, int depth) {
+      fprintf(f, "  %*s0x%x \"%s\" class %s rect %d,%d,%d,%d%s%s update %d,%d,%d,%d thread %u%s\n", depth * 2, "",
+              w->handle, w->text.c_str(), w->cls ? w->cls->name.c_str() : "?", w->rect.left, w->rect.top, w->rect.right, w->rect.bottom,
+              w->visible ? "" : " hidden", w->enabled ? "" : " disabled", w->update.left, w->update.top, w->update.right, w->update.bottom,
+              w->queue ? w->queue->thread_id : 0, w->display_pending ? " display-pending" : "");
+      for (Window* c : w->children) print(c, depth + 1);
+    };
+    for (Window* t : top_levels) {
+      print(t, 0);
+      char name[64];
+      snprintf(name, sizeof name, "/tmp/strongtalk-gui-0x%x.png", t->handle);
+      pngs.push_back(std::make_pair(t->handle, std::string(name)));
+    }
+    fprintf(f, "\ncapture 0x%lx\n", (long) capture_hwnd);
+  }
+  fclose(f);
+  for (auto& p : pngs) { Window* w = window(p.first); if (w) write_png(w, p.second.c_str()); }
+}
+
+// ---------------------------------------------------------------------------
 // AppKit
 
 static void run_app() {
   @autoreleasepool {
     [NSApplication sharedApplication];
-    [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
+    [NSApp setActivationPolicy: HiddenGUI ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular];
     STAppDelegate* delegate = [[STAppDelegate alloc] init];
     NSApp.delegate = delegate;
     menu_target = [[STMenuTarget alloc] init];
@@ -2808,6 +2899,9 @@ static void run_app() {
 @end
 
 @implementation STMenuTarget
+- (void) dumpGUIState: (id) sender {
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ dump_gui_state(); });
+}
 - (void) menuItemSelected: (NSMenuItem*) item {
   STMenuItemInfo* info = item.representedObject;
   if (info == nil) return;
@@ -2835,6 +2929,7 @@ static void run_app() {
 - (void) windowDidResize: (NSNotification*) n { top_level_moved(hwnd, n.object); }
 - (void) windowDidMove: (NSNotification*) n   { top_level_moved(hwnd, n.object); }
 - (void) windowDidBecomeKey: (NSNotification*) n {
+  if (TraceMessages) fprintf(stderr, "[key window 0x%x]\n", hwnd);
   top_level_activated(hwnd, true);
   menu_bar_owner = hwnd;
   update_main_menu();
