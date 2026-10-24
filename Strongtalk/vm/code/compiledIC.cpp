@@ -215,21 +215,26 @@ char* CompiledIC::normalLookup(oop recv) {
     // general one should be able to recover using abort in the evaluator.
     //
     // FIX THIS (gri 6/10/96)
-    BlockScavenge bs; // make sure that no scavenge happens
-    klassOop msgKlass = klassOop(Universe::find_global("Message"));
-    oop obj = msgKlass->klass_part()->allocateObject();
-    assert(obj->is_mem(), "just checkin'...");
-    memOop msg = memOop(obj);
-    objArrayOop args = oopFactory::new_objArray(0);
-    // for now: assume instance variables are there...
-    // later: should check this or use a VM interface:
-    // msg->set_receiver(recv);
-    // msg->set_selector(ic->selector());
-    // msg->set_arguments(args);
-    msg->raw_at_put(2, recv);
-    msg->raw_at_put(3, selector());
-    msg->raw_at_put(4, args);
-    symbolOop sel = oopFactory::new_symbol("doesNotUnderstand:");
+    memOop msg;
+    symbolOop sel;
+    { // no scavenge while the message is built (not during the doesNotUnderstand: call,
+      // see InterpretedIC::does_not_understand)
+      BlockScavenge bs;
+      klassOop msgKlass = klassOop(Universe::find_global("Message"));
+      oop obj = msgKlass->klass_part()->allocateObject();
+      assert(obj->is_mem(), "just checkin'...");
+      msg = memOop(obj);
+      objArrayOop args = oopFactory::new_objArray(0);
+      // for now: assume instance variables are there...
+      // later: should check this or use a VM interface:
+      // msg->set_receiver(recv);
+      // msg->set_selector(ic->selector());
+      // msg->set_arguments(args);
+      msg->raw_at_put(2, recv);
+      msg->raw_at_put(3, selector());
+      msg->raw_at_put(4, args);
+      sel = oopFactory::new_symbol("doesNotUnderstand:");
+    }
     if (interpreter_normal_lookup(recv->klass(), sel).is_empty()) {
       // doesNotUnderstand: not found ==> process error
       { ResourceMark rm;

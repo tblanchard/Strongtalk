@@ -218,6 +218,7 @@ void os::fetch_top_frame(Thread* thread, intptr_t** sp, intptr_t** fp, char** pc
   *sp = NULL;
   *fp = NULL;
   *pc = NULL;
+  if (thread == NULL) return;		// a terminated process
 #if defined(__arm64__) || defined(__aarch64__)
   arm_thread_state64_t state;
   mach_msg_type_number_t count = ARM_THREAD_STATE64_COUNT;

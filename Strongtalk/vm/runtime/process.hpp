@@ -434,6 +434,7 @@ class Processes: AllStatic {
   // Verifycation
   static void verify();
   static void print();
+  static void print_not_running();	// print, without the stacks of running processes (diagnostics)
 
   // Deoptimization
  public:

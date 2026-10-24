@@ -918,6 +918,10 @@ static COLORREF brush_color(word hbrush, bool& ok) {
 word FillRect_user(word hdc, word rect, word hbrush) {
   RECT r;
   memcpy(&r, (void*) rect, sizeof r);
+  // GDI fills inverted rectangles too (as PatBlt with negative extents): the image's
+  // ValueBar has its bars grow up from the baseline (bottom < top)
+  if (r.right < r.left) std::swap(r.left, r.right);
+  if (r.bottom < r.top) std::swap(r.top, r.bottom);
   bool ok;
   COLORREF c;
   { GUILocker l; c = brush_color(hbrush, ok); }

@@ -1104,6 +1104,16 @@ void Processes::print() {
   }
 }
 
+void Processes::print_not_running() {
+  stdOut->print_cr("All processes:");
+  ALL_PROCESSES(p) {
+    ResourceMark rm;
+    p->print();
+    if (p != DeltaProcess::active() && p->state() != running) p->trace_stack();
+    else stdOut->print_cr("- (running: stack not shown)");
+  }
+}
+
 void Processes::remove(DeltaProcess* p) {
   assert(includes(p), "p must be present");
   DeltaProcess* current = processList; 
@@ -1340,7 +1350,8 @@ extern "C" void win32_dump_processes(const char* path) {
   StackPrintLimit = 1000;
   stdOut->print_cr("\nactive process:");
   if (DeltaProcess::active() != NULL) { ResourceMark rm; DeltaProcess::active()->print(); }
-  Processes::print();
+  // the stacks of the processes that do not run (the active one changes meanwhile)
+  Processes::print_not_running();
   StackPrintLimit = saved_limit;
   fflush(stdout);
   dup2(saved, 1);

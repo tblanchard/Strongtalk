@@ -76,6 +76,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include "zoneHeap.hpp"
 #include "compiledPIC.hpp"
 #include "compiler.hpp"
+#include "zone.hpp"
 char         SlidingSystemAverage::buffer[buffer_size];
 unsigned int SlidingSystemAverage::stat[number_of_cases];
 unsigned int SlidingSystemAverage::pos;
@@ -113,7 +114,7 @@ class SystemAverageTask : public PeriodicTask {
   SystemAverageTask() : PeriodicTask(10) { }
 
   void task() {
-    char type;
+    char type = SlidingSystemAverage::nowhere;
     if (last_Delta_fp) {
       if (theCompiler) { 
         type = SlidingSystemAverage::in_compiler;
@@ -125,6 +126,16 @@ class SystemAverageTask : public PeriodicTask {
         type = SlidingSystemAverage::in_vm;
       }
     } else {
+#ifdef STRONGTALK_ARM64
+      // the portable interpreter is C++ code: interpreted unless the pc is generated code
+      char* pc = DeltaProcess::active()->profile_top_frame().pc();
+      if (Universe::code != NULL && Universe::code->contains(pc)) type = SlidingSystemAverage::in_compiled_code;
+      else if (PIC::in_heap(pc))                                  type = SlidingSystemAverage::in_pic_code;
+      else if (StubRoutines::contains(pc))                         type = SlidingSystemAverage::in_stub_code;
+      else                                                         type = SlidingSystemAverage::in_interpreted_code;
+      SlidingSystemAverage::add(type);
+      return;
+#endif
       // interpreted code / compiled code / runtime routine
       frame fr = DeltaProcess::active()->profile_top_frame();
       if (fr.is_interpreted_frame()) {
