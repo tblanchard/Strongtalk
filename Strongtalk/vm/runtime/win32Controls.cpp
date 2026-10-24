@@ -310,14 +310,23 @@ static int max_top(Window* w) {
 }
 
 extern void set_scroll_bar(Window* w, bool vertical, int min, int max, int page, int pos, bool redraw);
+static void scroll_bar_visibility(Window* w, bool vertical, bool visible);
 
 static void update_listbox_scroll(Window* w) {
   ListBox* l = listbox_of(w);
-  l->top = std::max(0, std::min(l->top, max_top(w)));
-  if (w->style & 0x00200000) {	// WS_VSCROLL
-    int page = visible_items(w);
-    set_scroll_bar(w, true, 0, std::max(0, l->count - 1), page, l->top, true);
+  if (!(w->style & 0x00200000) && !w->vscroll.visible) {	// no WS_VSCROLL
+    l->top = std::max(0, std::min(l->top, max_top(w)));
+    return;
   }
+  // the scroll bar is shown when the items do not fit (as the Win32 list box)
+  bool needed = max_top(w) > 0;
+  if (needed != w->vscroll.visible) {
+    scroll_bar_visibility(w, true, needed);	// changes the client area (and sends WM_SIZE)
+    w->style |= 0x00200000;
+  }
+  l->top = std::max(0, std::min(l->top, max_top(w)));
+  int page = visible_items(w);
+  set_scroll_bar(w, true, 0, std::max(0, l->count - 1), page, l->top, true);
 }
 
 static void ensure_visible(Window* w, int item) {
@@ -662,7 +671,7 @@ static void thumb(Window* w, bool vertical, int pos, int& offset, int& length) {
   int len = track_length(w, vertical);
   int range = s.max - s.min + 1;
   if (range <= 0 || (s.page > 0 && s.page >= range)) { offset = 0; length = len; return; }
-  length = s.page > 0 ? std::max(20, (int) ((int64_t) len * s.page / range)) : 20;
+  length = s.page > 0 ? std::max(32, (int) ((int64_t) len * s.page / range)) : 32;
   length = std::min(length, len);
   int span = range - std::max(1, s.page);
   int p = std::max(0, std::min(span, pos - s.min));
@@ -675,19 +684,19 @@ void paint_scroll_bars(Window* w, word hdc) {
     ScrollBar& s = bar_of(w, vertical);
     if (!s.visible) continue;
     RECT t = track_rect(w, vertical);
-    gdi_fill_rect(hdc, t, 0xF4F4F4);
-    gdi_fill_rect(hdc, vertical ? make_rect(t.left, t.top, t.left + 1, t.bottom) : make_rect(t.left, t.top, t.right, t.top + 1), 0xE0E0E0);
+    gdi_fill_rect(hdc, t, 0xE6E6E6);
+    gdi_fill_rect(hdc, vertical ? make_rect(t.left, t.top, t.left + 1, t.bottom) : make_rect(t.left, t.top, t.right, t.top + 1), 0xB4B4B4);
     int range = s.max - s.min + 1;
     if (s.disabled || range <= 0 || (s.page > 0 && s.page >= range)) continue;
     int offset, length;
     thumb(w, vertical, scroll_bar_tracking() == w ? s.track_pos : s.pos, offset, length);
     RECT r = vertical ? make_rect(t.left + 4, t.top + offset + 2, t.right - 3, t.top + offset + length - 2)
                       : make_rect(t.left + offset + 2, t.top + 4, t.left + offset + length - 2, t.bottom - 3);
-    gdi_fill_rect(hdc, r, 0x9A9A9A);
+    gdi_fill_rect(hdc, r, 0x7A7A7A);
   }
   if (w->vscroll.visible && w->hscroll.visible) {
     RECT c = client_rect_in_window(w);
-    gdi_fill_rect(hdc, make_rect(c.right, c.bottom, c.right + scroll_bar_size, c.bottom + scroll_bar_size), 0xF4F4F4);
+    gdi_fill_rect(hdc, make_rect(c.right, c.bottom, c.right + scroll_bar_size, c.bottom + scroll_bar_size), 0xE6E6E6);
   }
 }
 
@@ -775,7 +784,7 @@ static void scroll_bar_visibility(Window* w, bool vertical, bool visible) {
   if (s.visible == visible) return;
   s.visible = visible;
   if (visible) w->style |= vertical ? 0x00200000 : 0x00100000;
-  else         w->style &= ~(vertical ? 0x00200000 : 0x00100000);
+  else if (w->cls == NULL || strcasecmp(w->cls->name.c_str(), "ListBox") != 0) w->style &= ~(vertical ? 0x00200000 : 0x00100000);
   RECT c = client_rect(w);
   invalidate(w, NULL, true);
   if (w->parent != NULL) { RECT r = w->rect; invalidate(w->parent, &r, true); }

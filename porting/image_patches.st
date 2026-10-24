@@ -128,3 +128,31 @@ showType
                                                                    ].
                           ].
 ! !
+
+"Window>>release freed scratchRECT before releasing the visual, whose detaching invalidates
+ (use after free: harmless on Windows, a NULL proxy here)"!
+
+! (Delta mirrorFor: #Window) methodsFor: 'control' !
+
+release
+
+
+	self session unregisterWindow: self.
+
+	visual notNil
+		ifTrue: [	visual detaching; release.
+						visual := nil.	].
+
+	"freed after the visual is released: detaching views still invalidate (the image
+	  wrote into the freed RECT; on macOS a freed proxy is NULL)"
+	scratchRECT free.
+
+	win32Handle := nil.
+
+	self hasMenu
+		ifTrue: [ self menu release ].
+	mostRecentInputFocus := nil.
+	menu := nil.
+	popUpMenu := nil.
+	toClose := nil.
+	controls := nil.! !

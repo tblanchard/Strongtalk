@@ -31,6 +31,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
   template(smi_overflow,                   "SmallIntegerOverflow")       \
   template(division_by_zero,               "DivisionByZero")             \
   template(receiver_has_wrong_type,        "ReceiverHasWrongType")       \
+  template(null_proxy_access,              "NullProxyAccess")            \
   template(division_not_exact,             "DivisionNotExact")           \
   template(first_argument_has_wrong_type,  "FirstArgumentHasWrongType")  \
   template(second_argument_has_wrong_type, "SecondArgumentHasWrongType") \
@@ -187,6 +188,7 @@ class vmSymbols : AllStatic {
   static symbolOop smi_overflow() { return vm_symbols[smi_overflow_enum]; }
   static symbolOop division_by_zero() { return vm_symbols[division_by_zero_enum]; }
   static symbolOop receiver_has_wrong_type() { return vm_symbols[receiver_has_wrong_type_enum]; }
+  static symbolOop null_proxy_access()       { return vm_symbols[null_proxy_access_enum]; }
   static symbolOop division_not_exact() { return vm_symbols[division_not_exact_enum]; }
   static symbolOop first_argument_has_wrong_type() { return vm_symbols[first_argument_has_wrong_type_enum]; }
   static symbolOop second_argument_has_wrong_type() { return vm_symbols[second_argument_has_wrong_type_enum]; }

@@ -2913,6 +2913,9 @@ static void dump_gui_state() {
     }
     fprintf(f, "\nwindows:\n");
     std::function<void(Window*, int)> print = [&](Window* w, int depth) {
+      if (w->vscroll.visible || w->hscroll.visible || (w->style & (WS_VSCROLL | WS_HSCROLL)))
+        fprintf(f, "  %*s  scroll v%d %d..%d page %d pos %d, h%d, style 0x%x\n", depth * 2, "", w->vscroll.visible, w->vscroll.min,
+                w->vscroll.max, w->vscroll.page, w->vscroll.pos, w->hscroll.visible, w->style);
       fprintf(f, "  %*s0x%x \"%s\" class %s rect %d,%d,%d,%d%s%s update %d,%d,%d,%d thread %u%s\n", depth * 2, "",
               w->handle, w->text.c_str(), w->cls ? w->cls->name.c_str() : "?", w->rect.left, w->rect.top, w->rect.right, w->rect.bottom,
               w->visible ? "" : " hidden", w->enabled ? "" : " disabled", w->update.left, w->update.top, w->update.right, w->update.bottom,

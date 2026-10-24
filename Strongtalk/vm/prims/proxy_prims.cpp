@@ -166,6 +166,7 @@ PRIM_DECL_1(proxyOopPrimitives::free, oop receiver) {
 PRIM_DECL_2(proxyOopPrimitives::byteAt, oop receiver, oop offset) {
   PROLOGUE_2("byteAt", receiver, offset);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   return as_smiOop(proxyOop(receiver)->byte_at(smiOop(offset)->value()));
@@ -174,6 +175,7 @@ PRIM_DECL_2(proxyOopPrimitives::byteAt, oop receiver, oop offset) {
 PRIM_DECL_2(proxyOopPrimitives::doubleByteAt, oop receiver, oop offset) {
   PROLOGUE_2("doubleByteAt", receiver, offset);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   return as_smiOop(proxyOop(receiver)->doubleByte_at(smiOop(offset)->value()));
@@ -182,6 +184,7 @@ PRIM_DECL_2(proxyOopPrimitives::doubleByteAt, oop receiver, oop offset) {
 PRIM_DECL_3(proxyOopPrimitives::doubleByteAtPut, oop receiver, oop offset, oop value) {
   PROLOGUE_3("doubleByteAtPut", receiver, offset, value);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_smi()) return markSymbol(vmSymbols::second_argument_has_wrong_type());
@@ -192,6 +195,7 @@ PRIM_DECL_3(proxyOopPrimitives::doubleByteAtPut, oop receiver, oop offset, oop v
 PRIM_DECL_2(proxyOopPrimitives::smiAt, oop receiver, oop offset) {
   PROLOGUE_2("smiAt", receiver, offset);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   // a 32-bit (Win32 LONG) field: the image's external structures have 4-byte words
@@ -203,6 +207,7 @@ PRIM_DECL_2(proxyOopPrimitives::smiAt, oop receiver, oop offset) {
 PRIM_DECL_3(proxyOopPrimitives::smiAtPut, oop receiver, oop offset, oop value) {
   PROLOGUE_3("smiAtPut", receiver, offset, value);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_smi())
@@ -229,6 +234,7 @@ PRIM_DECL_3(proxyOopPrimitives::subProxyAt, oop receiver, oop offset, oop result
 PRIM_DECL_3(proxyOopPrimitives::proxyAt, oop receiver, oop offset, oop result) {
   PROLOGUE_3("proxyAt", receiver, offset, result);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!result->is_proxy())
@@ -241,6 +247,7 @@ PRIM_DECL_3(proxyOopPrimitives::proxyAt, oop receiver, oop offset, oop result) {
 PRIM_DECL_3(proxyOopPrimitives::proxyAtPut, oop receiver, oop offset, oop value) {
   PROLOGUE_3("proxyAtPut", receiver, offset, value);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_proxy())
@@ -253,6 +260,7 @@ PRIM_DECL_3(proxyOopPrimitives::proxyAtPut, oop receiver, oop offset, oop value)
 PRIM_DECL_2(proxyOopPrimitives::singlePrecisionFloatAt, oop receiver, oop offset) {
   PROLOGUE_2("singlePrecisionFloatAt", receiver, offset);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   return oopFactory::new_double((double) proxyOop(receiver)->float_at(smiOop(offset)->value()));
@@ -261,6 +269,7 @@ PRIM_DECL_2(proxyOopPrimitives::singlePrecisionFloatAt, oop receiver, oop offset
 PRIM_DECL_3(proxyOopPrimitives::singlePrecisionFloatAtPut, oop receiver, oop offset, oop value) {
   PROLOGUE_3("singlePrecisionFloatAtPut", receiver, offset, value);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_double())
@@ -272,6 +281,7 @@ PRIM_DECL_3(proxyOopPrimitives::singlePrecisionFloatAtPut, oop receiver, oop off
 PRIM_DECL_2(proxyOopPrimitives::doublePrecisionFloatAt, oop receiver, oop offset) {
   PROLOGUE_2("doublePrecisionFloatAt", receiver, offset);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   return oopFactory::new_double(proxyOop(receiver)->double_at(smiOop(offset)->value()));
@@ -280,6 +290,7 @@ PRIM_DECL_2(proxyOopPrimitives::doublePrecisionFloatAt, oop receiver, oop offset
 PRIM_DECL_3(proxyOopPrimitives::doublePrecisionFloatAtPut, oop receiver, oop offset, oop value) {
   PROLOGUE_3("doublePrecisionFloatAtPut", receiver, offset, value);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_double())
@@ -443,6 +454,7 @@ PRIM_DECL_7(proxyOopPrimitives::callOut5, oop receiver, oop arg1, oop arg2, oop 
 PRIM_DECL_3(proxyOopPrimitives::byteAtPut, oop receiver, oop offset, oop value) {
   PROLOGUE_3("byteAtPut", receiver, offset, value);
   ASSERT_RECEIVER;
+  if (proxyOop(receiver)->is_null()) return markSymbol(vmSymbols::null_proxy_access());
   if (!offset->is_smi())
     return markSymbol(vmSymbols::first_argument_has_wrong_type());
   if (!value->is_smi()) return markSymbol(vmSymbols::second_argument_has_wrong_type());
