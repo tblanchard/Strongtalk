@@ -41,6 +41,9 @@ class dispatchTable: AllStatic {
   // the dispatch table
   static u_char** table();
 
+  // the portable interpreter: is code intercepted (single step, the console debugger)?
+  static bool intercepts(int code);
+
   // initializes the dispatch table to the original state.
   static void reset();
 

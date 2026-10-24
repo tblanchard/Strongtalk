@@ -110,6 +110,10 @@ u_char** dispatchTable::table() {
 }
 
 
+bool dispatchTable::intercepts(int code) {
+  return mode != normal_mode && dispatch_table[code] == (void*) &single_step_stub;
+}
+
 void dispatchTable::reset() {
   for (int index = 0; index < Bytecodes::number_of_codes; index++) {
     dispatch_table[index] = original_table[index];

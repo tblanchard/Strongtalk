@@ -88,3 +88,43 @@ normalSendNode: node
 
 	"No rewriting"
 	result := DeltaNormalSend new to: recv send: msg! !
+
+"TypedCodeView>>showType called showSourceError:at:, which does not exist (a doesNotUnderstand:
+ walkback when the selection does not parse as a method): show the parse error as the other views"!
+
+! (Delta mirrorFor: #TypedCodeView) methodsFor: 'control' !
+
+showType
+
+	| 
+		mirror <Mirror>   selection <Tuple[Int, Int]> node <ASTNode> parseTree <ParseTree> 
+		position <Tuple[Int, Int]>   otype <ObjectType> eh <TypeErrorHandler>
+	|
+	
+	mirror := self codeManager mirror.
+	selection := self linearSelection.
+	selection at1 = 0 ifTrue: [^self].
+	parseTree := DeltaParser new parseMethod: self modelString within: mirror scope ifError: [ :msg :pos | self showParseError: msg at: pos in: self. ^ self].
+	node := parseTree nodeForPosition: selection.
+	position := parseTree positionForNode: node.	
+	self  sourceSelection: position.
+	eh := Type doChecks: [otype := mirror typeForNode: node inMethod: parseTree body].					
+	eh reportedErrors isEmpty
+		ifTrue:[
+						self visual promptOk:  'Type of selection is ', otype name asString printString
+											title: 'Showing type in ', self codeManager locator name
+											type: #info
+											action: [].
+					] 
+		ifFalse: [
+                         otype isError  ifTrue:[
+                         											self reportShowTypeResult: 'Selection has erroneous type. Browse type errors?'
+                         													errors: eh reportedErrors
+                         										]
+                                                     ifFalse:[
+                                                     				self reportShowTypeResult:  'Type of selection is ' ,
+                                                                                otype name asString printString, '; however the expression includes type errors. Browse type errors?'
+                                                                            errors: eh reportedErrors
+                                                                   ].
+                          ].
+! !

@@ -671,19 +671,21 @@ void InterpretedIC::inline_cache_miss() {
   // iterate (bounded) instead of recursing so the native stack cannot overflow.
   const int max_dnu_retries = 100;
   for (int retries = 0; ; retries++) {
-  NoGCVerifier noGC;
-
-  // get ic info
   frame           f         = DeltaProcess::active()->last_frame();
   InterpretedIC*  ic        = f.current_interpretedIC();
+  oop             receiver;
+  klassOop        klass;
+  { NoGCVerifier noGC;		// (the lookup; not the doesNotUnderstand: call below)
+
+  // get ic info
   Bytecodes::Code send_code = ic->send_code();
 
-  oop receiver = ic->argument_spec() == Bytecodes::args_only // Are we at a self or super send?
-               ? f.receiver()                                //  yes: take receiver of frame
-	       : f.expr(ic->nof_arguments());                //  no:  take receiver pushed before the arguments
+  receiver = ic->argument_spec() == Bytecodes::args_only // Are we at a self or super send?
+           ? f.receiver()                                //  yes: take receiver of frame
+           : f.expr(ic->nof_arguments());                //  no:  take receiver pushed before the arguments
 
   // do the lookup
-  klassOop klass = receiver->klass();
+  klass = receiver->klass();
   LookupResult result = Bytecodes::is_super_send(send_code)
                       ? interpreter_super_lookup(ic->selector())
                       : interpreter_normal_lookup(klass, ic->selector());
@@ -696,6 +698,7 @@ void InterpretedIC::inline_cache_miss() {
   if (!result.is_empty()) {
     update_inline_cache(ic, &f, send_code, klass, result);
     return;
+  }
   }
   if (retries == max_dnu_retries) {
     { ResourceMark rm;

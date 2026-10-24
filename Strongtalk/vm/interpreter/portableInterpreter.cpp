@@ -1073,9 +1073,20 @@ void PortableInterpreter::trace_bytecode() {
 // ---------------------------------------------------------------------------
 // The interpreter loop
 
+extern "C" void single_step_handler();	// evaluator.cpp
+
 bool PortableInterpreter::run() {
   while (true) {
     Bytecodes::Code code = Bytecodes::Code(*hp);
+    if (dispatchTable::intercepts(code)) {
+      // single stepping (the console debugger): as the x86 single_step_stub, call the
+      // handler with the frame of the instruction (hp is the current one), then execute it
+      enter_C(hp);
+      single_step_handler();
+      leave_C();
+      if (have_nlr_through_C) return nlr_unwind(nlr_result, nlr_home, nlr_home_id);
+      code = Bytecodes::Code(*hp);
+    }
     if (TraceBytecodes) trace_bytecode();
     NumberOfBytecodesExecuted++;
 
