@@ -220,16 +220,34 @@ class PrimitiveArgument : public StackObj {
   oop value() const { return _slot != NULL ? *_slot : _value; }
 };
 
+extern "C" intptr_t nlr_home;		// the NLR state (portableInterpreter.cpp)
+extern "C" int      nlr_home_id;
+
 PRIM_DECL_2(unwindprotect, oop receiver, oop protectBlock) {
   PROLOGUE_2("unwindprotect", receiver, protectBlock);
   PrimitiveArgument protect(protectBlock, 2);		// used after a call that can GC
   oop res = Delta::call(receiver, vmSymbols::value());
 
   if (have_nlr_through_C) {
+#ifdef STRONGTALK_ARM64
+    // An NLR leaves the protected block: evaluate the protect block, then continue the NLR
+    // (unless the protect block starts an NLR of its own, which then continues instead)
+    unwindInfo enabler;				// the NLR result stays a root during the call
+    have_nlr_through_C = false;
+    Delta::call(protect.value(), vmSymbols::value());
+    if (!have_nlr_through_C) {
+      ::nlr_home    = enabler.nlr_home();
+      ::nlr_home_id = enabler.nlr_home_id();
+      ::nlr_result  = enabler._nlr_result;
+      have_nlr_through_C = true;
+    }
+    res = ::nlr_result;
+#else
     unwindInfo enabler;
     res  = Delta::call(protect.value(), vmSymbols::value(), nlr_result);
     // Now since we have to continue the first non-local-return
     // the nlr_result must be correct.
+#endif
   }
 
   return res;

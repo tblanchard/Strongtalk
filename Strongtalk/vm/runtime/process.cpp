@@ -123,6 +123,7 @@ unwindInfo::unwindInfo() {
    _nlr_home_id = ::nlr_home_id;
    _nlr_result  = ::nlr_result;
 
+#ifndef STRONGTALK_ARM64
    // Save patch information
    assert(last_Delta_fp, "last_Delta_fp must be set");
    saved_C_frame_return_addr          = C_frame_return_addr;
@@ -131,6 +132,13 @@ unwindInfo::unwindInfo() {
 
    // Restore original return address
    *saved_C_frame_return_addr_location = saved_C_frame_return_addr;
+#else
+   // arm64: no return address patching (the portable interpreter unwinds C frames itself);
+   // the unwindInfo keeps the NLR result a root and the NLR target up to date (deoptimization)
+   saved_C_frame_return_addr = NULL;
+   saved_C_frame_return_addr_location = NULL;
+   saved_patch_return_address = NULL;
+#endif
 
    _is_compiled = _nlr_home_id >= 0;
    DeltaProcess::active()->push_unwind(this);
@@ -139,15 +147,19 @@ unwindInfo::unwindInfo() {
 unwindInfo::~unwindInfo() {
   // If we get an aborting NLR in the protect part we should continue the aborting NLR
   // and not the original NLR.
+#ifndef STRONGTALK_ARM64	// (arm64: unwindprotect decides which NLR continues)
   if (::nlr_home != 0) {
     // Restore NLR state
     ::nlr_home    = _nlr_home;
     ::nlr_home_id = _nlr_home_id;
     ::nlr_result  = _nlr_result;
   }
+#endif
+#ifndef STRONGTALK_ARM64
   // Restore patch information
   *saved_C_frame_return_addr_location = saved_patch_return_address;
   C_frame_return_addr                 = saved_C_frame_return_addr;
+#endif
 
   DeltaProcess::active()->pop_unwind();
 }
@@ -256,6 +268,13 @@ void VMProcess::terminate(DeltaProcess* proc) {
   assert(proc->_thread,                      "thread must be present");
   assert(proc->_event,                       "event must be present");
 
+  if (::getenv("STRONGTALK_TRACE_TERMINATE") != NULL) {
+    ResourceMark rm;
+    stdOut->print("[terminating process ");
+    proc->print();
+    proc->trace_stack();
+    stdOut->print_cr("]");
+  }
   os::terminate_thread(proc->_thread);
   proc->_thread = NULL;
   os::delete_event(proc->_event);
@@ -1317,9 +1336,12 @@ extern "C" void win32_dump_processes(const char* path) {
   if (fd < 0 || saved < 0) return;
   dup2(fd, 1);
   close(fd);
+  int saved_limit = StackPrintLimit;
+  StackPrintLimit = 1000;
   stdOut->print_cr("\nactive process:");
   if (DeltaProcess::active() != NULL) { ResourceMark rm; DeltaProcess::active()->print(); }
   Processes::print();
+  StackPrintLimit = saved_limit;
   fflush(stdout);
   dup2(saved, 1);
   close(saved);

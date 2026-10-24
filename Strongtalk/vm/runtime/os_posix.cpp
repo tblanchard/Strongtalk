@@ -83,6 +83,9 @@ static int new_thread_id() {
 static void* thread_start(void* arg) {
   Thread* thread = (Thread*) arg;
   current_id = thread->id;
+  // terminate_thread cancels a thread only where it waits for control (wait_for_event), never
+  // while it is in other code (e.g. waiting in the GUI emulation with its lock held)
+  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
   return (void*) (intptr_t) thread->main(thread->parameter);
 }
 
@@ -114,9 +117,9 @@ Thread* os::create_thread(int main(void* parameter), void* parameter, int* id_ad
 
 void os::terminate_thread(Thread* thread) {
   if (thread == &main_thread) return;
-  pthread_cancel(thread->pthread);
+  pthread_cancel(thread->pthread);	// takes effect when it waits for control (wait_for_event)
   pthread_detach(thread->pthread);
-  free(thread);
+  // the Thread is not freed: the thread may run until its next wait for control
 }
 
 int os::current_thread_id() {
@@ -132,9 +135,9 @@ Event* os::create_event(bool initial_state) {
 }
 
 void os::delete_event(Event* event) {
-  pthread_cond_destroy(&event->cond);
-  pthread_mutex_destroy(&event->mutex);
-  free(event);
+  // not freed: the event of a terminated process is still used by its thread while it is
+  // cancelled (VMProcess::terminate deletes it right after terminate_thread); events are small
+  (void) event;
 }
 
 void os::reset_event(Event* event) {
@@ -150,10 +153,17 @@ void os::signal_event(Event* event) {
   pthread_mutex_unlock(&event->mutex);
 }
 
+static void unlock_mutex(void* m) { pthread_mutex_unlock((pthread_mutex_t*) m); }
+
+// The only point where VM threads can be cancelled (terminate_thread)
 void os::wait_for_event(Event* event) {
   pthread_mutex_lock(&event->mutex);
+  pthread_cleanup_push(unlock_mutex, &event->mutex);
+  int old_state;
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
   while (!event->signaled) pthread_cond_wait(&event->cond, &event->mutex);
-  pthread_mutex_unlock(&event->mutex);
+  pthread_setcancelstate(old_state, NULL);
+  pthread_cleanup_pop(1);
 }
 
 // Returns true if the wait timed out.

@@ -529,3 +529,17 @@ Phases:
       (to rebuild: link it into a resynced image directory, launch once, Dumper saveSystem).
       The originals are in image-backup-2026-10-23/. With the saved image and no patch file a launch
       writes nothing to source/; vmtest, vmcompiled, benchmarks and the results comparison pass.
+- [x] GUI (2026-10-23/24): Win32 USER32/GDI32/COMDLG32 emulation on AppKit (runtime/win32User.mm,
+      win32Gdi.cpp, win32Controls.cpp; see win32GUI.hpp). GUI test scripts ($STRONGTALK_GUI_SCRIPT, hidden
+      unless STRONGTALK_GUI_VISIBLE) dump windows to PNG and inject AppKit events; "Dump GUI State" (app menu)
+      writes queues, windows and process stacks to /tmp/strongtalk-gui-state.txt. porting/run_gui.sh.
+      VM bugs found by the GUI:
+      - NLRs skipped ensure:/ifCurtailed: blocks (port bug): unwindprotect called the protect block with
+        an extra argument and did not continue the NLR afterwards; unwindInfo's x86 return address
+        patching wrote into the Delta stack. A critical: region left with ^ kept its semaphore: the
+        GUI froze (Win32Control's monitor). Now correct interpreted and compiled.
+      - os::terminate_thread (pthread_cancel) could kill a thread anywhere (e.g. waiting in the GUI with
+        its lock held) and freed the Thread and event still in use: VM threads are cancellable only in
+        wait_for_event (cleanup handler unlocks), Thread and Event are not freed.
+      - setHigh:low: / high kept 32 bits of 64-bit pointers; 512 KB thread stacks overflowed; global
+        operator new aborted (system frameworks use it).
