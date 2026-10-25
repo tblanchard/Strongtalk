@@ -94,6 +94,17 @@ class Process: public PrintableCHeapObj {
   int     _thread_id; // Native thread id (set by OS when created)
   Event*  _event;     // Thread lock
 
+  // the NLR state of the process while it does not run (see basic_transfer)
+  bool     _saved_have_nlr;
+  oop      _saved_nlr_result;
+  intptr_t _saved_nlr_home;
+  int      _saved_nlr_home_id;
+ public:
+  void save_nlr_state();
+  void restore_nlr_state();
+  oop* saved_nlr_result_addr()   { return &_saved_nlr_result; }
+ protected:
+
   static Process* _current_process;       //  active Delta process or vm process
 };
 
@@ -434,7 +445,9 @@ class Processes: AllStatic {
   // Verifycation
   static void verify();
   static void print();
-  static void print_not_running();	// print, without the stacks of running processes (diagnostics)
+  // print, without the stacks of running processes; active_in_C: the caller is the active
+  // process in a C call, its stack is walkable (diagnostics)
+  static void print_not_running(bool active_in_C);
 
   // Deoptimization
  public:

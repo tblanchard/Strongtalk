@@ -143,8 +143,11 @@ void VM_DeoptimizeStacks::doit() {
 }
 
 void VM_TerminateProcess::doit() {
+  if (calling_process() != target) {	// (only a process terminates itself)
+    lprintf("[VM_TerminateProcess: calling process %p is not the target %p]\n", calling_process(), target);
+  }
   VMProcess::terminate(target);
-  delete calling_process();
+  if (calling_process() == target) delete calling_process();
   set_calling_process(NULL);
 }
 

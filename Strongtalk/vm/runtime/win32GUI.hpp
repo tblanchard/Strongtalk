@@ -78,6 +78,8 @@ struct Obj {
   ObjKind kind;
   HANDLE  handle;
   bool    stock;	// stock objects are never deleted
+  int     selected;	// GDI objects: number of DC states (current and saved) holding it
+  bool    deleted;	// DeleteObject while selected: freed when the last DC state lets go
   Obj(ObjKind k);
   virtual ~Obj();
 };
@@ -104,7 +106,6 @@ struct Bitmap : Obj {
   CGContextRef ctx;		// device pixels (width * gdi_scale), y down, logical coordinates
   uint32_t*    pixels;		// 0xXXRRGGBB
   size_t       row_words;	// uint32_t per row
-  int          selected;	// number of DCs it is selected into
   Bitmap(int w, int h, int bpp);
   ~Bitmap();
   void resize(int w, int h);	// keeps the overlapping contents

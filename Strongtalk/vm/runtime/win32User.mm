@@ -44,6 +44,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISE
 #include <map>
 #include <unordered_map>
 #include <functional>
+#include <atomic>
 
 extern "C" uint32_t win32_external_word(void* p);	// proxy_prims.cpp
 extern "C" void*    win32_external_pointer(uint32_t w);
@@ -56,6 +57,10 @@ static bool TraceMessages = getenv("STRONGTALK_TRACE_MESSAGES") != NULL;
 // GUI test scripts run invisibly (no Dock icon, transparent windows that ignore the mouse), so that
 // they do not get in the way of a user; STRONGTALK_GUI_VISIBLE=1 shows them
 static bool HiddenGUI = getenv("STRONGTALK_GUI_SCRIPT") != NULL && getenv("STRONGTALK_GUI_VISIBLE") == NULL;
+
+// Dump GUI State: the process stacks (0 not wanted, 1 requested, 2 being written)
+static std::atomic<int> process_dump_state(0);
+static void serve_process_dump();
 
 // ---------------------------------------------------------------------------
 // Win32 constants
@@ -193,7 +198,7 @@ static const HANDLE handle_limit = 0x9FFF0000;
 static std::unordered_map<HANDLE, Obj*> handles;
 static HANDLE next_handle = handle_base;
 
-Obj::Obj(ObjKind k) : kind(k), handle(0), stock(false) {
+Obj::Obj(ObjKind k) : kind(k), handle(0), stock(false), selected(0), deleted(false) {
   GUILocker l;
   do {
     handle = next_handle;
@@ -215,7 +220,7 @@ Obj* lookup(word h, ObjKind kind) {
   auto i = handles.find((HANDLE) h);
   if (i == handles.end()) return NULL;
   Obj* o = i->second;
-  if (kind != K_ANY && o->kind != kind) return NULL;
+  if (o->deleted || (kind != K_ANY && o->kind != kind)) return NULL;
   return o;
 }
 
@@ -1658,6 +1663,7 @@ static bool handle_internal(QMessage& m) {
 }
 
 static word TranslateMessage(word msg) {
+  serve_process_dump();
   Queue* q = my_queue();
   uint32_t* f = (uint32_t*) msg;
   if (f[1] != WM_KEYDOWN && f[1] != WM_SYSKEYDOWN) return 0;
@@ -1678,6 +1684,7 @@ static word TranslateMessage(word msg) {
 }
 
 static word DispatchMessageA(word msg) {
+  serve_process_dump();
   uint32_t* f = (uint32_t*) msg;
   word hwnd = f[0], message = f[1];
   word wparam = (word) external_pointer(f[2]), lparam = (word) external_pointer(f[3]);
@@ -2932,7 +2939,29 @@ static void dump_gui_state() {
   }
   fclose(f);
   for (auto& p : pngs) { Window* w = window(p.first); if (w) write_png(w, p.second.c_str()); }
+  // The process stacks must be walked by the VM itself: ask the next process that dispatches
+  // messages, and give up after 3 s (Delta code busy or hung without dispatching).
+  int expected = 0;
+  if (!process_dump_state.compare_exchange_strong(expected, 1)) return;		// another dump is waiting
+  for (int i = 0; i < 300 && process_dump_state.load() == 1; i++) usleep(10000);
+  expected = 1;
+  if (process_dump_state.compare_exchange_strong(expected, 0)) {
+    if (FILE* a = fopen("/tmp/strongtalk-gui-state.txt", "a")) {
+      fprintf(a, "\nprocesses: not dumped (no process dispatched messages within 3 s)\n");
+      fclose(a);
+    }
+    return;
+  }
+  while (process_dump_state.load() != 0) usleep(10000);		// being written
+}
+
+// Called by the Delta processes in TranslateMessage/DispatchMessageA (where they hold the VM)
+static void serve_process_dump() {
+  if (process_dump_state.load() != 1) return;
+  int expected = 1;
+  if (!process_dump_state.compare_exchange_strong(expected, 2)) return;
   win32_dump_processes("/tmp/strongtalk-gui-state.txt");
+  process_dump_state.store(0);
 }
 
 // ---------------------------------------------------------------------------

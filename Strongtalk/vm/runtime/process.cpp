@@ -227,13 +227,38 @@ void Process::external_resume_current() {
   os::resume_thread(current()->_thread);
 }
 
+// The NLR state (have_nlr_through_C, nlr_result, nlr_home, nlr_home_id) is global (compiled
+// code addresses it), but belongs to the running process: a process that gives up control in
+// the middle of an NLR (e.g. an ensure: block of an aborting process that suspends) must not
+// leave it to the next one (the scheduler took over the abort and ended itself).
+extern "C" bool       have_nlr_through_C;
+extern "C" oop        nlr_result;
+extern "C" intptr_t   nlr_home;
+extern "C" int        nlr_home_id;
+
+void Process::save_nlr_state() {
+  _saved_have_nlr    = have_nlr_through_C;
+  _saved_nlr_result  = have_nlr_through_C ? nlr_result : oop(smiOop_zero);
+  _saved_nlr_home    = nlr_home;
+  _saved_nlr_home_id = nlr_home_id;
+}
+
+void Process::restore_nlr_state() {
+  have_nlr_through_C = _saved_have_nlr;
+  nlr_result         = _saved_nlr_result;	// (a root while saved: DeltaProcess::oop_iterate)
+  nlr_home           = _saved_nlr_home;
+  nlr_home_id        = _saved_nlr_home_id;
+}
+
 void Process::basic_transfer(Process* target) {
   if (TraceProcessEvents) {
     stdOut->print("Process: "); print();
     stdOut->print(" -> "); target->print();
     stdOut->cr();
   }
+  save_nlr_state();
   os::transfer(_thread, _event, target->_thread, target->_event);
+  restore_nlr_state();
 }
 
 // ======= VMProcess ========
@@ -244,6 +269,7 @@ VMProcess::VMProcess() {
   _vm_process   = this;
   _vm_operation = NULL;
 
+  _saved_have_nlr = false; _saved_nlr_result = smiOop_zero; _saved_nlr_home = 0; _saved_nlr_home_id = 0;
   _thread    = os::starting_thread(&_thread_id);
   _event     = os::create_event(true);
 }
@@ -268,13 +294,6 @@ void VMProcess::terminate(DeltaProcess* proc) {
   assert(proc->_thread,                      "thread must be present");
   assert(proc->_event,                       "event must be present");
 
-  if (::getenv("STRONGTALK_TRACE_TERMINATE") != NULL) {
-    ResourceMark rm;
-    stdOut->print("[terminating process ");
-    proc->print();
-    proc->trace_stack();
-    stdOut->print_cr("]");
-  }
   os::terminate_thread(proc->_thread);
   proc->_thread = NULL;
   os::delete_event(proc->_event);
@@ -314,7 +333,18 @@ void VMProcess::loop() {
     assert(vm_operation(), "A VM_Operation should be present");
     vm_operation()->evaluate();
     DeltaProcess* p = vm_operation()->calling_process();
+    VM_Operation* done = _vm_operation;
     _vm_operation = NULL;
+    if (p != NULL && (p->_event == NULL || p->_thread == NULL || !Processes::includes(p))) {
+      // the calling process has been terminated meanwhile: continue with the scheduler
+      lprintf("[VM operation %s: its process was terminated]\n", done->name());
+      p = NULL;
+    }
+    DeltaProcess* to = p ? p : DeltaProcess::scheduler();
+    if (to->_event == NULL) {
+      lprintf("[VM loop: after %s, transfer to %s %p without an event (state %d)]\n", done->name(),
+              to == DeltaProcess::scheduler() ? "the scheduler" : "process", to, (int) to->state());
+    }
     if (p) {
       transfer_to(p);
     } else {
@@ -456,6 +486,7 @@ void DeltaProcess::transfer_and_continue() {
       stdOut->cr();
     }
   }
+  save_nlr_state();
   os::transfer_and_continue(_thread, _event, scheduler()->_thread, scheduler()->_event);
 }
 
@@ -495,6 +526,7 @@ void DeltaProcess::wait_for_control() {
   set_state(yielded_after_async_dll);
   async_dll_call_completed();
   os::wait_for_event(_event);
+  restore_nlr_state();
   if (is_terminating()) 
     ErrorHandler::abort_current_process();
 }
@@ -505,6 +537,7 @@ extern "C" bool have_nlr_through_C;
 int DeltaProcess::launch_delta(DeltaProcess* process) {
   // Wait until we get the torch
   process->suspend_at_creation();
+  have_nlr_through_C = false;		// (the NLR state of the process that started it)
 
   // We have the torch
   assert(process == DeltaProcess::active(),  "process consistency check");
@@ -522,7 +555,9 @@ int DeltaProcess::launch_delta(DeltaProcess* process) {
   } else {
     p->set_state(completed);
   }
-  assert(process == DeltaProcess::active(),  "process consistency check");
+  if (process != DeltaProcess::active()) {
+    lprintf("[launch_delta: process %p ends while %p is active]\n", process, DeltaProcess::active());
+  }
 
   VM_TerminateProcess op(process);
   VMProcess::execute(&op);
@@ -537,6 +572,7 @@ DeltaProcess::DeltaProcess(oop receiver, symbolOop selector) {
 
   _is_terminating = false;
 
+  _saved_have_nlr = false; _saved_nlr_result = smiOop_zero; _saved_nlr_home = 0; _saved_nlr_home_id = 0;
   _event       = os::create_event(false);
   _thread      = os::create_thread((int (*)(void*)) &launch_delta, (void*) this, &_thread_id);
 
@@ -605,6 +641,7 @@ void DeltaProcess::frame_iterate(FrameClosure* blk) {
 
 void DeltaProcess::oop_iterate(OopClosure* blk) {
   blk->do_oop((oop*) &_receiver);
+  blk->do_oop(saved_nlr_result_addr());
   blk->do_oop((oop*) &_selector);
   blk->do_oop((oop*) &_processObj);
 
@@ -1104,12 +1141,12 @@ void Processes::print() {
   }
 }
 
-void Processes::print_not_running() {
+void Processes::print_not_running(bool active_in_C) {
   stdOut->print_cr("All processes:");
   ALL_PROCESSES(p) {
     ResourceMark rm;
     p->print();
-    if (p != DeltaProcess::active() && p->state() != running) p->trace_stack();
+    if (p == DeltaProcess::active() ? active_in_C : p->state() != running) p->trace_stack();
     else stdOut->print_cr("- (running: stack not shown)");
   }
 }
@@ -1338,7 +1375,8 @@ void suspend_process_at_stack_overflow(intptr_t* sp, intptr_t* fp, char* pc) {
 #include <fcntl.h>
 #include <unistd.h>
 // Diagnostics for the GUI ("Dump GUI State", win32User.mm): appends the states and stacks of
-// all processes to path. Not synchronized with the running process; for hangs.
+// all processes to path. Called by the active process in a DLL call (it holds the VM, and its
+// stack is walkable).
 extern "C" void win32_dump_processes(const char* path) {
   fflush(stdout);
   int saved = dup(1);
@@ -1348,10 +1386,9 @@ extern "C" void win32_dump_processes(const char* path) {
   close(fd);
   int saved_limit = StackPrintLimit;
   StackPrintLimit = 1000;
-  stdOut->print_cr("\nactive process:");
+  stdOut->print_cr("\nactive process (the one calling the GUI):");
   if (DeltaProcess::active() != NULL) { ResourceMark rm; DeltaProcess::active()->print(); }
-  // the stacks of the processes that do not run (the active one changes meanwhile)
-  Processes::print_not_running();
+  Processes::print_not_running(true);
   StackPrintLimit = saved_limit;
   fflush(stdout);
   dup2(saved, 1);

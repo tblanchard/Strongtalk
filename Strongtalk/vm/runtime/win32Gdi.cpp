@@ -104,7 +104,7 @@ static CGContextRef create_context(int w, int h, uint32_t*& pixels, size_t& row_
   return ctx;
 }
 
-Bitmap::Bitmap(int w, int h, int bpp) : Obj(K_BITMAP), width(w), height(h), bits_pixel(bpp), selected(0) {
+Bitmap::Bitmap(int w, int h, int bpp) : Obj(K_BITMAP), width(w), height(h), bits_pixel(bpp) {
   ctx = create_context(w, h, pixels, row_words);
   for (size_t i = 0; i < row_words * std::max(1, h) * gdi_scale; i++) pixels[i] = 0xFFFFFFFF;	// white
 }
@@ -329,7 +329,22 @@ struct DC : Obj {
   std::vector<DCState> saved;
   Palette* palette;
   DC(Type t, HANDLE w);
+  ~DC();
 };
+
+// The objects of a DC state are counted (Obj::selected) so that DeleteObject of a selected pen,
+// brush or font (as Win32 allows) defers freeing it and DCs never hold dangling pointers.
+static void hold(Obj* o) { if (o) o->selected++; }
+static void let_go(Obj* o) {
+  if (o && --o->selected == 0 && o->deleted) delete o;
+}
+static void hold_state(DCState& s)   { hold(s.pen); hold(s.brush); hold(s.font); hold(s.bitmap); }
+static void let_go_state(DCState& s) { let_go(s.pen); let_go(s.brush); let_go(s.font); let_go(s.bitmap); }
+
+DC::~DC() {
+  let_go_state(s);
+  for (DCState& x : saved) let_go_state(x);
+}
 
 static Pen*     stock_pens[3];		// WHITE_PEN, BLACK_PEN, NULL_PEN
 static Brush*   stock_brushes[6];	// WHITE_BRUSH .. NULL_BRUSH
@@ -344,7 +359,7 @@ DC::DC(Type t, HANDLE w) : Obj(K_DC), type(t), hwnd(w), paint_clip_set(false), p
   s.brush = stock_brushes[0];
   s.font = stock_fonts[13 - 10];	// SYSTEM_FONT
   s.bitmap = t == MEMORY ? stock_bitmap : NULL;
-  if (s.bitmap) s.bitmap->selected++;
+  hold_state(s);
   s.text_color = 0x000000;
   s.bk_color = 0xFFFFFF;
   s.bk_mode = OPAQUE;
@@ -482,8 +497,6 @@ static word DeleteDC(word hdc) {
   GUILocker l;
   DC* dc = dc_of(hdc);
   if (dc == NULL || dc->stock || dc->type == DC::WINDOW || dc->type == DC::NONCLIENT) return dc != NULL;
-  if (dc->s.bitmap) dc->s.bitmap->selected--;
-  for (DCState& s : dc->saved) if (s.bitmap) s.bitmap->selected--;
   delete dc;
   return 1;
 }
@@ -493,7 +506,7 @@ static word SaveDC(word hdc) {
   DC* dc = dc_of(hdc);
   if (dc == NULL) return 0;
   dc->saved.push_back(dc->s);
-  if (dc->s.bitmap) dc->s.bitmap->selected++;
+  hold_state(dc->s);
   return (word) dc->saved.size();
 }
 
@@ -504,9 +517,9 @@ static word RestoreDC(word hdc, word level) {
   int n = (int) dc->saved.size();
   int target = (int32_t) level < 0 ? n + (int32_t) level : (int32_t) level - 1;	// index of the state to restore
   if (target < 0 || target >= n) return 0;
-  if (dc->s.bitmap) dc->s.bitmap->selected--;
+  let_go_state(dc->s);		// the restored state's hold moves from saved[target] to s
   dc->s = dc->saved[target];
-  for (int i = target + 1; i < n; i++) if (dc->saved[i].bitmap) dc->saved[i].bitmap->selected--;
+  for (int i = target + 1; i < n; i++) let_go_state(dc->saved[i]);
   dc->saved.resize(target);
   return 1;
 }
@@ -547,14 +560,15 @@ static word GetStockObject(word index) {
 static word DeleteObject(word h) {
   GUILocker l;
   Obj* o = lookup(h, K_ANY);
-  if (o == NULL) return 0;
+  if (o == NULL || o->deleted) return 0;
   if (o->stock) return 1;
   switch (o->kind) {
     case K_PEN: case K_BRUSH: case K_FONT: case K_PALETTE:
-      delete o;		// (Win32: selected objects must not be deleted; the image does not)
+      if (o->selected > 0) { o->deleted = true; return 1; }	// freed when deselected (lookup fails meanwhile)
+      delete o;
       return 1;
     case K_BITMAP:
-      if (((Bitmap*) o)->selected > 0) return 0;
+      if (o->selected > 0) return 0;
       delete o;
       return 1;
     default:
@@ -567,21 +581,22 @@ static word SelectObject(word hdc, word h) {
   DC* dc = dc_of(hdc);
   Obj* o = lookup(h, K_ANY);
   if (dc == NULL || o == NULL) return 0;
-  word old = 0;
+  Obj** slot;
   switch (o->kind) {
-    case K_PEN:   old = dc->s.pen->handle;   dc->s.pen = (Pen*) o;     break;
-    case K_BRUSH: old = dc->s.brush->handle; dc->s.brush = (Brush*) o; break;
-    case K_FONT:  old = dc->s.font->handle;  dc->s.font = (Font*) o;   break;
+    case K_PEN:   slot = (Obj**) &dc->s.pen;   break;
+    case K_BRUSH: slot = (Obj**) &dc->s.brush; break;
+    case K_FONT:  slot = (Obj**) &dc->s.font;  break;
     case K_BITMAP:
       if (dc->type != DC::MEMORY) return 0;
-      old = dc->s.bitmap->handle;
-      dc->s.bitmap->selected--;
-      dc->s.bitmap = (Bitmap*) o;
-      dc->s.bitmap->selected++;
+      slot = (Obj**) &dc->s.bitmap;
       break;
     default: return 0;
   }
-  // stale pointers would be dangerous: objects that were deleted while selected
+  Obj* previous = *slot;
+  word old = previous->handle;
+  hold(o);
+  *slot = o;
+  let_go(previous);		// frees it if it was deleted while selected
   return old;
 }
 

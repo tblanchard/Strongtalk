@@ -543,3 +543,15 @@ Phases:
         wait_for_event (cleanup handler unlocks), Thread and Event are not freed.
       - setHigh:low: / high kept 32 bits of 64-bit pointers; 512 KB thread stacks overflowed; global
         operator new aborted (system frameworks use it).
+      - The NLR state (have_nlr_through_C, nlr_result, nlr_home, nlr_home_id) is global but belonged
+        to whichever process ran: a process that suspended in the ensure: block of an abort left it to
+        the next one. Computing the Mandelbrot set while a computation ran (terminate + abort) let the
+        scheduler take over the abort and terminate itself (transfer to it later: NULL event,
+        SIGSEGV). Process::save_nlr_state/restore_nlr_state around every transfer (a GC root).
+      - GDI: DeleteObject of a pen/brush/font selected into a DC freed it (the Mandelbrot ensure: block
+        releases its pens): the DC kept a dangling pointer and the next SelectObject answered garbage
+        as the old pen ("Windows error" after compute, resize, compute). DC states now count their
+        objects (Obj::selected); deleting a selected object is deferred until it is deselected.
+      - Dump GUI State walked process stacks from another thread while Delta code ran (SIGSEGV): the
+        stacks are now written by the next process in TranslateMessage/DispatchMessageA (it holds
+        the VM; its own stack is walkable), with a note instead after 3 s.
