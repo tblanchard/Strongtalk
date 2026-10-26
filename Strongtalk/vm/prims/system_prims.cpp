@@ -284,6 +284,11 @@ PRIM_DECL_1(systemPrimitives::writeSnapshot, oop fileName) {
 
 PRIM_DECL_1(systemPrimitives::globalAssociationKey, oop receiver) {
   PROLOGUE_1("globalAssociationKey", receiver);
+  // The image's Method>>fileOutDebugInfo: calls this primitive instead of primitiveMethodDebugInfo:
+  // in the VM that saved the image the two were identical code (the first field), folded into one
+  // function by the linker, and the call was filed out under the first name of that function.
+  // (The same for Method>>fileOutSelectorOrMethod, see globalAssociationValue.)
+  if (receiver->is_method()) return methodOop(receiver)->fileout_debug_info();	// external bcis
   assert(receiver->is_association(), "receiver must be association");
   return associationOop(receiver)->key();
 }
@@ -299,6 +304,8 @@ PRIM_DECL_2(systemPrimitives::globalAssociationSetKey, oop receiver, oop key) {
 
 PRIM_DECL_1(systemPrimitives::globalAssociationValue, oop receiver) {
   PROLOGUE_1("globalAssociationValue", receiver);
+  // Method>>fileOutSelectorOrMethod (primitiveMethodOuterIfFail:, see globalAssociationKey)
+  if (receiver->is_method()) return methodOop(receiver)->selector_or_method();
   assert(receiver->is_association(), "receiver must be association");
   return associationOop(receiver)->value();
 }

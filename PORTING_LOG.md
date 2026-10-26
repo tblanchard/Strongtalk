@@ -555,3 +555,16 @@ Phases:
       - Dump GUI State walked process stacks from another thread while Delta code ran (SIGSEGV): the
         stacks are now written by the next process in TranslateMessage/DispatchMessageA (it holds
         the VM; its own stack is walkable), with a note instead after 3 s.
+- [x] Saving the image asserted in the debug VM (2026-10-26; "receiver must be association" in
+      globalAssociationKey). In the 2006 image, Method>>fileOutDebugInfo: calls
+      primitiveGlobalAssociationKey and Method>>fileOutSelectorOrMethod calls
+      primitiveGlobalAssociationValue: in the Windows VM those functions were identical to
+      primitiveMethodDebugInfo / primitiveMethodOuterIfFail: (field 1 / field 2), the linker folded
+      them, and the image was filed out under the first name. (A scan of all 301 distinct primitive
+      calls of the image against the sources found only these two.) The release VM did not check and
+      wrote the native-layout debug info instead of fileout_debug_info's external one: the image
+      saved 2026-10-23/24 had wrong temp-info bcis in 1641 methods (scopes such as 285..353 read
+      back as 402..402). Both primitives now answer the method's values for a method receiver. The
+      patched image was rebuilt from the 2006 save (resynced source DB + image_patches.st +
+      Dumper saveSystem): its debug info equals the 2006 image's except for the patched
+      SmallInteger>>digitsForAbs:; the debug VM saves it; vmtest, vmcompiled, results and GUI pass.
