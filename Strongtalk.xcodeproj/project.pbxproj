@@ -255,6 +255,18 @@
 					DELTA_COMPILER,
 				);
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Strongtalk/vm/**";
+				OTHER_LDFLAGS = (
+					"-framework",
+					AppKit,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					CoreText,
+					"-framework",
+					QuartzCore,
+					"-framework",
+					ImageIO,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -282,6 +294,18 @@
 					DELTA_COMPILER,
 				);
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Strongtalk/vm/**";
+				OTHER_LDFLAGS = (
+					"-framework",
+					AppKit,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					CoreText,
+					"-framework",
+					QuartzCore,
+					"-framework",
+					ImageIO,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
