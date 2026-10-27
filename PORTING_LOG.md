@@ -568,3 +568,4 @@ Phases:
       patched image was rebuilt from the 2006 save (resynced source DB + image_patches.st +
       Dumper saveSystem): its debug info equals the 2006 image's except for the patched
       SmallInteger>>digitsForAbs:; the debug VM saves it; vmtest, vmcompiled, results and GUI pass.
+      Installed in the image directory; the previous image and source DB are in image-backup-2026-10-26/.
