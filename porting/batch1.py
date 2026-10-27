@@ -1,5 +1,5 @@
 import re, os, collections
-os.chdir('/Users/todd/Projects/strongtalk-source-r36/Strongtalk/Strongtalk/vm')
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Strongtalk', 'vm'))
 
 def rd(p): return open(p, encoding='latin-1').read()
 def wr(p, s): open(p, 'w', encoding='latin-1').write(s)

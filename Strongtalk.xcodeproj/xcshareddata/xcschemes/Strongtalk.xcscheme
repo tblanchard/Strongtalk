@@ -32,7 +32,7 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      customWorkingDirectory = "$(PROJECT_DIR)"
+      customWorkingDirectory = "$(SRCROOT)"
       useCustomWorkingDirectory = "YES"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
@@ -63,7 +63,7 @@
       buildConfiguration = "Release"
       shouldUseLaunchSchemeArgsEnv = "YES"
       savedToolIdentifier = ""
-      customWorkingDirectory = "$(PROJECT_DIR)"
+      customWorkingDirectory = "$(SRCROOT)"
       useCustomWorkingDirectory = "YES"
       debugDocumentVersioning = "YES">
       <BuildableProductRunnable

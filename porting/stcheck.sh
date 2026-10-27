@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Usage: stcheck.sh [files...]  — syntax-check Strongtalk VM sources for arm64 macOS
-cd /Users/todd/Projects/strongtalk-source-r36/Strongtalk/Strongtalk/vm
+cd ${0:A:h}/../Strongtalk/vm
 INC=(); for d in */; do INC+=(-I$d); done
 files=("$@"); [[ ${#files} -eq 0 ]] && files=(*/*.cpp)
 mkdir -p /tmp/stlogs

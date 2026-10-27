@@ -3,7 +3,7 @@
 # Undefined symbols are listed in <dir>/undefined.txt, compile errors in <dir>/compile_errors.txt.
 # An object is rebuilt when its .cpp or any header is newer than it.
 # RELEASE=1: optimized build without assertions in /tmp/stobj_rel (develop flags stay settable).
-cd /Users/todd/Projects/strongtalk-source-r36/Strongtalk/Strongtalk/vm
+cd ${0:A:h}/../Strongtalk/vm
 INC=(); for d in */; do INC+=(-I$PWD/$d); done
 if [[ -n $RELEASE ]]; then OUT=/tmp/stobj_rel; CFLAGS=(-O2 -g); else OUT=/tmp/stobj; CFLAGS=(-g -O0 -DASSERT -DDEBUG); fi
 mkdir -p $OUT

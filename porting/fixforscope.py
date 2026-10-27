@@ -1,7 +1,8 @@
 import re, sys, collections
 # Hoist MSVC-style for-loop variables used after their loop.
 # Input: clang errors "file:line:col: error: use of undeclared identifier 'v'"
-base='/Users/todd/Projects/strongtalk-source-r36/Strongtalk/Strongtalk/vm/'
+import os
+base=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Strongtalk', 'vm', '')
 errs=collections.defaultdict(set)
 for line in open('/tmp/stlogs/uniq_errors.txt'):
     m=re.match(r"([^:]+):(\d+):\d+: error: use of undeclared identifier '(\w+)'(; did you mean '(\w+)'\?)?$", line.strip())

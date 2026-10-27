@@ -155,7 +155,7 @@ up to reading the image: `Could not open file (strongtalk.bst) for reading!`
       - `+TraceBootstrap` prints every object (stream position, type, size, index).
 - Next stop: the first Smalltalk send (`Delta::call` → `call_delta` stub) → phase B (interpreter).
 - `porting/stlink.sh` rewritten: rebuilds an object if its .cpp or any header is newer.
-- Run: `cd /Users/todd/Projects/strongtalk-source-r36 && /tmp/stobj/strongtalk` (image in cwd).
+- Run: `/tmp/stobj/strongtalk` from the repository root (image in cwd).
 
 ## B: portable interpreter design (interpreter/portableInterpreter.cpp)
 - Delta frames keep the original layout, on a per-thread "Delta stack" (separate from the C stack):
