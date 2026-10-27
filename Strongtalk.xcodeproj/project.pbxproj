@@ -235,6 +235,7 @@
 		5F2B8B3B3084148900560E2A /* Debug configuration for PBXNativeTarget "Strongtalk" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_STYLE = Automatic;
 				EXCLUDED_SOURCE_FILE_NAMES = (
 					main.cpp,
@@ -274,6 +275,7 @@
 		5F2B8B3C3084148900560E2A /* Release configuration for PBXNativeTarget "Strongtalk" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_STYLE = Automatic;
 				EXCLUDED_SOURCE_FILE_NAMES = (
 					main.cpp,
