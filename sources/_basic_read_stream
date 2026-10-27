@@ -1,0 +1,120 @@
+Class
+#categories!
+initialization!
+private!
+accessing! !
+#group!
+base! !
+initialize!
+2743967!
+initialization!
+0! !
+contents!
+2745413!
+accessing!
+0SeqCltn[E]! !
+#extensionsAreSubtypes!
+true! !
+actualPosition:!
+2744619!
+private!
+1Int:! !
+reset!
+2747467!
+accessing!
+0! !
+upTo:!
+2748462!
+accessing!
+0Object:SeqCltn[E]! !
+repositioningAt:!
+2747257!
+accessing!
+0Int:E! !
+actualPosition!
+2744472!
+private!
+1Int! !
+actualAtEnd!
+2744306!
+private!
+1Boolean! !
+#typeArgumentString!
+E ! !
+#branded!
+true! !
+at:!
+2744774!
+accessing!
+0Int:E! !
+initializeActualPosition!
+2744148!
+initialization!
+0! !
+contentsRemaining!
+2745819!
+accessing!
+0SeqCltn[E]! !
+setToEnd!
+2747602!
+accessing!
+0! !
+skip:!
+2747899!
+accessing!
+0Int:! !
+position:!
+2747086!
+accessing!
+0Int:! !
+#superclassTypeString!
+BasicInputStream[E]! !
+skipTo:!
+2748090!
+accessing!
+0Object:Boolean! !
+copyFrom:to:!
+2746140!
+accessing!
+4Int:Int:VarSeqCltn[EX]! !
+#supportedProtocolString!
+ReadStream[E]! !
+#revision!
+$Revision: 1.2 $! !
+collection!
+2745038!
+accessing!
+0SeqCltn[E]! !
+isEmpty!
+2746722!
+accessing!
+0Boolean! !
+#instanceVariableString!
+actualPosition <Int>
+		! !
+size!
+2747748!
+accessing!
+0Int! !
+#subtype!
+true! !
+#isGeneric!
+true! !
+#comment!
+This class provides the standard implementation of the ReadStream protocol. 
+
+Subclass responsibilities:
+    %responsibility actualPosition:
+        Should be extended in subclasses to change any external position cursor, if necessary.
+    %responsibility actualNext
+        Subclasses must ensure that their implementation of next and nextFromPeek increments the position.
+
+(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license.   $Revision: 1.2 $
+! !
+#abstract!
+true! !
+position!
+2746867!
+accessing!
+0Int! !

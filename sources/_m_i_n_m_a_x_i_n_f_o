@@ -1,0 +1,57 @@
+Class
+ptMaxTrackSizeOffset!
+2966356!
+offsets!
+0Int! !
+#categories!
+accessing!
+offsets! !
+#superclassTypeString!
+Win32Structure! !
+#group!
+base! !
+#extensionsAreSubtypes!
+true! !
+#revision!
+$Revision: 1.2 $! !
+ptMaxTrackSize!
+2965583!
+accessing!
+0POINT! !
+ptMaxSize!
+2965401!
+accessing!
+0POINT! !
+ptMaxSizeOffset!
+2966227!
+offsets!
+0Int! !
+ptReservedOffset!
+2966626!
+offsets!
+0Int! !
+#subtype!
+true! !
+ptMinTrackSizeOffset!
+2966491!
+offsets!
+0Int! !
+ptMinTrackSize!
+2965774!
+accessing!
+0POINT! !
+#branded!
+true! !
+#comment!
+(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license.! !
+#abstract!
+false! !
+ptMaxPositionOffset!
+2966093!
+offsets!
+0Int! !
+structureSize!
+2965965!
+accessing!
+0Int! !

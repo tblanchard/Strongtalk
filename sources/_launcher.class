@@ -1,0 +1,42 @@
+Class
+#categories!
+registering menus!
+private!
+control!
+accessing! !
+launchers!
+7911093!
+accessing!
+0IdentitySet[Launcher]! !
+registerLauncher:!
+2069084!
+private!
+1Launcher:! !
+registerMenu:for:!
+2067104!
+registering menus!
+0Menu:Object:! !
+menuRegistry!
+2068115!
+private!
+1OrdCltn[LookupKey[Object,Menu]]! !
+rebuildMenus!
+2068745!
+private!
+1! !
+mergedMenu!
+2068424!
+private!
+1Menu! !
+startProgEnv!
+6462586!
+control!
+0Instance! !
+unregisterMenuFor:!
+2067523!
+registering menus!
+0Object:! !
+createUITranscript!
+2069274!
+control!
+0! !

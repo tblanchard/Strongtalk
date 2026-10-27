@@ -1,0 +1,127 @@
+Class
+sourceDirectoryEnvVar!
+2710888!
+Unclassified!
+0Str! !
+addSectionToChangeLog:!
+2701417!
+Unclassified!
+0[WriteStream,^Int]:Int! !
+restoreBackup!
+2708207!
+Unclassified!
+0! !
+for:!
+2706081!
+Unclassified!
+0Mirror:Instance! !
+checkSystemConsistency!
+6472483!
+Unclassified!
+0Tuple[Boolean,Boolean]! !
+printRestoreWarning!
+6439779!
+Unclassified!
+0! !
+restoreFile!
+2709407!
+Unclassified!
+0FilePath! !
+test!
+2712943!
+Unclassified!
+0! !
+identificationFileName!
+2706751!
+Unclassified!
+0Str! !
+changeLogFile!
+5845178!
+Unclassified!
+0FilePath! !
+printImageChangeWarningFrom:to:!
+2706927!
+Unclassified!
+0Str:Str:! !
+#categories!
+Unclassified! !
+updateSaveLogFile!
+5846574!
+Unclassified!
+0! !
+restoreFileName!
+2709714!
+Unclassified!
+0Str! !
+identificationFile!
+2706423!
+Unclassified!
+0FilePath! !
+errorStreams!
+2705466!
+Unclassified!
+0Cltn[CharOutputStream]! !
+dualHandlerFor:!
+2705211!
+Unclassified!
+0Instance:Instance! !
+checkSystemConsistencyAndPrintMessagesIfNeeded!
+6475688!
+Unclassified!
+0! !
+sourceDirectory!
+2709885!
+Unclassified!
+0FilePath! !
+unsavedChangesHaveBeenMade!
+5873863!
+Unclassified!
+0Boolean! !
+systemIsConsistent!
+6460654!
+Unclassified!
+0Boolean! !
+systemBeingSaved!
+5847685!
+Unclassified!
+0! !
+initialChangeLogSize!
+5845694!
+Unclassified!
+0Int! !
+currentChangeLogSize!
+5873693!
+Unclassified!
+0Int! !
+activeHandlers!
+2700935!
+Unclassified!
+0IdentityDictionary! !
+changeLog!
+5845862!
+Unclassified!
+0CharWriteStream! !
+printRestoreOption!
+6440365!
+Unclassified!
+0! !
+saveLogFile!
+5845491!
+Unclassified!
+0FilePath! !
+rawChangeLog!
+5846349!
+Unclassified!
+0ExternalReadWriteStream! !
+flush!
+2705785!
+Unclassified!
+0! !
+currentUnsavedChanges!
+5874151!
+Unclassified!
+0CharInputStream! !
+changeLogFileName!
+2702278!
+Unclassified!
+0Str! !

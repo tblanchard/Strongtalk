@@ -1,0 +1,212 @@
+Class
+benchmarkMenu!
+402721!
+new menus!
+0Menu! !
+testContext!
+397221!
+test code!
+0! !
+#categories!
+private!
+utilities!
+test code!
+typechecker tests!
+dave's benchmarks!
+library testing!
+new menus!
+startup! !
+dictAtPutBenchmark!
+399139!
+dave's benchmarks!
+0! !
+typeSystemMenu!
+7872474!
+new menus!
+0Menu! !
+ocBenchmark!
+411468!
+startup!
+0! !
+testMenu!
+408355!
+new menus!
+0Menu! !
+#abstract!
+false! !
+#group!
+base! !
+arrayBenchmark!
+409507!
+startup!
+0! !
+uiMenu!
+7876808!
+new menus!
+0Menu! !
+newListBox!
+392676!
+private!
+1! !
+livermoreFloatValueInner:y:z:!
+411026!
+startup!
+0:::! !
+#extensionsAreSubtypes!
+true! !
+cpuBenchmark!
+392476!
+private!
+1! !
+hashingBenchmarks!
+399952!
+dave's benchmarks!
+0! !
+typecheckMirror:!
+398551!
+typechecker tests!
+0Mirror:! !
+testLibrary!
+402385!
+library testing!
+0! !
+indexTest!
+396365!
+test code!
+0! !
+testNLR!
+397549!
+test code!
+0! !
+gcMenu!
+7874878!
+new menus!
+0Menu! !
+livermoreFloatValueBenchmark!
+410458!
+startup!
+0! !
+test:title:!
+411791!
+startup!
+0::! !
+newWidget!
+393546!
+private!
+1! !
+livermoreBenchmark!
+409809!
+startup!
+0! !
+printObjectHistogram!
+395326!
+utilities!
+0! !
+typecheckMinWorld!
+398424!
+typechecker tests!
+0! !
+streamWrite!
+394457!
+private!
+1! !
+#branded!
+true! !
+testNLRBlock!
+397708!
+test code!
+0! !
+doubleOverflowCheck!
+396112!
+test code!
+0! !
+testBlueBookClasses!
+401346!
+library testing!
+0! !
+compilationMenu!
+7875541!
+new menus!
+0Menu! !
+dictBenchmark!
+399560!
+dave's benchmarks!
+0! !
+#superclassTypeString!
+Object! !
+#revision!
+$Revision: 1.29 $! !
+clearLookupCache!
+395025!
+utilities!
+0! !
+tryNewMixin!
+398303!
+typechecker tests!
+0! !
+streamRead2!
+394031!
+private!
+1! !
+developmentMenu!
+7877912!
+new menus!
+0Menu! !
+profilingMenu!
+7873552!
+new menus!
+0Menu! !
+displayErrorsFromHandler:!
+397841!
+typechecker tests!
+0DeltaTypeErrorHandler:! !
+setIncludeBenchmark!
+400168!
+dave's benchmarks!
+0! !
+#subtype!
+true! !
+setupInlining!
+395484!
+utilities!
+0! !
+dictAtBenchmark!
+398731!
+dave's benchmarks!
+0! !
+#comment!
+(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license.
+! !
+setIncludesBenchmark!
+400511!
+dave's benchmarks!
+0! !
+decodeAllMethods!
+395175!
+utilities!
+0! !
+testBlueBookCPUBoundClasses!
+400855!
+library testing!
+0! !
+streamRead!
+393676!
+private!
+1! !
+tryNewClass!
+398182!
+typechecker tests!
+0! !
+streamWrite2!
+394725!
+private!
+1! !
+registerTmpMenus!
+408170!
+new menus!
+0! !
+testContext:and:and:!
+397370!
+test code!
+0:::! !

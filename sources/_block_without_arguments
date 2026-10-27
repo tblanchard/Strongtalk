@@ -1,0 +1,95 @@
+Class
+#categories!
+evaluating! !
+#superclassTypeString!
+Block! !
+#group!
+base! !
+profile!
+4672869!
+evaluating!
+0! !
+critical!
+4670766!
+evaluating!
+0R! !
+#extensionsAreSubtypes!
+true! !
+#revision!
+$Revision: 1.4 $! !
+verify!
+4673866!
+evaluating!
+0! !
+#isGeneric!
+true! !
+whileFalse:!
+4675003!
+evaluating!
+0[]:Object! !
+value!
+4673540!
+evaluating!
+0R! !
+whileTrue!
+4675478!
+evaluating!
+0Object! !
+time!
+4673212!
+evaluating!
+0Int! !
+fork!
+4672068!
+evaluating!
+0Process! !
+ensure:!
+4671769!
+evaluating!
+0[]:R! !
+whileFalse!
+4674843!
+evaluating!
+0Object! !
+#typeArgumentString!
+(R covar) ! !
+#subtype!
+true! !
+forkAt:!
+4672241!
+evaluating!
+0Int:Process! !
+ifCurtailed:!
+4672437!
+evaluating!
+0[]:R! !
+whileTrue:!
+4675636!
+evaluating!
+0[]:Object! !
+#branded!
+true! !
+#comment!
+(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license.   $Revision: 1.4 $
+! !
+#abstract!
+false! !
+userTime!
+4673372!
+evaluating!
+0Int! !
+#supportedProtocolString!
+[^R]! !
+repeat!
+4673013!
+evaluating!
+0BottomType! !
+valueIfFail:!
+4673697!
+evaluating!
+2[^X def]:R|X! !
+newProcess!
+4672710!
+evaluating!
+0Process! !

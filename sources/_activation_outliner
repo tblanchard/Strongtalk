@@ -1,0 +1,48 @@
+Class
+#categories!
+accessing!
+private!
+private-initialization! !
+initialPacifiedState!
+4906778!
+private!
+1Boolean! !
+currentByteCodeSeparatorCharacter!
+4906592!
+private!
+1Character! !
+#extensionsAreSubtypes!
+true! !
+#superclassTypeString!
+CommonProgEnvOutliner! !
+#group!
+Unclassified! !
+#subtype!
+true! !
+#branded!
+true! !
+#comment!
+(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license.! !
+#revision!
+$Revision: 1.1 $! !
+#instanceVariableString!
+activation <Activation>! !
+activation!
+4903357!
+accessing!
+0Activation! !
+buildClosedHeader!
+4904537!
+private!
+1Visual! !
+initActivation:!
+4906971!
+private-initialization!
+1Activation:! !
+#abstract!
+false! !
+buildBody!
+4903507!
+private!
+1Visual! !
