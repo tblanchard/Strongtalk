@@ -4,3 +4,11 @@ xcuserdata/
 .DS_Store
 # compiler temporaries
 *.o.tmp
+# files the running VM/image writes next to the image
+/strongtalk.log
+/strongtalk.log.old
+/*.bst.bak
+/deltatest.tmp
+/source/*.bak
+/source/*.new
+Thumbs.db

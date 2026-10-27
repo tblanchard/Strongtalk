@@ -1,0 +1,489 @@
+Class
+palette:!
+3948037!
+methods copied from Window!
+0Palette:! !
+localDisplayOn:!
+3936726!
+displaying!
+0Canvas:! !
+win32Style!
+3930419!
+private!
+1ExternalData! !
+recursiveRealizePaletteForeground:updateColors:!
+3949267!
+methods copied from Window!
+0Boolean:Boolean:! !
+originalWndProc!
+3928460!
+private!
+1HWND! !
+display!
+3955885!
+methods copied from Windows with mods!
+0! !
+character:focus:event:!
+3942810!
+event handling!
+0Character:Visual:UIEvent:Boolean! !
+noPalette!
+3947137!
+methods copied from Window!
+0! !
+withDCDo:!
+3954094!
+methods copied from Window!
+0[HDC]:! !
+#extensionsAreSubtypes!
+true! !
+hInstance!
+3931769!
+restricted-win32!
+0ExternalProxy! !
+isRectangularAndOpaque!
+3941387!
+private-testing!
+1Boolean! !
+paintPending:!
+3947715!
+methods copied from Window!
+0Boolean:! !
+detaching!
+3920863!
+notification!
+0! !
+sendMessage:wparam:lparam:!
+3935905!
+restricted-win32!
+0ExternalData:ExternalData:ExternalData:ExternalProxy! !
+nextPaintTime:!
+3946968!
+methods copied from Window!
+0Float:! !
+useDisplayBuffering:!
+3952435!
+methods copied from Window!
+0Boolean:! !
+refreshInterval:!
+3950250!
+methods copied from Window!
+0Float:! !
+keyDown:focus:event:!
+3943040!
+event handling!
+0Symbol:Visual:UIEvent:Boolean! !
+enabled:!
+3938479!
+accessing!
+0Boolean:! !
+invalidate:!
+3927468!
+private!
+1Region:! !
+cursor!
+3944782!
+methods copied from Window!
+0Cursor! !
+visible:!
+3940816!
+control!
+0Boolean:! !
+allocation:at:!
+3936902!
+geometry-local!
+0Region:Point:! !
+changing!
+3939626!
+control!
+0! !
+enabled!
+3938343!
+accessing!
+0Boolean! !
+moveBy:!
+3943920!
+geometry-nonlocal!
+0Point:! !
+withBufferedCanvasDo:!
+3952618!
+methods copied from Window!
+2[Canvas,^X def]:X! !
+nativeWindow!
+3938897!
+accessing!
+0Window|Win32Control! !
+unregisterControl:!
+3952068!
+methods copied from Window!
+0Win32Control:! !
+beforeSetFocus!
+3941813!
+private-message handling!
+1! !
+destroyWin32Handle!
+3925696!
+private!
+1! !
+redraw!
+3939049!
+accessing!
+0Boolean! !
+#revision!
+$Revision: 1.6 $! !
+blinkFocus:!
+3956365!
+restricted-to session!
+0Boolean:! !
+isFocusCandidate!
+3941162!
+private-testing!
+1Boolean! !
+originalWndProc:!
+3928607!
+private!
+1HWND:! !
+#classVariableString!
+Controls <VarDict[Int, Win32Control]>
+CustomWndProc <APICallback>
+MaxControlId <Int>
+			"We assign numbers to controls sequentially (%bug breaks after 1 billion created)"
+	! !
+beforeKillFocus!
+3941550!
+private-message handling!
+1! !
+nativePosition!
+3928155!
+private!
+1Point! !
+backgroundPainter!
+3938120!
+accessing!
+0Painter! !
+isFocus!
+3942669!
+testing!
+0Boolean! !
+commandWith:!
+3931359!
+restricted-win32!
+0ExternalData:ExternalData! !
+wndProc!
+3930761!
+private!
+1ExternalProxy! !
+callOrigWndProcFor:withLParam:!
+3922731!
+private!
+1MSG:ExternalData:ExternalData! !
+registerPaintTime!
+3950705!
+methods copied from Window!
+0! !
+extendedWin32Style!
+3926741!
+private!
+1ExternalData! !
+refreshInterval!
+3950083!
+methods copied from Window!
+0Float! !
+checkForNativePositionChanging!
+3923568!
+private!
+1Boolean! !
+displayUpwardPopUpMenuAt:!
+3926251!
+private!
+1Point:Boolean! !
+#comment!
+A Visual that has a corresponding native Win32 window.
+
+%optional #commandWith: - should override to process any WM_COMMAND messages needed
+
+(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license.   $Revision: 1.5 $
+! !
+showTimes!
+3951847!
+methods copied from Window!
+0Boolean! !
+checkPaintTime:!
+3944222!
+methods copied from Window!
+0Float:! !
+release!
+3940625!
+control!
+0! !
+nextPaintTime!
+3946805!
+methods copied from Window!
+0Float! !
+notificationMsg:!
+3935361!
+restricted-win32!
+0ExternalData:! !
+cursor:!
+3944932!
+methods copied from Window!
+0Cursor:! !
+useDisplayBuffering!
+3952258!
+methods copied from Window!
+0Boolean! !
+wndProc:!
+3930928!
+private!
+1ExternalProxy:! !
+createVisible!
+3924992!
+private!
+1Boolean! !
+hasWin32Handle!
+3927316!
+private!
+1Boolean! !
+keyUp:focus:event:!
+3943267!
+event handling!
+0Symbol:Visual:UIEvent:Boolean! !
+#group!
+ui! !
+setWindowText:!
+3929590!
+private!
+1Str:! !
+mouseEvent:at:event:!
+3943492!
+event handling!
+0Symbol:Point:UIEvent:Boolean! !
+localFromGlobalPosition:!
+3946327!
+methods copied from Window!
+0Point:Point! !
+setFocus!
+3936235!
+restricted-win32!
+0! !
+paintOccuring!
+3947287!
+methods copied from Window!
+0! !
+setCursor!
+3951042!
+methods copied from Window!
+0ExternalData! !
+#categories!
+notification!
+private!
+restricted-win32!
+displaying!
+geometry-local!
+accessing!
+initialization!
+control!
+private-testing!
+private-message handling!
+testing!
+event handling!
+geometry-nonlocal!
+methods copied from Window!
+methods copied from Windows with mods!
+debugging!
+restricted-to session! !
+createNativeWindow!
+3924283!
+private!
+1! !
+canBeFocusCandidate!
+3923300!
+private!
+1Boolean! !
+cleanUp!
+3923899!
+private!
+1! !
+contextMenuMsg:hwnd:wParam:lParam:!
+3942342!
+private-message handling!
+1ExternalData:HWND:ExternalData:ExternalData:Boolean! !
+printAllocOn:!
+3956059!
+debugging!
+0CharOutputStream:! !
+ignoreNextFocusSet:!
+3940457!
+control!
+0Boolean:! !
+initialize!
+3939188!
+initialization!
+0! !
+paintPending!
+3947552!
+methods copied from Window!
+0Boolean! !
+palette!
+3947884!
+methods copied from Window!
+0Palette! !
+measureItemMsg:!
+3931947!
+restricted-win32!
+0MEASUREITEMSTRUCT:ExternalData! !
+withDirectCanvasDo:!
+3954448!
+methods copied from Window!
+2[Canvas,^X def]:X! !
+handleMouseEvent:at:!
+3945679!
+methods copied from Window!
+0Symbol:Point:Boolean! !
+callOrigWndProc:wParam:lParam:!
+3921655!
+private!
+1ExternalData:ExternalData:ExternalData:ExternalData! !
+setCursorMsg:hwnd:wParam:lParam:!
+3951312!
+methods copied from Window!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+updateWindowDimensions!
+3929864!
+private!
+1! !
+controlId!
+3924149!
+private!
+1Int! !
+controls!
+3944610!
+methods copied from Window!
+0Extensible[Win32Control]! !
+drawItemMsg:!
+3931582!
+restricted-win32!
+0DRAWITEMSTRUCT:ExternalData! !
+callOrigWndProcFor:!
+3922267!
+private!
+1MSG:ExternalData! !
+queryPaletteMsg:hwnd:wParam:lParam:!
+3948806!
+methods copied from Window!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+redraw:!
+3928760!
+private!
+1Boolean:! !
+handleMouseEvent:message:wParam:lParam:!
+3926910!
+private!
+1Symbol:ExternalData:ExternalData:ExternalData:! !
+win32Handle!
+3936523!
+restricted-win32!
+0HWND! !
+#branded!
+true! !
+#superclassTypeString!
+InstanceCritical |> (ClassCritical |> Visual)! !
+registerControl:!
+3950521!
+methods copied from Window!
+0Win32Control:! !
+deferringRedrawDo:!
+3939846!
+control!
+0[^Object]:! !
+withCanvasDo:!
+3953764!
+methods copied from Window!
+2[Canvas,^X def]:X! !
+buttonColorMsg:!
+3931114!
+restricted-win32!
+0ExternalProxy:ExternalData! !
+globalFromLocalPosition:!
+3945252!
+methods copied from Window!
+0Point:Point! !
+#instanceVariableString!
+win32Handle <HWND>
+controlId <Int>
+originalWndProc <HWND>
+			"The windows procedure that we overrode using so-called Windows subclassing"
+enabled <Boolean>
+			"Indicates whether the control is enabled/disabled"
+redraw <Boolean>
+			"If false, then redrawing is disabled"
+backgroundPainter <Painter>
+isFocus <Boolean>
+ignoreNextFocusSet <Boolean>
+			"if this is true, the we have asked to acquire or release the win32 focus,
+				in which case the set/killFocus message is ignored, since
+				any processing has already been done.  This must be
+				done since if something we contain is getting the
+				input focus, we set the containing native window
+				to be the focus even though it is not the actual
+				visual that has the focus."
+
+refreshInterval <Float>
+			"Time in seconds for the maximum time between refreshes."
+nextPaintTime <Float>
+			"If not nil, then if any paint is needed, it should occur
+				no later than this time"
+paintPending <Boolean>
+useDisplayBuffering <Boolean>
+			"If true, use double buffering for flicker free display"
+nativePosition <Point>
+			"Position of native window in containing native window"
+controls <Extensible[Win32Control]>
+palette <Palette>
+cursor <Cursor>
+		! !
+paletteChangedMsg:hwnd:wParam:lParam:!
+3948267!
+methods copied from Window!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+buildWin32Handle!
+3921504!
+private!
+1! !
+nativePositionChanged!
+3921184!
+notification!
+0! !
+setEnabled:!
+3929279!
+private!
+1Boolean:! !
+fullyEnabled!
+3938670!
+accessing!
+0Boolean! !
+#subtype!
+true! !
+customWndProc!
+3925129!
+private!
+1APICallback! !
+message:for:wParam:lParam:!
+3932140!
+restricted-win32!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+defaultRefreshInterval!
+3945089!
+methods copied from Window!
+0Float! !
+#abstract!
+false! !
+debugTest:for:!
+3925296!
+private!
+1ExternalData:ExternalData:! !
+isFocus:!
+3921016!
+notification!
+0Boolean:! !

@@ -5,8 +5,9 @@
 VM=${1:-/tmp/stobj/strongtalk}
 WARM=${2:-sieve}
 LIMIT=${LIMIT:-1000}
-cd /Users/todd/Projects/strongtalk-source-r36
-export STRONGTALK_EVAL_FILE=/Users/todd/Projects/strongtalk-source-r36/Strongtalk/porting/results.st
+here=${0:A:h}
+cd $here/..
+export STRONGTALK_EVAL_FILE=$here/results.st
 filter() { grep -o 'RESULT .*' }
 perl -e 'alarm 600; exec @ARGV' $VM -UseRecompilation $WARM 2>&1 | filter > /tmp/results_interpreted.txt
 perl -e 'alarm 600; exec @ARGV' $VM +UseRecompilation +UseArm64Compiler InvocationCounterLimit=$LIMIT $WARM 2>&1 | filter > /tmp/results_compiled.txt

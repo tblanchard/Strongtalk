@@ -1,0 +1,12 @@
+#---------------- general
+-UseRecompilation
+#---------------- inlining db
+-UseInliningDatabase
+-UseInliningDatabaseEagerly
+#---------------- debugging
+-PrintCompilation
+#---------------- memory area sizes
+OldSize=1000
+CodeSize=6000
+#---------------- compilation heuristics
+InvocationCounterLimit=10000

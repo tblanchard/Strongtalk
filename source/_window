@@ -1,0 +1,843 @@
+Class
+palette:!
+2412178!
+accessing!
+0Palette:! !
+paintMsg:hwnd:wParam:lParam:!
+2461201!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+win32Style!
+2438935!
+private!
+1ExternalData! !
+recursiveRealizePaletteForeground:updateColors:!
+2445825!
+restricted-win32!
+0Boolean:Boolean:! !
+unregisterControl:!
+2447721!
+restricted-win32!
+0Win32Control:! !
+character:focus:event:!
+2454711!
+event handling!
+0Character:Visual:UIEvent:Boolean! !
+toClose!
+2413478!
+accessing!
+0[Window]! !
+sizeMsg:hwnd:wParam:lParam:!
+2467720!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+hInstance!
+2444526!
+restricted-win32!
+0ExternalProxy! !
+containerBackgroundPainter!
+2450669!
+VisualParent impl!
+0Painter! !
+hasMenu!
+2423957!
+private!
+1Boolean! !
+measureItemMsg:hwnd:wParam:lParam:!
+2465384!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+paintPending:!
+2472145!
+private-testing!
+1Boolean:! !
+sendMessage:wparam:lparam:!
+2446964!
+restricted-win32!
+0ExternalData:ExternalData:ExternalData:ExternalData! !
+menu:!
+2410645!
+accessing!
+0Menu:! !
+keyDown:focus:event:!
+2455018!
+event handling!
+0Symbol:Visual:UIEvent:Boolean! !
+enabled:!
+2409395!
+accessing!
+0Boolean:! !
+drawItemMsg:hwnd:wParam:lParam:!
+2463066!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+cursor!
+2408858!
+accessing!
+0Cursor! !
+name:!
+2411171!
+accessing!
+0Str:! !
+handleTabEvent:!
+2423582!
+private!
+1UIEvent:! !
+fitToMedium:!
+2422139!
+private!
+1Point:Point! !
+withBufferedCanvasDo:!
+2441224!
+private!
+3[Canvas,^X def]:X! !
+nativeWindow!
+2452531!
+VisualParent impl!
+0Window|Win32Control! !
+nCmdShow!
+2433767!
+private!
+1ExternalProxy! !
+dumpOn:!
+2472291!
+debugging!
+0CharOutputStream:! !
+computePreferences!
+2417132!
+private!
+1! !
+beforeSetFocus!
+2415422!
+private!
+1! !
+initSession:visual:!
+2414191!
+initialization!
+0Session:Visual:! !
+setExtent:!
+2437259!
+private!
+1Point:! !
+captureChangedMsg:hwnd:wParam:lParam:!
+2462430!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+defaultRefreshInterval!
+2417608!
+private!
+1Float! !
+paintBackgroundOn:!
+2434205!
+private!
+1Canvas:! !
+oldcheckLayout:!
+2470193!
+restricted-to session!
+0SeqCltn[Region]:! !
+backgroundPainter!
+2408291!
+accessing!
+0Painter! !
+initialInputFocus!
+2431664!
+private!
+1Visual! !
+extent:!
+2420068!
+private!
+1Point:! !
+layout:!
+2431812!
+private!
+1Point:! !
+translateRect:fromChild:!
+2454212!
+VisualParent impl!
+0Rect:Visual:Rect! !
+optimizeIncrementalLayout:!
+2411783!
+accessing!
+0Boolean:! !
+checkLayout:!
+2468612!
+restricted-to session!
+0SeqCltn[Region]:! !
+endPaint:paintStructure:!
+2419859!
+private!
+1HWND:PAINTSTRUCT:! !
+cursor:!
+2408984!
+accessing!
+0Cursor:! !
+recordDeferredPaint:!
+2435413!
+private!
+1Rect:! !
+withCanvasDo:!
+2442335!
+private!
+3[Canvas,^X def]:X! !
+checkPaintTime:!
+2469665!
+restricted-to session!
+0Float:! !
+release!
+7988595!
+control!
+0! !
+backgroundPainter:!
+2408703!
+accessing!
+0Painter:! !
+eraseBackgroundMsg:hwnd:wParam:lParam:!
+2463419!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+addNonLocalCount:!
+2450527!
+VisualParent impl!
+0Int:! !
+buttonColorMsg:hwnd:wParam:lParam:!
+2462068!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+closeMsg:hwnd:wParam:lParam:!
+2456827!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+menuCommandForItem:!
+2433216!
+private!
+1Int:! !
+keyUp:focus:event:!
+2455465!
+event handling!
+0Symbol:Visual:UIEvent:Boolean! !
+natural!
+2411359!
+accessing!
+0Rect! !
+mouseEvent:at:event:!
+2455694!
+event handling!
+0Symbol:Point:UIEvent:Boolean! !
+setCapture!
+2447287!
+restricted-win32!
+0! !
+win32Handle:!
+2438796!
+private!
+1HWND:! !
+localFromGlobalPosition:!
+2432814!
+private!
+1Point:Point! !
+refreshInterval:!
+2412851!
+accessing!
+0Float:! !
+deferredPaintRegion:!
+2418060!
+private!
+1Rect:! !
+destroyMsg:hwnd:wParam:lParam:!
+2462799!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+getMinMaxInfoMsg:hwnd:wParam:lParam:!
+2464087!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+setCursor!
+2436714!
+private!
+1ExternalData! !
+#categories!
+accessing!
+initialization!
+private!
+restricted-win32!
+control!
+VisualParent impl!
+event handling!
+restricted-win32 queued message handling!
+restricted-win32 unqueued message handling!
+restricted-to session!
+private-testing!
+debugging!
+testing! !
+callAsyncDefWndProcFor:msgCode:wParam:lParam:!
+2416329!
+private!
+1HWND:ExternalData:ExternalData:ExternalData:ExternalData! !
+displayNowIfInvalid!
+2451176!
+VisualParent impl!
+0! !
+prefs!
+2471010!
+restricted-to session!
+0SeqCltn[Region]! !
+ignoreNextFocusSet:!
+2448456!
+control!
+0Boolean:! !
+setName:!
+2437392!
+private!
+1Str:! !
+desiredPosition:!
+2409117!
+accessing!
+0Point:! !
+withDirectCanvasDo:!
+2442971!
+private!
+3[Canvas,^X def]:X! !
+parentVisualOfChild!
+2452685!
+VisualParent impl!
+0Visual! !
+mostRecentInputFocus:!
+2411010!
+accessing!
+0Visual:! !
+positionInContainingNativeWindowOf:!
+2453009!
+VisualParent impl!
+0Visual:Point! !
+positionInTopWindowOf:!
+2453195!
+VisualParent impl!
+0Visual:! !
+setCursorMsg:hwnd:wParam:lParam:!
+2461480!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+haveErased:!
+2424386!
+private!
+1Boolean:! !
+controls!
+2417461!
+private!
+1Extensible[Win32Control]! !
+windowSizeForClientAreaSize:windowStyle:!
+2439490!
+private!
+1Point:ExternalData:Point! !
+nextPaintTime:!
+2434061!
+private!
+1Float:! !
+queryPaletteMsg:hwnd:wParam:lParam:!
+2466756!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+invalidate:forChild:!
+2452171!
+VisualParent impl!
+0Region:Visual:! !
+invalidate:!
+2448834!
+control!
+0Region:! !
+keyUpMsg:hwnd:wParam:lParam:!
+2460378!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+win32Handle!
+2447895!
+restricted-win32!
+0HWND! !
+parent:!
+2412510!
+accessing!
+0Window:! !
+characterMsg:hwnd:wParam:lParam:!
+2456457!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+handleMiscMsg:hwnd:wParam:lParam:!
+2457884!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+handleMouseEvent:at:msg:hwnd:wParam:lParam:!
+2458657!
+restricted-win32 queued message handling!
+0Symbol:Point:ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+scrollIfNeededToMakeVisible:relativeTo:minimizeMotion:!
+2453359!
+VisualParent impl!
+0Rect:Visual:Boolean:! !
+globalFromLocalPosition:!
+2423180!
+private!
+1Point:Point! !
+paletteChangedMsg:hwnd:wParam:lParam:!
+2466208!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+recordExtent!
+2435694!
+private!
+1! !
+layoutMsg:hwnd:wParam:lParam:!
+2460744!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+scrollMeOrAParentBy:vertical:!
+5868219!
+VisualParent impl!
+0Int:Boolean:! !
+requestClose!
+2449941!
+control!
+0! !
+setEnabled:!
+2436959!
+private!
+1Boolean:! !
+desiredXPos!
+2418215!
+private!
+1ExternalData! !
+keyDownMsg:hwnd:wParam:lParam:!
+2460010!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+translate:toChild:!
+2453966!
+VisualParent impl!
+0Point:Visual:Point! !
+#subtype!
+true! !
+translate:fromChild:!
+2453715!
+VisualParent impl!
+0Point:Visual:Point! !
+toClose:!
+2413608!
+accessing!
+0[Window]:! !
+visual!
+2414060!
+accessing!
+0Visual! !
+findInputFocus!
+2420602!
+private!
+1! !
+parentHandle!
+2434721!
+private!
+1ExternalData! !
+ncDestroyMsg:hwnd:wParam:lParam:!
+2465923!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+relayoutIfNeeded!
+2436163!
+private!
+1! !
+displayVisualIfCanOn:!
+2419548!
+private!
+1Canvas:! !
+windowSizeForClientAreaSize:!
+2439172!
+private!
+1Point:Point! !
+beginPaint:paintStructure:!
+2415865!
+private!
+1HWND:PAINTSTRUCT:HDC! !
+registerPaintTime!
+2435851!
+private!
+1! !
+windowsMessageHandlers!
+2440525!
+private!
+1Dict[ExternalData,[Window,ExternalData,HWND,ExternalData,ExternalData,^ExternalData]]! !
+displayPopUpMenu:at:forButton:!
+2451365!
+VisualParent impl!
+0Menu:Point:Symbol:! !
+processDeferredPainting!
+2471513!
+restricted-to session!
+0! !
+menu!
+2410525!
+accessing!
+0Menu! !
+display!
+2418677!
+private!
+1! !
+noPalette!
+2411485!
+accessing!
+0! !
+withDCDo:!
+2442641!
+private!
+1[HDC]:! !
+#extensionsAreSubtypes!
+true! !
+killFocusMsg:hwnd:wParam:lParam:!
+2464767!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+hasParent!
+2409704!
+accessing!
+0Boolean! !
+invalidate!
+2448618!
+control!
+0! !
+#group!
+ui! !
+useDisplayBuffering:!
+2413901!
+accessing!
+0Boolean:! !
+setFocus!
+2447469!
+restricted-win32!
+0! !
+containsFocus:!
+2450844!
+VisualParent impl!
+0Boolean:! !
+setFocusMsg:hwnd:wParam:lParam:!
+2467227!
+restricted-win32 unqueued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+purgeMostRecentFocusIfNeeded!
+2434925!
+private!
+1! !
+releaseCapture!
+2446793!
+restricted-win32!
+0! !
+#branded!
+true! !
+show!
+2450080!
+control!
+0! !
+topWindow!
+2453579!
+VisualParent impl!
+0Window! !
+changing!
+2468391!
+restricted-to session!
+0! !
+#supportedProtocolString!
+VisualParent; RelayoutTarget! !
+enabled!
+2409266!
+accessing!
+0Boolean! !
+shouldCallDefaultHandlerAsynchronouslyFor:!
+2437806!
+private!
+1ExternalData:Boolean! !
+commandMsg:hwnd:wParam:lParam:!
+2457111!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+desiredYPos!
+2418446!
+private!
+1ExternalData! !
+extent!
+2409579!
+accessing!
+0Point! !
+moveFocusBack!
+2433379!
+private!
+1! !
+isAttached!
+2452393!
+VisualParent impl!
+0Boolean! !
+close!
+2448153!
+control!
+0! !
+session!
+2413098!
+accessing!
+0Session! !
+#classVariableString!
+DefaultWndProc <ExternalProxy>
+WindowsMessageHandlers  <VarDict[ ExternalData,
+																 [Window, ExternalData, HWND, ExternalData, ExternalData, ^ExternalData] ]>
+			"Dictionary mapping message codes to dispatch blocks"
+BufferingPossible <Boolean>
+			"If false, then all double buffering is disabled"
+		! !
+moveFocusForward!
+2433572!
+private!
+1! !
+allocation!
+2408135!
+accessing!
+0Region! !
+trueClientAreaExtent!
+2438263!
+private!
+1Point! !
+prefsStatus!
+2471213!
+restricted-to session!
+0Int! !
+relayoutIfNeededForExtent:!
+2436324!
+private!
+1Point:! !
+wndProc!
+2444372!
+private!
+1APICallback! !
+initWindowsMessageHandlers!
+2424526!
+private!
+1! !
+deferredPaintRegion!
+2417911!
+private!
+1Rect! !
+trueClientAreaExtentFor:!
+2438441!
+private!
+1ExternalData:Point! !
+#comment!
+Native windows, with a fairly machine independent interface
+(except for methods with 'win32' in their names).
+
+Tags: %User %UI
+
+(c) 1995-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license.
+! !
+showTimes!
+2438067!
+private!
+1Boolean! !
+beforeQueuedMessage!
+2415272!
+private!
+1! !
+initialInputFocus:!
+2410127!
+accessing!
+0Visual:! !
+isActive!
+2472573!
+testing!
+0Boolean! !
+nextPaintTime!
+2433923!
+private!
+1Float! !
+windowSizeWithoutCaptionForClientAreaSize:!
+2440127!
+private!
+1Point:Point! !
+initMenuPopupMsg:hwnd:wParam:lParam:!
+2459634!
+restricted-win32 queued message handling!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+message:!
+2444685!
+restricted-win32!
+0MSG:! !
+useDisplayBuffering!
+2413748!
+accessing!
+0Boolean! !
+showModal!
+2450310!
+control!
+0! !
+hasWin32Handle!
+2409980!
+accessing!
+0Boolean! !
+#abstract!
+false! !
+scratchRECT!
+2436581!
+private!
+1RECT! !
+min!
+2410892!
+accessing!
+0Rect! !
+popUpMenuIfAbsent:!
+2452846!
+VisualParent impl!
+2[^X def]:Menu|X! !
+paintOccuring!
+2434481!
+private!
+1! !
+max!
+2410281!
+accessing!
+0Rect! !
+hasSession!
+2409841!
+accessing!
+0Session! !
+paintPending!
+2471999!
+private-testing!
+1Boolean! !
+palette!
+2412049!
+accessing!
+0Palette! !
+refreshInterval!
+2412708!
+accessing!
+0Float! !
+prerecordPrefsIfNeeded!
+2471360!
+restricted-to session!
+0! !
+haveErased!
+2424252!
+private!
+1Boolean! !
+#superclassTypeString!
+InstanceCritical |> Object! !
+registerControl:!
+2446625!
+restricted-win32!
+0Win32Control:! !
+medium!
+2410399!
+accessing!
+0Medium! !
+setNativeMenu!
+2413227!
+accessing!
+0! !
+optimizeIncrementalLayout!
+2411611!
+accessing!
+0Boolean! !
+defaultWndProc!
+2417746!
+private!
+1ExternalProxy! !
+activeMenu!
+2414952!
+private!
+1Menu! !
+#instanceVariableString!
+natural <Rect> min <Rect> max <Rect>
+			"These have to be cached for access so that the UI thread doesn't have to execute
+			  widget code"
+
+win32Handle <HWND>
+medium <Medium>
+session <Session>
+visual <Visual>
+parent <Window>
+			"If parent is non-nil, then this window is owned by another"
+backgroundPainter <Painter>
+
+desiredPosition <Point> "If nil, then use default position"
+extent <Point>
+
+scratchRECT <RECT>
+			"A temporary Win32 RECT structure used for invalidations.  This must be
+		     per window so we don't have to use critical regions to access it"
+
+mostRecentInputFocus <Visual>
+			"If not nil, points to the most recent input focus, so we can try to restore the
+				input focus to the right spot if the window is inactive and becomes active
+				again without a new focus being chosen.  We have to be careful not to
+				hold onto this too long, since it can cause a memory leak.  To that end,
+				frequent checks are made to see if it is attached; if it is not, this is purged"
+initialInputFocus <Visual>
+			"If not nil, points to a visual that should become the input focus once the window
+				is layed out. This is purged after use to prevent a memory leak."
+menu <Menu>
+			"If not nil, is the menu bar"
+popUpMenu <Menu>
+			"If not nil, then is a popup menu that is currently showing"
+optimizeIncrementalLayout <Boolean>
+ignoreNextFocusSet <Boolean>
+
+refreshInterval <Float>
+			"Time in seconds for the maximum time between refreshes."
+nextPaintTime <Float>
+			"If not nil, then if any paint is needed, it should occur
+				no later than this time"
+paintPending <Boolean>
+useDisplayBuffering <Boolean>
+			"If true, use double buffering for flicker free display"
+toClose <[Window]>
+			"This block is executed with the receiver when the user tries to close the window.  By default,
+				this just destroys the window quietly"
+enabled <Boolean>
+			"Indicates whether the window is enabled/disabled"
+cursor <Cursor>
+deferredPaintRegion <Rect>
+controls <Extensible[Win32Control]>
+palette <Palette>
+haveErased <Boolean>
+		! !
+removeParentsFrom:alreadyChecked:!
+2471780!
+restricted-to session!
+0Set[RelayoutTarget]:Set[RelayoutTarget]:! !
+buildWin32Handle!
+2416076!
+private!
+1! !
+parent!
+2412384!
+accessing!
+0Window! !
+#revision!
+$Revision: 1.13 $! !
+getPosition!
+2422872!
+private!
+1Point! !
+message:for:wParam:lParam:!
+2444992!
+restricted-win32!
+0ExternalData:HWND:ExternalData:ExternalData:ExternalData! !
+makeActive!
+2449298!
+control!
+0! !
+callDefWndProcFor:msgCode:wParam:lParam:!
+2416773!
+private!
+1HWND:ExternalData:ExternalData:ExternalData:ExternalData! !
+translateRect:toChild:!
+2454465!
+VisualParent impl!
+0Rect:Visual:Rect! !
+hasBackgroundPainter!
+2423799!
+private!
+1Boolean! !

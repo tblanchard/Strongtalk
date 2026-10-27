@@ -1,0 +1,184 @@
+
+"October 17, 2006 -> 14:36:48"!
+
+! (Delta mirrorFor: #DefinitionWriter) methodsFor: 'Unclassified' !
+fileOutBodyOn: stream <WriteStream> ^ <Int>
+
+	| pos <Int> sortedCategories <Cltn[Str]> |
+	pos := stream position.
+	sortedCategories := self mirror sourceInfo categories asSortedCollection: 
+			[ :s <Str> :s2 <Str> | s  <= s2  ]
+	 do: [ :cat <Str> | 
+		self fileOutCategory: cat on: stream ].
+	^pos! !
+
+"October 17, 2006 -> 14:37:7"!
+
+! (Delta mirrorFor: #DefinitionWriter) methodsFor: 'Unclassified' !
+fileOutBodyOn: stream <WriteStream> ^ <Int>
+
+	| pos <Int> sortedCategories <Cltn[Str]> |
+	pos := stream position.
+	sortedCategories := self mirror sourceInfo categories asSortedCollection: 
+			[ :s <Str> :s2 <Str> | s  <= s2  ].
+	sortedCategories do: [ :cat <Str> | 
+		self fileOutCategory: cat on: stream ].
+	^pos! !
+
+"October 17, 2006 -> 14:40:57"!
+
+"System saved" !
+"October 26, 2026 -> 12:6:59"!
+
+! (Delta mirrorFor: #SmallInteger) methodsFor: 'private' !
+digitsForAbs: v <Int> ^<Int>
+	"The number of decimal digits of v (>= 0). SmallIntegers have up to 19 digits on 64-bit
+	 (the 32-bit version stopped at 10)."
+
+	| n <Int> p <Int> |
+	n := 1.
+	p := 10.
+	[ n < 19 and: [ v >= p ] ] whileTrue: [ n := n + 1. p := p * 10 ].
+	^n! !
+
+"October 26, 2026 -> 12:6:59"!
+
+! (Delta mirrorFor: #DeltaRewriter) methodsFor: 'Unclassified' !
+normalSendNode: node
+	| recv msg sel arg1 arg2 arg3 |
+	self assert: [ node isNormalSendNode ].
+	recv := self rewrite: node recv.
+
+	recv isFloatValue ifTrue: [
+		result := self rewrite: node asFloatOperationOn: recv.
+		result notNil ifTrue: [ ^ self ].
+		"no FloatValue operation found"
+		AutoFloatConversion
+			ifTrue: [ recv := DeltaFloatUnaryOpToOop new f: #asFloat x: recv ]
+			ifFalse: [ self at: node error: 'not a supported FloatValue operation' ]
+	].
+
+	"Prepare arguments for normal message sends"
+	msg := self rewriteAsOop: node msg.
+	sel := msg selector.
+	msg nofArgs >= 1 ifTrue: [ arg1 := msg args at: 1 ].
+	msg nofArgs >= 2 ifTrue: [ arg2 := msg args at: 2 ].
+	msg nofArgs >= 3 ifTrue: [ arg3 := msg args at: 3 ].
+
+	"Self & Super sends"
+	(sel ~= #== and: [ sel ~= #~~ ]) ifTrue: [
+		(recv isRefNode and: [ recv decl isReceiverNode ])	ifTrue: [ result := DeltaSelfSend new send: msg.						^ self ]
+	].
+	(recv isRefNode and: [ recv decl isSuperVarNode ])		ifTrue: [ result := DeltaSuperSend new send: msg.					^ self ].
+
+	"Hardwired asFloatValue message"
+	sel = #asFloatValue ifTrue: [
+		result :=
+			EnableFloatValues
+				ifTrue: [ DeltaFloatify new obj: recv ]
+				ifFalse: [ recv "simply ignore conversion" ].
+		^ self
+	].
+
+	"Hardwired ifTrue: / ifFalse: messages"
+	self if: [ sel = #ifTrue:				] with: arg1 nofArgs: 0	do: [ result := DeltaIf new if: recv is: true then: arg1.						^ self ].
+	self if: [ sel = #ifFalse:			] with: arg1 nofArgs: 0	do: [ result := DeltaIf new if: recv is: false then: arg1.					^ self ].
+	self if: [ sel = #ifTrue:ifFalse:	] with: arg1 and: arg2	do: [ result := DeltaIf new if: recv is: true then: arg1 else: arg2.	^ self ].
+	self if: [ sel = #ifFalse:ifTrue:	] with: arg1 and: arg2	do: [ result := DeltaIf new if: recv is: false then: arg1 else: arg2.	^ self ].
+
+	"Hardwired and: / or: messages"
+	self if: [ sel = #and:					] with: arg1 nofArgs: 0	do: [ result := DeltaAndOr new if: recv and: arg1.							^ self ].
+	self if: [ sel = #or:					] with: arg1 nofArgs: 0	do: [ result := DeltaAndOr new if: recv or: arg1.								^ self ].
+
+	"Hardwired whileTrue: / whileFalse: messages"
+	self if: [ sel = #whileTrue			] with: recv nofArgs: 0	do: [ result := DeltaLoop new while: true do: recv.							^ self ].
+	self if: [ sel = #whileFalse		] with: recv nofArgs: 0	do: [ result := DeltaLoop new while: false do: recv.						^ self ].
+	self if: [ sel = #whileTrue:		] with: recv and: arg1	do: [ result := DeltaLoop new while: recv is: true do: arg1.			^ self ].
+	self if: [ sel = #whileFalse:		] with: recv and: arg1	do: [ result := DeltaLoop new while: recv is: false do: arg1.			^ self ].
+
+	"Hardwired repeat: / timesRepeat: / to:do: / to:by:do: messages"
+	self if: [ sel = #repeat				] with: recv nofArgs: 0	do: [ result := DeltaLoop new repeat: recv.										^ self ].
+	self if: [ sel = #timesRepeat:	] with: arg1 nofArgs: 0	do: [ result := DeltaLoop new do: recv timesRepeat: arg1.			^ self ].
+	self if: [ sel = #to:do:				] with: arg2 nofArgs: 1	do: [ result := DeltaLoop new from: recv to: arg1 do: arg2.			^ self ].
+	"inline only if step is a constant (64-bit VM patch: tested in the condition - the action runs
+	 after the block's scope has been marked inlined, so a variable step left a send with an inlined block)"
+	self if: [ sel = #to:by:do: and: [ arg2 isIntNode ] ] with: arg3 nofArgs: 1 do: [
+		result := DeltaLoop new from: recv to: arg1 by: arg2 do: arg3.
+		^ self
+	].
+
+	"Hardwired value message"
+"
+	self if: [ sel = #value				] with: recv nofArgs: 0 do: [ result := DeltaInlinedBlock new block: recv.							^ self ].
+"
+
+	"No rewriting"
+	result := DeltaNormalSend new to: recv send: msg! !
+
+"October 26, 2026 -> 12:6:59"!
+
+! (Delta mirrorFor: #TypedCodeView) methodsFor: 'control' !
+showType
+
+	| 
+		mirror <Mirror>   selection <Tuple[Int, Int]> node <ASTNode> parseTree <ParseTree> 
+		position <Tuple[Int, Int]>   otype <ObjectType> eh <TypeErrorHandler>
+	|
+	
+	mirror := self codeManager mirror.
+	selection := self linearSelection.
+	selection at1 = 0 ifTrue: [^self].
+	parseTree := DeltaParser new parseMethod: self modelString within: mirror scope ifError: [ :msg :pos | self showParseError: msg at: pos in: self. ^ self].
+	node := parseTree nodeForPosition: selection.
+	position := parseTree positionForNode: node.	
+	self  sourceSelection: position.
+	eh := Type doChecks: [otype := mirror typeForNode: node inMethod: parseTree body].					
+	eh reportedErrors isEmpty
+		ifTrue:[
+						self visual promptOk:  'Type of selection is ', otype name asString printString
+											title: 'Showing type in ', self codeManager locator name
+											type: #info
+											action: [].
+					] 
+		ifFalse: [
+                         otype isError  ifTrue:[
+                         											self reportShowTypeResult: 'Selection has erroneous type. Browse type errors?'
+                         													errors: eh reportedErrors
+                         										]
+                                                     ifFalse:[
+                                                     				self reportShowTypeResult:  'Type of selection is ' ,
+                                                                                otype name asString printString, '; however the expression includes type errors. Browse type errors?'
+                                                                            errors: eh reportedErrors
+                                                                   ].
+                          ].
+! !
+
+"October 26, 2026 -> 12:6:59"!
+
+! (Delta mirrorFor: #Window) methodsFor: 'control' !
+release
+
+
+	self session unregisterWindow: self.
+
+	visual notNil
+		ifTrue: [	visual detaching; release.
+						visual := nil.	].
+
+	"freed after the visual is released: detaching views still invalidate (the image
+	  wrote into the freed RECT; on macOS a freed proxy is NULL)"
+	scratchRECT free.
+
+	win32Handle := nil.
+
+	self hasMenu
+		ifTrue: [ self menu release ].
+	mostRecentInputFocus := nil.
+	menu := nil.
+	popUpMenu := nil.
+	toClose := nil.
+	controls := nil.! !
+
+"October 26, 2026 -> 12:7:1"!
+
+"System saved" !

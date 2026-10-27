@@ -1,0 +1,41 @@
+Class
+defaultWin32Cursor!
+2405759!
+restricted-win32 functions!
+0ExternalProxy! !
+defaultWin32Icon!
+2405989!
+restricted-win32 functions!
+0ExternalProxy! !
+#categories!
+restricted-win32 functions!
+custom messages!
+debugging! !
+wndProcOf:put:!
+2407000!
+restricted-win32 functions!
+0HWND:HWND:HWND! !
+bufferingPossible!
+2407650!
+debugging!
+0Boolean! !
+bufferingPossible:!
+2407877!
+debugging!
+0Boolean:! !
+wndProcOf:!
+2406772!
+restricted-win32 functions!
+0HWND:HWND! !
+defaultWndProc!
+2406221!
+restricted-win32 functions!
+0ExternalProxy! !
+parentOf:!
+2406574!
+restricted-win32 functions!
+0HWND:HWND! !
+LAYOUT!
+2407258!
+custom messages!
+0ExternalData! !

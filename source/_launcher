@@ -1,0 +1,221 @@
+Class
+#subtype!
+true! !
+#categories!
+private!
+restricted!
+menus!
+private-initialization!
+control!
+menus to move elsewhere!
+filing in/out!
+browsing!
+accessing!
+toolbar!
+control-private!
+notification! !
+windowTitle!
+2085087!
+accessing!
+0Str! !
+launchListDialogWithPainter:title:contents:multi:action:!
+5915260!
+browsing!
+0Painter:Str:SeqCltn[Str]:Boolean:[Cltn[Int]]:! !
+typecheckWorld!
+2073402!
+control!
+0! !
+#group!
+ui! !
+launchReferencesToGlobalName:!
+2080762!
+browsing!
+0Symbol:! !
+openUserClassHierarchyOutliner!
+7629430!
+browsing!
+0! !
+launchDoc!
+7866330!
+browsing!
+0! !
+#extensionsAreSubtypes!
+true! !
+openProtocolListOutliner!
+2084567!
+browsing!
+0! !
+hasToolBar!
+2085387!
+toolbar!
+0Boolean! !
+hasMenu!
+2071503!
+menus!
+0Boolean! !
+launchSendersMatching:!
+2082549!
+browsing!
+0Str:! !
+launchDefinitionsMatching:!
+5917834!
+browsing!
+0Str:! !
+promptForQuit:!
+5875446!
+control-private!
+1[]:! !
+findSenders!
+2077415!
+browsing!
+0! !
+findDefinition!
+2076429!
+browsing!
+0! !
+menuBar:!
+2070132!
+restricted!
+0Menu:! !
+launchImplementorsMatching:!
+2079229!
+browsing!
+0Str:! !
+startPagePath!
+2084897!
+browsing!
+0FilePath! !
+openMixinListOutliner!
+2084409!
+browsing!
+0! !
+recompileWorld!
+2072559!
+control!
+0! !
+#branded!
+true! !
+launchSingleLineTextDialogWithPainter:title:caption:default:action:!
+6001185!
+browsing!
+0Painter:Str:Str:Str:[Str]:! !
+docPath!
+7865489!
+accessing!
+0FilePath! !
+findImplementors!
+2077086!
+browsing!
+0! !
+#superclassTypeString!
+ClassCritical |> Application! !
+launchSelectorListWithPainter:title:contents:!
+5879561!
+browsing!
+0Painter:Str:SeqCltn[Tuple[Mirror,Symbol]]:! !
+openGlobalVariableListOutliner!
+2084233!
+browsing!
+0! !
+visualAllocated!
+6476021!
+notification!
+0! !
+fileOutWorld!
+2075556!
+filing in/out!
+0! !
+#revision!
+$Revision: 1.7 $! !
+saveSystem!
+2072915!
+control!
+0! !
+openTypeAliasListOutliner!
+2084731!
+browsing!
+0! !
+openClassHierarchyOutliner!
+7629648!
+browsing!
+0! !
+promptForSave:!
+6476743!
+control-private!
+1[]:! !
+#instanceVariableString!
+menuBar <Menu>
+sourceConsistencyHasBeenChecked <Boolean>
+! !
+initialize!
+5942993!
+private-initialization!
+1! !
+closeRequest:!
+5875185!
+control!
+0[]:! !
+browsingMenu!
+7629854!
+menus to move elsewhere!
+0Menu! !
+fileIn!
+2075057!
+filing in/out!
+0! !
+findGlobalReferences!
+2076752!
+browsing!
+0! !
+buildBareVisualTop:!
+5935020!
+private!
+1Boolean:Visual! !
+showUnsavedChanges!
+6469753!
+browsing!
+0! !
+#classVariableString!
+MenuRegistry <OrdCltn[LookupKey[Object,Menu]]>
+Launchers <IdentitySet[Launcher]>
+	"All unclosed instances of launcher, so that we
+		can notify them when their menus change"! !
+workspace!
+2085233!
+accessing!
+0Workspace! !
+#comment!
+The launcher is the entry point application for the programming environment.
+(c) 1996-1997 Sun Microsystems, Inc. ALL RIGHTS RESERVED. 
+Use and distribution of this software is subject to the terms of the attached source license. ! !
+#abstract!
+false! !
+browseStartPage!
+2076041!
+browsing!
+0! !
+launchListDialogWithPainter:title:modal:contents:multi:action:!
+5914273!
+browsing!
+0Painter:Str:Boolean:SeqCltn[Str]:Boolean:[Cltn[Int]]:! !
+toolBar!
+7866499!
+toolbar!
+0ToolBar! !
+fileMenu!
+7917522!
+menus!
+0Menu! !
+menuBar!
+7865990!
+menus!
+0Menu! !
+docMenu!
+7869058!
+menus!
+0Menu! !
+doClose:!
+5874792!
+control-private!
+1[]:! !

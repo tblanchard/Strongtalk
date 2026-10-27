@@ -1,0 +1,65 @@
+Class
+dispatchMsgFor:msg:wParam:lParam:!
+3917268!
+private!
+1ExternalProxy:SmallInteger:ExternalData:ExternalData:ExternalData! !
+#categories!
+private!
+restricted!
+testing! !
+unregisterControl:!
+3920356!
+restricted!
+0Int:! !
+measureItemMsg:for:!
+3919610!
+restricted!
+0MEASUREITEMSTRUCT:Int:ExternalData! !
+notificationMsg:for:!
+3919871!
+restricted!
+0ExternalData:Int:! !
+controlForHandle:ifAbsent:!
+3916707!
+private!
+3ExternalProxy:[^X def]:Win32Control|X! !
+controlIdFor:!
+3918521!
+restricted!
+0HWND:Int! !
+debugNotifications!
+3920715!
+testing!
+0Boolean! !
+customWndProc!
+3918763!
+restricted!
+0APICallback! !
+drawItemMsg:for:!
+3919358!
+restricted!
+0DRAWITEMSTRUCT:Int:ExternalData! !
+controlFor:ifAbsent:!
+3918274!
+restricted!
+2Int:[^X def]:Win32Control|X! !
+registerControl:for:!
+3920124!
+restricted!
+0Int:Win32Control:! !
+assignId!
+3917632!
+restricted!
+0Int! !
+debugEvents!
+3920555!
+testing!
+0Boolean! !
+controls!
+3916961!
+private!
+1VarDict[Int,Win32Control]! !
+buttonColorMsg:for:!
+3918018!
+restricted!
+0ExternalProxy:Int:ExternalData! !
