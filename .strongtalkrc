@@ -1,5 +1,6 @@
 #---------------- general
--UseRecompilation
+-UseRecompilation 
+-UseArm64Compiler
 #---------------- inlining db
 -UseInliningDatabase
 -UseInliningDatabaseEagerly
@@ -9,4 +10,4 @@
 OldSize=1000
 CodeSize=6000
 #---------------- compilation heuristics
-InvocationCounterLimit=10000
+InvocationCounterLimit=1000
